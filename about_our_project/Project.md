@@ -8,7 +8,7 @@
 |---|---|
 | Repository | `ft_transcendence` — 42 final Common Core project |
 | Product | **e-facture** |
-| Team | Salma, Fedor, Ana, Isabella, Yannis (5) |
+| Team | Salma, Fedor, Ana, Yanis, Isabella (5) |
 | Duration | 6 weeks |
 | Subject version | ft_transcendence v21.2 |
 | Target score | 14 mandatory + 5 bonus |
@@ -78,7 +78,7 @@ Violating any of these gets the project **rejected**, not just marked down.
 - User management: sign-up and log-in with **hashed and salted passwords**.
 - **All form input validated on both frontend and backend.**
 - **HTTPS** for every connection reaching the backend from outside.
-- **README in English** with all required sections (see §17).
+- **README in English** with all required sections (see §16).
 
 ---
 
@@ -326,12 +326,6 @@ to human-readable French diagnostics with actual/expected value substitution, an
 verified by mutation testing. It is the substantive engineering contribution of the
 project and is not available off the shelf in this form.
 
-### Explicitly NOT taken: *Standard user management* (Major, 2)
-
-It requires a friends system and online status. In a B2B tool for accountants that is
-absurd, and the evaluators will ask why it exists. We take *Organisation system* and
-*Advanced permissions* instead — same category, more points, coherent with the product.
-
 ---
 
 ## 9. Module plan — 5 bonus
@@ -345,8 +339,6 @@ These can be dropped without breaking anything. Build in this order.
 | Export / import | Minor | 1 | Low | |
 | GDPR compliance | Minor | 1 | Low | |
 | | | **5** | | |
-
-**Reserve, only if week 5 finishes early:** 2FA (Minor, 1).
 
 Bonus is capped at 5 points by the subject. Anything beyond **19 total** is wasted
 effort. Do not overbuild.
@@ -403,9 +395,8 @@ Baseline -> Features -> Tasks -> Branch -> Pull Request -> green CI -> main
 
 - **We do not split by technology.** A feature crosses frontend, backend and
   database, and one person carries it end to end. Nobody "owns" Java or Python.
-- **Référent, not owner.** For deep domain areas one person digs first and then
-  teaches the others. Knowledge must not stay in one head — the evaluation asks
-  *anyone* about *any* part.
+- Knowledge must not stay in one head — the evaluation asks *anyone* about
+  *any* part of the project.
 - Every change goes through a PR reviewed by at least one other member.
 - `main` stays green and deployable at all times.
 - Short PRs. A three-day branch is a merge conflict waiting to happen.
@@ -414,19 +405,19 @@ Baseline -> Features -> Tasks -> Branch -> Pull Request -> green CI -> main
 
 ## 12. Roles
 
-| Member | Role | Main feature blocks |
+| Member | Role | Expected main feature blocks |
 |---|---|---|
-| **Fedor** | Product Owner | Factur-X spike, rule catalogue, readable report (F08, F09) |
-| **Ana** | Project Manager | Organisations, invitations, roles, permissions (F02, F03, F04) |
-| **Salma** | Technical Lead | Baseline, Docker, CI, OpenAPI contract, validation layers (F00, F08) |
-| **Isabella** | Developer | Auth, legal pages, upload, GDPR (F01, F05, F06, F21) |
-| **Yannis** | Developer | Extraction, generation, public API, export (F11, F12, F13, F17) |
+| **Salma** | Project Manager | Baseline, Docker, CI, OpenAPI contract, validation layers (F00, F08) |
+| **Fedor** | Architect | Factur-X spike, rule catalogue, readable report (F08, F09) |
+| **Ana** | Developer | Organisations, invitations, roles, permissions (F02, F03, F04) |
+| **Yanis** | Developer | Extraction, generation, public API, export (F11, F12, F13, F17) |
+| **Isabella** | *To be defined* — Developer / Technical Lead / Architect / Project Manager | Auth, legal pages, upload, GDPR (F01, F05, F06, F21) |
 
 Roles are hats worn **on top of** development. Every member writes code and defends
 it. A PM who only plans will fail the evaluation.
 
-Référents: **Fedor** on Factur-X rules and diagnostics, **Yannis** on extraction
-and generation.
+Feature blocks are **expected**, not fixed assignments — they will be adjusted as the
+backlog is worked through.
 
 ---
 
@@ -527,25 +518,7 @@ asked about in interviews.
 
 ---
 
-## 17. AI usage policy
-
-The subject requires an honest description in the README of where AI was used, for
-which tasks and which parts of the project. It also warns that during evaluation any
-member can be asked to explain any piece of code and to make a small live
-modification.
-
-Practical rule:
-
-- **Fine:** scaffolding, boilerplate, UI mockups, test fixtures, documentation drafts,
-  explaining a library's API.
-- **Not fine:** generating the conformity engine or the rule catalogue. That is the
-  core we will be defending. Write it, understand it, be able to change it live.
-- Anything AI-generated that stays in the repo must be understood by the person who
-  merged it. If you cannot explain it in review, it does not merge.
-
----
-
-## 18. Definition of done for the whole project
+## 17. Definition of done for the whole project
 
 - [ ] `docker compose up --build` brings up the full stack
 - [ ] CI green on `main`, blocking merges when red
