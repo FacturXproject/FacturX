@@ -4,12 +4,20 @@ from datetime import datetime
 import time
 import sqlite3
 import os
+from pathlib import Path
 
 start_time = time.time()
-DB_PATH = os.environ.get('DB_PATH', '/app/database/app.db')
+# Resolve database path from environment or default to repository/database/app.db
+BASE_DIR = Path(__file__).resolve().parent
+DEFAULT_DB = (BASE_DIR.parent / 'database' / 'app.db').resolve()
+DB_PATH = Path(os.environ.get('DB_PATH', str(DEFAULT_DB))).resolve()
 
 def get_users():
-    conn = sqlite3.connect(DB_PATH)
+    # If DB file does not exist, return empty list to avoid crashing in demos
+    if not DB_PATH.exists():
+        return []
+
+    conn = sqlite3.connect(str(DB_PATH))
     cursor = conn.cursor()
     cursor.execute('SELECT id, name, email, role FROM users')
     rows = cursor.fetchall()

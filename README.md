@@ -220,4 +220,35 @@ cd trans/database
 python3 init.py
 ```
 
+## Docker Compose (development)
+
+A docker-compose file is included to run the frontend and backend in separate containers. It mounts source directories so changes are visible without rebuilding images.
+
+Start services:
+
+```bash
+cd trans
+docker compose up --build
+```
+
+Services:
+- Frontend: http://localhost:5173
+- Backend: http://localhost:5000
+
+You can override the database file path by setting the DB_PATH environment variable for the backend container. Example (host path):
+
+```bash
+DB_PATH=/host/path/to/database/app.db docker compose up --build
+```
+
+## Continuous Integration (GitHub Actions)
+
+A basic CI workflow is provided at `.github/workflows/ci.yml`. It:
+- Installs and builds the frontend
+- Verifies backend Python syntax
+- Initializes the SQLite demo database
+- Verifies the database contains sample users
+
+The workflow runs on push and pull requests.
+
 **Last Updated**: 12 August 2026
