@@ -1,7 +1,12 @@
 import sqlite3
 import os
 
-db_path = '/home/lasmodis/42_project/trans/database/app.db'
+from pathlib import Path
+BASE_DIR = Path(__file__).resolve().parent
+DB_FILE = BASE_DIR / 'app.db'
+
+# Use repository-local database path (portable & CI-friendly)
+db_path = str(DB_FILE.resolve())
 
 # Remove old database if exists
 if os.path.exists(db_path):
