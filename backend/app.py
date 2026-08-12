@@ -9,7 +9,8 @@ from pathlib import Path
 start_time = time.time()
 # Resolve database path from environment or default to repository/database/app.db
 BASE_DIR = Path(__file__).resolve().parent
-DEFAULT_DB = (BASE_DIR.parent / 'database' / 'app.db').resolve()
+# Default to /app/database/app.db (the docker-compose mounts ./database -> /app/database)
+DEFAULT_DB = (BASE_DIR / 'database' / 'app.db').resolve()
 DB_PATH = Path(os.environ.get('DB_PATH', str(DEFAULT_DB))).resolve()
 
 def get_users():
