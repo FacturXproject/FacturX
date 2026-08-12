@@ -9,6 +9,7 @@ import Success from './pages/Success';
 import XmlReader from './pages/XmlReader';
 import UploadPage from './pages/UploadPage';
 import HealthCheck from './pages/HealthCheck';
+import Users from './pages/Users';
 import Layout from './components/Layout';
 
 function ProtectedRoute({ loggedIn, children }) {
@@ -25,6 +26,8 @@ export default function App() {
         <Route path="/" element={<Login onLogin={() => setLoggedIn(true)} />} />
         
         <Route path="/healthcheck" element={<HealthCheck />} />
+        
+        <Route path="/users" element={<Users />} />
 
         <Route path="/dashboard" element={
           <ProtectedRoute loggedIn={loggedIn}>

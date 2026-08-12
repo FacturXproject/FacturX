@@ -2,8 +2,23 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
 from datetime import datetime
 import time
+import sqlite3
 
 start_time = time.time()
+DB_PATH = '/home/lasmodis/42_project/trans/database/app.db'
+
+def get_users():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, name, email, role FROM users')
+    rows = cursor.fetchall()
+    conn.close()
+    
+    users = [
+        {"id": row[0], "name": row[1], "email": row[2], "role": row[3]}
+        for row in rows
+    ]
+    return users
 
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -19,6 +34,9 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
                 "timestamp": datetime.utcnow().isoformat() + "Z",
                 "uptime": time.time() - start_time
             }
+            self.wfile.write(json.dumps(response).encode())
+        elif self.path == '/users':
+            response = {"users": get_users()}
             self.wfile.write(json.dumps(response).encode())
         elif self.path == '/':
             response = {"message": "FacturX Backend API"}
