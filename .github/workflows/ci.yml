@@ -4,8 +4,12 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
-  build:
+  build-and-smoke-test:
     runs-on: ubuntu-latest
 
     steps:
@@ -19,13 +23,11 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: |
-          npm ci
+        run: npm ci
 
       - name: Build frontend
         working-directory: frontend
-        run: |
-          npm run build
+        run: npm run build
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -33,12 +35,10 @@ jobs:
           python-version: '3.12'
 
       - name: Verify backend syntax
-        run: |
-          python -m py_compile backend/app.py
+        run: python -m py_compile backend/app.py
 
       - name: Initialize SQLite database
-        run: |
-          python3 database/init.py
+        run: python3 database/init.py
 
       - name: Verify database contains users
         run: |
@@ -53,3 +53,44 @@ if cnt < 1:
     raise SystemExit('No users found in database')
 conn.close()
 PY
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          tags: trans-backend:ci
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: false
+          tags: trans-frontend:ci
+
+      - name: Start services with docker compose
+        run: |
+          docker compose -f docker-compose.yml up -d --build
+
+      - name: Wait for backend
+        run: |
+          for i in $(seq 1 20); do
+            if curl -sS http://localhost:5000/healthcheck >/dev/null 2>&1; then
+              echo "backend reachable"; exit 0
+            fi
+            echo "waiting..."; sleep 2
+          done
+          exit 1
+
+      - name: Verify /users endpoint
+        run: |
+          curl -sS http://localhost:5000/users | python3 -c "import sys, json; print('ok' if json.load(sys.stdin).get('users') else 'no-users')"
+
+      - name: Tear down compose
+        if: always()
+        run: docker compose -f docker-compose.yml down --volumes --remove-orphans
