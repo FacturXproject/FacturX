@@ -1,8 +1,6 @@
 name: CI
 
-on:
-  push:
-  pull_request:
+on: [push, pull_request]
 
 permissions:
   contents: read
@@ -46,7 +44,7 @@ jobs:
 import sqlite3
 conn = sqlite3.connect('database/app.db')
 cur = conn.cursor()
-cur.execute("SELECT count(*) FROM users")
+cur.execute('SELECT count(*) FROM users')
 cnt = cur.fetchone()[0]
 print('users_count=', cnt)
 if cnt < 1:
@@ -89,7 +87,7 @@ PY
 
       - name: Verify /users endpoint
         run: |
-          curl -sS http://localhost:5000/users | python3 -c "import sys, json; print('ok' if json.load(sys.stdin).get('users') else 'no-users')"
+          curl -sS http://localhost:5000/users | python3 -c "import sys, json; j=json.load(sys.stdin); sys.exit(0 if j.get('users') else 2)"
 
       - name: Tear down compose
         if: always()
