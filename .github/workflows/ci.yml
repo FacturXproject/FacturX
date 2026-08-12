@@ -72,9 +72,10 @@ jobs:
           done
           exit 1
 
-      - name: Verify /users endpoint
+      - name: Verify /users endpoint (from backend container)
         run: |
-          curl -sS http://localhost:5000/users | python3 -c "import sys, json; j=json.load(sys.stdin); sys.exit(0 if j.get('users') else 2)"
+          docker compose -f docker-compose.yml exec -T backend \
+            sh -c "curl -sS http://localhost:5000/users" | python3 -c 'import sys, json; j=json.load(sys.stdin); sys.exit(0 if j.get("users") else 2)'
 
       - name: Tear down compose
         if: always()
