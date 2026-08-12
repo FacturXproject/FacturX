@@ -220,13 +220,4 @@ cd trans/database
 python3 init.py
 ```
 
-## Next Steps
-
-- Add more database tables for invoices, verification reports, etc.
-- Implement user authentication
-- Add more backend endpoints for invoice processing
-- Expand frontend with additional pages and components
-
----
-
 **Last Updated**: 12 August 2026
