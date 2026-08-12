@@ -41,16 +41,16 @@ jobs:
       - name: Verify database contains users
         run: |
           python3 - <<'PY'
-import sqlite3
-conn = sqlite3.connect('database/app.db')
-cur = conn.cursor()
-cur.execute('SELECT count(*) FROM users')
-cnt = cur.fetchone()[0]
-print('users_count=', cnt)
-if cnt < 1:
-    raise SystemExit('No users found in database')
-conn.close()
-PY
+            import sqlite3
+            conn = sqlite3.connect('database/app.db')
+            cur = conn.cursor()
+            cur.execute('SELECT count(*) FROM users')
+            cnt = cur.fetchone()[0]
+            print('users_count=', cnt)
+            if cnt < 1:
+                raise SystemExit('No users found in database')
+            conn.close()
+          PY
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
