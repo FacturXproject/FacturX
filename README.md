@@ -1,6 +1,6 @@
 # FacturX App - Local Setup Guide
 
-This guide explains how to run the FacturX application locally with the frontend, backend, and database all connected.
+This guide explains how to run the FacturX application locally with the frontend, backend, and database all connected
 
 ## Project Structure
 
