@@ -1,4 +1,9 @@
 
+Roles:
+
+
+
+
 
 Salma - Project Manager (PM)
 
@@ -8,5 +13,5 @@ Fedor - Architect
 
 Yanis - Developers
 
-Isabella - Developers or Technical Lead or Architect or Project Manager
+Isabella - Developers 
 
