@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  # Frontend - React + Vite
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: facturx-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    environment:
+      - VITE_API_URL=http://localhost:5000
+    depends_on:
+      - backend
+    networks:
+      - facturx-network
+
+  # Backend - Python HTTP Server
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: facturx-backend
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app
+      - ./database:/app/database
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - facturx-network
+
+networks:
+  facturx-network:
+    driver: bridge
