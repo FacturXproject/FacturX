@@ -17,3 +17,23 @@ jobs:
 
       - name: Build Docker images
         run: docker compose build
+      
+      - name: Test backend healthcheck
+        run: |
+          for i in {1..20}; do
+            if curl --fail http://localhost:8080/api/healthcheck; then
+              echo "Backend healthcheck passed"
+              exit 0
+            fi
+
+            echo "Backend not ready yet..."
+            sleep 3
+          done
+
+          echo "Backend healthcheck failed"
+          docker compose logs backend
+          exit 1
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down
