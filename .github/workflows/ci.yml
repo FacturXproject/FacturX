@@ -18,6 +18,9 @@ jobs:
       - name: Build Docker images
         run: docker compose build
       
+      - name: Start containers
+        run: docker compose up -d
+        
       - name: show backend logs 
         run: docker compose logs backend
       - name: Test backend healthcheck
