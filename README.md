@@ -1,7 +1,6 @@
 # FacturX App
 
 FacturX is a full-stack web application built with a React frontend, a Spring Boot backend, and PostgreSQL.
-
 ## Tech Stack
 
 ### Frontend
