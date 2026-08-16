@@ -342,7 +342,7 @@ Both `AuthService` and `UserService` can use the same `UserRepository`.
 
 You need:
 
-- Java 17+
+- Java 17
 - PostgreSQL
 
 Check Java:
