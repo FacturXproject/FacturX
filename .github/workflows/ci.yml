@@ -1,97 +1,44 @@
 name: CI
 
-on: [push, pull_request]
-
-permissions:
-  contents: read
-  packages: write
+on:
+  push:
+  pull_request:
 
 jobs:
-  build-and-smoke-test:
+  docker-build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v6
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+      - name: Validate Docker Compose
+        run: docker compose config -q
 
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: Build frontend
-        working-directory: frontend
-        run: npm run build
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.12'
-
-      - name: Verify backend syntax
-        run: python -m py_compile backend/app.py
-
-      - name: Initialize SQLite database
-        run: python3 database/init.py
-
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build backend image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile
-          push: false
-          tags: trans-backend:ci
-
-      - name: Build frontend image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./frontend
-          file: ./frontend/Dockerfile
-          push: false
-          tags: trans-frontend:ci
-
-      - name: Start services with docker compose
+      - name: Build Docker images
+        run: docker compose build
+      
+      - name: Start containers
+        run: docker compose up -d
+        
+      - name: show backend logs 
+        run: docker compose logs backend
+      - name: Test backend healthcheck
         run: |
-          docker compose -f docker-compose.yml up -d --build
-
-      - name: Wait for backend
-        run: |
-          for i in $(seq 1 20); do
-            if curl -sS http://localhost:5000/healthcheck >/dev/null 2>&1; then
-              echo "backend reachable"; exit 0
-            fi
-            echo "waiting..."; sleep 2
-          done
-          exit 1
-
-      - name: Verify /users endpoint (with retries, timeout 3m)
-        run: |
-          timeout=180
-          interval=3
-          elapsed=0
-          while [ $elapsed -lt $timeout ]; do
-            echo "Attempting to verify /users (elapsed: ${elapsed}s)..."
-            if docker compose -f docker-compose.yml exec -T backend \
-              python3 -c 'import urllib.request, json, sys; resp=urllib.request.urlopen("http://localhost:5000/users"); data=json.load(resp); sys.exit(0 if data.get("users") else 2)'; then
-              echo "✓ /users endpoint verified"
+          for i in {1..20}; do
+            if curl --fail http://localhost:8080/api/healthcheck; then
+              echo "Backend healthcheck passed"
               exit 0
             fi
-            sleep $interval
-            elapsed=$((elapsed + interval))
+
+            echo "Backend not ready yet..."
+            sleep 3
           done
-          echo "✗ Timeout waiting for /users endpoint after ${timeout}s" >&2
-          docker compose -f docker-compose.yml ps || true
-          docker compose -f docker-compose.yml logs backend --no-color --tail 200 || true
+
+          echo "Backend healthcheck failed"
+          docker compose logs backend
           exit 1
 
-      - name: Tear down compose
+      - name: Stop containers
         if: always()
-        run: docker compose -f docker-compose.yml down --volumes --remove-orphans
+        run: docker compose down

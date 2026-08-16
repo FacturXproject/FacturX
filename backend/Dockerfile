@@ -1,12 +1,20 @@
-FROM python:3.12-alpine
+# ---------- Build ----------
+FROM eclipse-temurin:17-jdk AS builder
 
 WORKDIR /app
 
-# Copy backend code
 COPY . .
 
-# Expose port
-EXPOSE 5000
+RUN ./mvnw clean package -DskipTests
 
-# Start server (accessible from outside container)
-CMD ["python3", "app.py"]
+
+# ---------- Runtime ----------
+FROM eclipse-temurin:17-jre
+
+WORKDIR /app
+
+COPY --from=builder /app/target/*.jar app.jar
+
+EXPOSE 8080
+
+ENTRYPOINT ["java", "-jar", "app.jar"]
