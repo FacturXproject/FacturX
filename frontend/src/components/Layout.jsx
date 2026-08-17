@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, CheckCircle, RefreshCw, FileCode2, LogOut, FileCheck } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Tableau de bord' },
@@ -8,12 +9,16 @@ const navItems = [
   { to: '/lecture-xml', icon: FileCode2, label: 'Lecture XML' },
 ];
 
-export default function Layout({ children, onLogout }) {
+export default function Layout({ children }) {
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
-  const handleLogout = () => {
-    if (onLogout) onLogout();
-    navigate('/');
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      navigate('/login');
+    }
   };
 
   return (

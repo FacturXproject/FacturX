@@ -1,6 +1,8 @@
-import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
+import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Processing from './pages/Processing';
 import ComplianceReport from './pages/ComplianceReport';
@@ -12,89 +14,38 @@ import HealthCheck from './pages/HealthCheck';
 import Users from './pages/Users';
 import Layout from './components/Layout';
 
-function ProtectedRoute({ loggedIn, children }) {
-  if (!loggedIn) return <Navigate to="/" replace />;
-  return children;
+function Protected({ children }) {
+  return (
+    <ProtectedRoute>
+      <Layout>{children}</Layout>
+    </ProtectedRoute>
+  );
 }
 
 export default function App() {
-  const [loggedIn, setLoggedIn] = useState(false);
-
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Login onLogin={() => setLoggedIn(true)} />} />
-        
-        <Route path="/healthcheck" element={<HealthCheck />} />
-        
-        <Route path="/users" element={<Users />} />
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
 
-        <Route path="/dashboard" element={
-          <ProtectedRoute loggedIn={loggedIn}>
-            <Layout onLogout={() => setLoggedIn(false)}>
-              <Dashboard />
-            </Layout>
-          </ProtectedRoute>
-        } />
+          <Route path="/healthcheck" element={<HealthCheck />} />
+          <Route path="/users" element={<Users />} />
 
-        <Route path="/traitement" element={
-          <ProtectedRoute loggedIn={loggedIn}>
-            <Layout onLogout={() => setLoggedIn(false)}>
-              <Processing />
-            </Layout>
-          </ProtectedRoute>
-        } />
+          <Route path="/" element={<Protected><Dashboard /></Protected>} />
+          <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
+          <Route path="/traitement" element={<Protected><Processing /></Protected>} />
+          <Route path="/rapport" element={<Protected><ComplianceReport /></Protected>} />
+          <Route path="/conversion" element={<Protected><Conversion /></Protected>} />
+          <Route path="/succes" element={<Protected><Success /></Protected>} />
+          <Route path="/lecture-xml" element={<Protected><XmlReader /></Protected>} />
+          <Route path="/verifier" element={<Protected><UploadPage mode="verifier" /></Protected>} />
+          <Route path="/convertir" element={<Protected><UploadPage mode="convertir" /></Protected>} />
 
-        <Route path="/rapport" element={
-          <ProtectedRoute loggedIn={loggedIn}>
-            <Layout onLogout={() => setLoggedIn(false)}>
-              <ComplianceReport />
-            </Layout>
-          </ProtectedRoute>
-        } />
-
-        <Route path="/conversion" element={
-          <ProtectedRoute loggedIn={loggedIn}>
-            <Layout onLogout={() => setLoggedIn(false)}>
-              <Conversion />
-            </Layout>
-          </ProtectedRoute>
-        } />
-
-        <Route path="/succes" element={
-          <ProtectedRoute loggedIn={loggedIn}>
-            <Layout onLogout={() => setLoggedIn(false)}>
-              <Success />
-            </Layout>
-          </ProtectedRoute>
-        } />
-
-        <Route path="/lecture-xml" element={
-          <ProtectedRoute loggedIn={loggedIn}>
-            <Layout onLogout={() => setLoggedIn(false)}>
-              <XmlReader />
-            </Layout>
-          </ProtectedRoute>
-        } />
-
-        <Route path="/verifier" element={
-          <ProtectedRoute loggedIn={loggedIn}>
-            <Layout onLogout={() => setLoggedIn(false)}>
-              <UploadPage mode="verifier" />
-            </Layout>
-          </ProtectedRoute>
-        } />
-
-        <Route path="/convertir" element={
-          <ProtectedRoute loggedIn={loggedIn}>
-            <Layout onLogout={() => setLoggedIn(false)}>
-              <UploadPage mode="convertir" />
-            </Layout>
-          </ProtectedRoute>
-        } />
-
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
