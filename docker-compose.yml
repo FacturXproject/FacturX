@@ -1,39 +1,81 @@
-version: '3.8'
-
 services:
-  # Frontend - React + Vite
+
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+
     container_name: facturx-frontend
+
     ports:
       - "5173:5173"
+
     volumes:
       - ./frontend/src:/app/src
       - ./frontend/public:/app/public
+
     environment:
-      - VITE_API_URL=http://localhost:5000
+      - VITE_API_URL=http://localhost:8080
+
     depends_on:
       - backend
+
     networks:
       - facturx-network
 
-  # Backend - Python HTTP Server
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+
     container_name: facturx-backend
+
     ports:
-      - "5000:5000"
-    volumes:
-      - ./backend:/app
-      - ./database:/app/database
+      - "8080:8080"
+
     environment:
-      - PYTHONUNBUFFERED=1
+      - DB_HOST=postgres
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
     networks:
       - facturx-network
+
+
+  postgres:
+    image: postgres:17
+
+    container_name: facturx-postgres
+
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=facturx
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d facturx"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+    networks:
+      - facturx-network
+
+
+volumes:
+  postgres-data:
+
 
 networks:
   facturx-network:
