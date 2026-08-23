@@ -36,3 +36,13 @@ InvitationController → InvitationService → InvitationRepository → PostgreS
                    OrganizationRepository (to resolve orgId → Organization)
                             ↓
                    OrganizationMemberRepository (on accept, creates membership)
+                   ### Note: shared `Role` enum
+
+### Note: `organization/` contains multiple features
+
+`organization/` holds both F02 (Organizations, Yanis) and F03 (Invitations,
+Ana), grouped by **domain**, not by owner — per the "organized by domain"
+convention in this README. Invitations, members, and roles are all part
+of the same conceptual area (who belongs to an organization and how),
+so they live together, even though each feature is developed independently
+on its own branch.
