@@ -32,7 +32,8 @@ public class OrganizationMember {
     @JoinColumn(name = "organization_id")
     private Organization organization;
 
-    private String role; // ADMIN, COMPTABLE, CLIENT
+    @Enumerated(EnumType.STRING)
+    private Role role;
 
     private LocalDateTime joinedAt = LocalDateTime.now();
 
@@ -42,11 +43,11 @@ public class OrganizationMember {
     public Long getId() { return id; }
     public User getUser() { return user; }
     public Organization getOrganization() { return organization; }
-    public String getRole() { return role; }
+    public Role getRole() { return role; }
     public LocalDateTime getJoinedAt() { return joinedAt; }
 
     // setters
     public void setUser(User user) { this.user = user; }
     public void setOrganization(Organization organization) { this.organization = organization; }
-    public void setRole(String role) { this.role = role; }
+    public void setRole(Role role) { this.role = role; }
 }
