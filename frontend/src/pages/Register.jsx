@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FileCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { validateEmail } from '../utils/validation';
+import { validateEmail, validatePassword, validateName } from '../utils/validation';
 
 const inputStyle = {
   width: '100%',
@@ -30,49 +30,71 @@ const errorStyle = {
   marginTop: '4px',
 };
 
-export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+const fields = [
+  { name: 'firstName', label: 'Prénom', type: 'text', autoComplete: 'given-name' },
+  { name: 'lastName', label: 'Nom', type: 'text', autoComplete: 'family-name' },
+  { name: 'email', label: 'Adresse email', type: 'email', autoComplete: 'email', placeholder: 'prenom.nom@entreprise.fr' },
+  { name: 'password', label: 'Mot de passe', type: 'password', autoComplete: 'new-password', placeholder: '••••••••' },
+];
+
+function validateField(name, value) {
+  switch (name) {
+    case 'firstName':
+      return validateName(value, 'Le prénom');
+    case 'lastName':
+      return validateName(value, 'Le nom');
+    case 'email':
+      return validateEmail(value);
+    case 'password':
+      return validatePassword(value);
+    default:
+      return null;
+  }
+}
+
+export default function Register() {
+  const [values, setValues] = useState({ firstName: '', lastName: '', email: '', password: '' });
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { register } = useAuth();
 
-  const validate = () => {
-    const errors = {};
-    const emailError = validateEmail(email);
-    if (emailError) errors.email = emailError;
-    if (!password) errors.password = 'Le mot de passe est obligatoire.';
-    setFieldErrors(errors);
-    return Object.keys(errors).length === 0;
+  const handleChange = (name, value) => {
+    setValues((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleBlur = (field) => {
-    if (field === 'email') {
-      const error = validateEmail(email);
-      setFieldErrors((prev) => ({ ...prev, email: error ?? undefined }));
+  const handleBlur = (name) => {
+    const error = validateField(name, values[name]);
+    setFieldErrors((prev) => ({ ...prev, [name]: error ?? undefined }));
+  };
+
+  const validateAll = () => {
+    const errors = {};
+    for (const { name } of fields) {
+      const error = validateField(name, values[name]);
+      if (error) errors[name] = error;
     }
-    if (field === 'password' && !password) {
-      setFieldErrors((prev) => ({ ...prev, password: 'Le mot de passe est obligatoire.' }));
-    }
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError('');
-    if (!validate()) return;
+    if (!validateAll()) return;
 
     setSubmitting(true);
     try {
-      await login(email, password);
+      await register(values);
       navigate('/');
     } catch (err) {
       const status = err.response?.status;
-      if (status === 401) {
-        setFormError('Identifiants invalides.');
-      } else if (status === 429) {
-        setFormError('Trop de tentatives. Réessayez dans 15 minutes.');
+      const serverFields = err.response?.data?.fields;
+      if (status === 400 && serverFields) {
+        setFieldErrors(serverFields);
+      } else if (status === 409) {
+        setFormError('Cette adresse email est déjà utilisée.');
       } else {
         setFormError('Une erreur est survenue. Réessayez.');
       }
@@ -112,45 +134,29 @@ export default function Login() {
           padding: '28px',
         }}>
           <h2 style={{ margin: '0 0 20px', fontSize: '16px', fontWeight: 600, color: '#1a1a2e' }}>
-            Connexion
+            Créer un compte
           </h2>
 
           <form onSubmit={handleSubmit} noValidate>
-            <div style={{ marginBottom: '14px' }}>
-              <label htmlFor="email" style={labelStyle}>Adresse email</label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onBlur={() => handleBlur('email')}
-                placeholder="prenom.nom@entreprise.fr"
-                style={inputStyle}
-                aria-invalid={Boolean(fieldErrors.email)}
-                aria-describedby={fieldErrors.email ? 'email-error' : undefined}
-              />
-              {fieldErrors.email && <p id="email-error" style={errorStyle}>{fieldErrors.email}</p>}
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label htmlFor="password" style={labelStyle}>Mot de passe</label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onBlur={() => handleBlur('password')}
-                placeholder="••••••••"
-                style={inputStyle}
-                aria-invalid={Boolean(fieldErrors.password)}
-                aria-describedby={fieldErrors.password ? 'password-error' : undefined}
-              />
-              {fieldErrors.password && <p id="password-error" style={errorStyle}>{fieldErrors.password}</p>}
-            </div>
+            {fields.map(({ name, label, type, autoComplete, placeholder }) => (
+              <div key={name} style={{ marginBottom: name === 'password' ? '20px' : '14px' }}>
+                <label htmlFor={name} style={labelStyle}>{label}</label>
+                <input
+                  id={name}
+                  name={name}
+                  type={type}
+                  autoComplete={autoComplete}
+                  value={values[name]}
+                  onChange={(e) => handleChange(name, e.target.value)}
+                  onBlur={() => handleBlur(name)}
+                  placeholder={placeholder}
+                  style={inputStyle}
+                  aria-invalid={Boolean(fieldErrors[name])}
+                  aria-describedby={fieldErrors[name] ? `${name}-error` : undefined}
+                />
+                {fieldErrors[name] && <p id={`${name}-error`} style={errorStyle}>{fieldErrors[name]}</p>}
+              </div>
+            ))}
 
             {formError && (
               <p role="alert" style={{ ...errorStyle, marginBottom: '14px', textAlign: 'center' }}>{formError}</p>
@@ -172,33 +178,18 @@ export default function Login() {
                 opacity: submitting ? 0.7 : 1,
               }}
             >
-              Se connecter
+              Créer mon compte
             </button>
           </form>
 
           <div style={{ marginTop: '16px', textAlign: 'center' }}>
             <Link
-              to="/register"
+              to="/login"
               style={{ background: 'none', border: 'none', color: '#4a9eff', fontSize: '13px', cursor: 'pointer', textDecoration: 'underline' }}
             >
-              Créer un compte
+              Déjà un compte ? Se connecter
             </Link>
           </div>
-        </div>
-
-        <div style={{
-          marginTop: '20px',
-          padding: '14px 16px',
-          background: '#fff',
-          border: '1px solid #e5e7eb',
-          borderRadius: '8px',
-        }}>
-          <p style={{ color: '#6b7280', fontSize: '11.5px', lineHeight: '1.6', margin: 0, textAlign: 'center' }}>
-            Service de vérification de conformité et de conversion de factures électroniques au format{' '}
-            <strong style={{ color: '#4b5563' }}>Factur-X</strong>, conformément à la réforme française
-            d'e-invoicing obligatoire à partir du{' '}
-            <strong style={{ color: '#4b5563' }}>1er septembre 2026</strong>.
-          </p>
         </div>
       </div>
     </div>

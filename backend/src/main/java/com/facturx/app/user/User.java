@@ -1,75 +1,120 @@
 package com.facturx.app.user;
 
-import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import java.io.Serializable;
+import java.time.OffsetDateTime;
 
 @Entity
-@Table(name = "users")
-public class User {
+@Table(name = "users", uniqueConstraints = @UniqueConstraint(name = "ux_users_email", columnNames = "email"))
+public class User implements Serializable {
 
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    public static final String STATUS_ACTIVE = "active";
+    public static final String STATUS_DISABLED = "disabled";
+
     @Id
-    private Long userId; //primary Key for my SQL 
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    private String name; //column 
+    @Column(nullable = false, length = 255)
+    private String email;
 
-    private String lastName; //column 
+    // BCrypt hashes are always 60 chars; 72 mirrors the brief's DDL.
+    @JsonIgnore
+    @Column(name = "password_hash", nullable = false, length = 72)
+    private String passwordHash;
 
-    private String email; 
+    @Column(name = "first_name", nullable = false, length = 50)
+    private String firstName;
 
-    private String homeAdress;
+    @Column(name = "last_name", nullable = false, length = 50)
+    private String lastName;
 
-    private String sex;
+    @Column(nullable = false, length = 20)
+    private String status = STATUS_ACTIVE;
 
-    public User() {}
-    //// setters
-    public void setName(String name) {
-        this.name = name;
-    }
-    public void setSex (String sex) {
-        this.sex = sex ;
-    }
-    public void setLastName(String lastName) {
-        this.lastName = lastName;
-    }
-    public void setEmail(String email) {
-        this.email = email;
-    }
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private OffsetDateTime createdAt;
 
-    public void setHomeAdress(String homeAdress) {
-        this.homeAdress = homeAdress;
-    }
-    public String getName() {
-    return name;
+    @Column(name = "updated_at", nullable = false)
+    private OffsetDateTime updatedAt;
+
+    public User() {
     }
 
-    //geters
-    public String getLastName() {
-        return lastName;
+    @PrePersist
+    void onCreate() {
+        OffsetDateTime now = OffsetDateTime.now();
+        this.createdAt = now;
+        this.updatedAt = now;
+    }
+
+    @PreUpdate
+    void onUpdate() {
+        this.updatedAt = OffsetDateTime.now();
+    }
+
+    public Long getId() {
+        return id;
     }
 
     public String getEmail() {
         return email;
     }
 
-    public String getHomeAdress() {
-        return homeAdress;
+    public void setEmail(String email) {
+        this.email = email;
     }
 
-    public String getSex() {
-        return sex;
+    public String getPasswordHash() {
+        return passwordHash;
     }
 
-    public Long getUserId() {
-        return userId;
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
     }
 
+    public String getFirstName() {
+        return firstName;
+    }
+
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+    }
+
+    public String getLastName() {
+        return lastName;
+    }
+
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public boolean isActive() {
+        return STATUS_ACTIVE.equals(status);
+    }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public OffsetDateTime getUpdatedAt() {
+        return updatedAt;
+    }
 }
-
-//Java side                     Database side
-
-//User object                   users table
-//---------                     -----------
-//userId      ───────────────>  user_id
-//name        ───────────────>  name
-//lastName    ───────────────>  last_name
-//email       ───────────────>  email
