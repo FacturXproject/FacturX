@@ -39,7 +39,7 @@ jobs:
       - name: Test backend healthcheck
         run: |
           for i in {1..20}; do
-            if curl --fail http://localhost:8080/api/healthcheck; then
+            if curl -k --fail https://localhost/api/healthcheck; then
               echo "Backend healthcheck passed"
               exit 0
             fi
