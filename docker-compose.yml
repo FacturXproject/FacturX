@@ -11,6 +11,10 @@ services:
       - "80:80"
       - "443:443"
 
+    volumes:
+      - ./secrets/localhost.crt:/etc/nginx/certs/localhost.crt:ro
+      - ./secrets/localhost.key:/etc/nginx/certs/localhost.key:ro
+
     depends_on:
       - frontend
       - backend
@@ -49,8 +53,8 @@ services:
 
     environment:
       - DB_HOST=postgres
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
 
     depends_on:
       postgres:
@@ -66,9 +70,9 @@ services:
     container_name: facturx-postgres
 
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=facturx
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
 
     volumes:
       - postgres-data:/var/lib/postgresql/data
