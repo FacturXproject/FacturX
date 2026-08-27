@@ -12,8 +12,8 @@ services:
       - "443:443"
 
     volumes:
-      - ./secrets/localhost.crt:/etc/nginx/certs/localhost.crt:ro
-      - ./secrets/localhost.key:/etc/nginx/certs/localhost.key:ro
+      - ./nginx/certs/localhost.crt:/etc/nginx/certs/localhost.crt:ro
+      - ./nginx/certs/localhost.key:/etc/nginx/certs/localhost.key:ro
 
     depends_on:
       - frontend
