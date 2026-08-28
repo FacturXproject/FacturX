@@ -11,6 +11,7 @@ openssl req \
     -newkey rsa:2048 \
     -keyout nginx/certs/localhost.key \
     -out nginx/certs/localhost.crt \
-    -subj "/CN=localhost"
+    -subj "/CN=localhost" \
+    -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
 
 echo "TLS certificate generated in nginx/certs/"
