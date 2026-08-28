@@ -4,71 +4,69 @@ import { FileCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { validateEmail } from '../utils/validation';
 
-const inputStyle = {
-  width: '100%',
-  padding: '8px 10px',
-  border: '1px solid #d1d5db',
-  borderRadius: '6px',
-  fontSize: '14px',
-  color: '#1a1a2e',
-  outline: 'none',
-  boxSizing: 'border-box',
-  background: '#fff',
-};
-
-const labelStyle = {
-  display: 'block',
-  fontSize: '12.5px',
-  fontWeight: 500,
-  color: '#374151',
-  marginBottom: '5px',
-};
-
-const errorStyle = {
-  color: '#dc2626',
-  fontSize: '12px',
-  marginTop: '4px',
-};
-
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
   const navigate = useNavigate();
   const { login } = useAuth();
 
   const validate = () => {
     const errors = {};
+
     const emailError = validateEmail(email);
-    if (emailError) errors.email = emailError;
-    if (!password) errors.password = 'Le mot de passe est obligatoire.';
+
+    if (emailError) {
+      errors.email = emailError;
+    }
+
+    if (!password) {
+      errors.password = 'Le mot de passe est obligatoire.';
+    }
+
     setFieldErrors(errors);
+
     return Object.keys(errors).length === 0;
   };
 
   const handleBlur = (field) => {
     if (field === 'email') {
       const error = validateEmail(email);
-      setFieldErrors((prev) => ({ ...prev, email: error ?? undefined }));
+
+      setFieldErrors((prev) => ({
+        ...prev,
+        email: error ?? undefined,
+      }));
     }
+
     if (field === 'password' && !password) {
-      setFieldErrors((prev) => ({ ...prev, password: 'Le mot de passe est obligatoire.' }));
+      setFieldErrors((prev) => ({
+        ...prev,
+        password: 'Le mot de passe est obligatoire.',
+      }));
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     setFormError('');
-    if (!validate()) return;
+
+    if (!validate()) {
+      return;
+    }
 
     setSubmitting(true);
+
     try {
       await login(email, password);
       navigate('/');
     } catch (err) {
       const status = err.response?.status;
+
       if (status === 401) {
         setFormError('Identifiants invalides.');
       } else if (status === 429) {
@@ -82,42 +80,40 @@ export default function Login() {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#f8f9fa',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '24px',
-    }}>
-      <div style={{ width: '100%', maxWidth: '380px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '8px' }}>
-            <div style={{ background: '#1a2744', borderRadius: '10px', padding: '10px', display: 'inline-flex' }}>
+    <div className="min-h-screen bg-[#f8f9fa] flex items-center justify-center p-6">
+      <div className="w-full max-w-[380px]">
+
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-2.5 mb-2">
+            <div className="bg-[#1a2744] rounded-[10px] p-2.5 inline-flex">
               <FileCheck size={24} color="#4a9eff" />
             </div>
           </div>
-          <h1 style={{ margin: '12px 0 4px', fontSize: '22px', fontWeight: 700, color: '#1a1a2e', letterSpacing: '-0.4px' }}>
+
+          <h1 className="mt-3 mb-1 text-[22px] font-bold text-[#1a1a2e] tracking-[-0.4px]">
             Factur-X Validator
           </h1>
-          <p style={{ color: '#6b7280', fontSize: '13px' }}>
+
+          <p className="text-[#6b7280] text-[13px]">
             Conformité & conversion e-factures
           </p>
         </div>
 
-        <div style={{
-          background: '#fff',
-          border: '1px solid #e5e7eb',
-          borderRadius: '10px',
-          padding: '28px',
-        }}>
-          <h2 style={{ margin: '0 0 20px', fontSize: '16px', fontWeight: 600, color: '#1a1a2e' }}>
+        <div className="bg-white border border-[#e5e7eb] rounded-[10px] p-7">
+          <h2 className="mb-5 text-base font-semibold text-[#1a1a2e]">
             Connexion
           </h2>
 
           <form onSubmit={handleSubmit} noValidate>
-            <div style={{ marginBottom: '14px' }}>
-              <label htmlFor="email" style={labelStyle}>Adresse email</label>
+
+            <div className="mb-3.5">
+              <label
+                htmlFor="email"
+                className="block text-[12.5px] font-medium text-[#374151] mb-[5px]"
+              >
+                Adresse email
+              </label>
+
               <input
                 id="email"
                 name="email"
@@ -127,15 +123,31 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 onBlur={() => handleBlur('email')}
                 placeholder="prenom.nom@entreprise.fr"
-                style={inputStyle}
+                className="w-full px-2.5 py-2 border border-[#d1d5db] rounded-md text-sm text-[#1a1a2e] outline-none bg-white box-border"
                 aria-invalid={Boolean(fieldErrors.email)}
-                aria-describedby={fieldErrors.email ? 'email-error' : undefined}
+                aria-describedby={
+                  fieldErrors.email ? 'email-error' : undefined
+                }
               />
-              {fieldErrors.email && <p id="email-error" style={errorStyle}>{fieldErrors.email}</p>}
+
+              {fieldErrors.email && (
+                <p
+                  id="email-error"
+                  className="text-[#dc2626] text-xs mt-1"
+                >
+                  {fieldErrors.email}
+                </p>
+              )}
             </div>
 
-            <div style={{ marginBottom: '20px' }}>
-              <label htmlFor="password" style={labelStyle}>Mot de passe</label>
+            <div className="mb-5">
+              <label
+                htmlFor="password"
+                className="block text-[12.5px] font-medium text-[#374151] mb-[5px]"
+              >
+                Mot de passe
+              </label>
+
               <input
                 id="password"
                 name="password"
@@ -145,61 +157,67 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 onBlur={() => handleBlur('password')}
                 placeholder="••••••••"
-                style={inputStyle}
+                className="w-full px-2.5 py-2 border border-[#d1d5db] rounded-md text-sm text-[#1a1a2e] outline-none bg-white box-border"
                 aria-invalid={Boolean(fieldErrors.password)}
-                aria-describedby={fieldErrors.password ? 'password-error' : undefined}
+                aria-describedby={
+                  fieldErrors.password ? 'password-error' : undefined
+                }
               />
-              {fieldErrors.password && <p id="password-error" style={errorStyle}>{fieldErrors.password}</p>}
+
+              {fieldErrors.password && (
+                <p
+                  id="password-error"
+                  className="text-[#dc2626] text-xs mt-1"
+                >
+                  {fieldErrors.password}
+                </p>
+              )}
             </div>
 
             {formError && (
-              <p role="alert" style={{ ...errorStyle, marginBottom: '14px', textAlign: 'center' }}>{formError}</p>
+              <p
+                role="alert"
+                className="text-[#dc2626] text-xs mb-3.5 text-center"
+              >
+                {formError}
+              </p>
             )}
 
             <button
               type="submit"
               disabled={submitting}
-              style={{
-                width: '100%',
-                padding: '9px',
-                background: '#1a2744',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '14px',
-                fontWeight: 500,
-                cursor: submitting ? 'default' : 'pointer',
-                opacity: submitting ? 0.7 : 1,
-              }}
+              className="w-full py-[9px] bg-[#1a2744] text-white border-0 rounded-md text-sm font-medium cursor-pointer disabled:cursor-default disabled:opacity-70"
             >
               Se connecter
             </button>
           </form>
 
-          <div style={{ marginTop: '16px', textAlign: 'center' }}>
+          <div className="mt-4 text-center">
             <Link
               to="/register"
-              style={{ background: 'none', border: 'none', color: '#4a9eff', fontSize: '13px', cursor: 'pointer', textDecoration: 'underline' }}
+              className="text-[#4a9eff] text-[13px] underline"
             >
               Créer un compte
             </Link>
           </div>
         </div>
 
-        <div style={{
-          marginTop: '20px',
-          padding: '14px 16px',
-          background: '#fff',
-          border: '1px solid #e5e7eb',
-          borderRadius: '8px',
-        }}>
-          <p style={{ color: '#6b7280', fontSize: '11.5px', lineHeight: '1.6', margin: 0, textAlign: 'center' }}>
-            Service de vérification de conformité et de conversion de factures électroniques au format{' '}
-            <strong style={{ color: '#4b5563' }}>Factur-X</strong>, conformément à la réforme française
-            d'e-invoicing obligatoire à partir du{' '}
-            <strong style={{ color: '#4b5563' }}>1er septembre 2026</strong>.
+        <div className="mt-5 px-4 py-3.5 bg-white border border-[#e5e7eb] rounded-lg">
+          <p className="text-[#6b7280] text-[11.5px] leading-[1.6] text-center m-0">
+            Service de vérification de conformité et de conversion de factures
+            électroniques au format{' '}
+            <strong className="text-[#4b5563]">
+              Factur-X
+            </strong>
+            , conformément à la réforme française d&apos;e-invoicing obligatoire
+            à partir du{' '}
+            <strong className="text-[#4b5563]">
+              1er septembre 2026
+            </strong>
+            .
           </p>
         </div>
+
       </div>
     </div>
   );
