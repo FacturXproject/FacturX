@@ -286,20 +286,29 @@ FacturX/
 │       └── ci.yml
 │
 ├── nginx/
-│   ├── nginx.conf
+│   ├── Dockerfile
+│   ├── conf/
+│   │   └── nginx.conf
 │   └── certs/
+│       ├── localhost.crt
+│       └── localhost.key
+│
+├── scripts/
+│   └── generate-certs.sh
 │
 ├── frontend/
 │   ├── Dockerfile
 │   ├── package.json
 │   └── src/
 │
-└── backend/
-    ├── README.md
-    ├── Dockerfile
-    ├── pom.xml
-    ├── mvnw
-    └── src/
+├── backend/
+│   ├── README.md
+│   ├── Dockerfile
+│   ├── pom.xml
+│   ├── mvnw
+│   └── src/
+│
+└── database/
 ```
 
 The architecture can later evolve to:
@@ -341,6 +350,12 @@ From the project root, first create your local environment file:
 cp .env.example .env
 ```
 
+Generate the local TLS certificates if they are not already present:
+
+```bash
+./scripts/generate-certs.sh
+```
+
 Then start the stack:
 
 ```bash
@@ -368,14 +383,11 @@ Test the health endpoint:
 curl -k https://localhost/api/healthcheck
 ```
 
-The health check answers for the whole chain, not only for Spring Boot:
+The current health check response is:
 
-```json
-{ "backend": "ok", "database": "ok" }
+```text
+Yess i'm working
 ```
-
-Once the Python service is added, `"extractor": "ok"` joins the payload. This is what
-makes the health check a real end-to-end integration test rather than a liveness probe.
 
 FastAPI will be added to Docker Compose when the first Python-based feature is
 implemented.
@@ -410,7 +422,7 @@ facturx-network
 │
 ├── nginx
 │      ↓
-│   the only container exposed to the host (:443)
+│   the only container exposed to the host (:80 and :443)
 │      ↓
 │   frontend, backend
 │
@@ -560,7 +572,7 @@ GET /api/healthcheck
 Example:
 
 ```bash
-curl http://localhost:8080/api/healthcheck
+curl -k https://localhost/api/healthcheck
 ```
 
 ---
