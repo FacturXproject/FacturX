@@ -27,8 +27,13 @@ public class InvitationService {
 
     public InvitationResponse create(Long orgId, InvitationRequest request) {
         Organization organization = organizationRepository.findById(orgId)
-            .orElseThrow(() -> new RuntimeException("Organization not found"));
-
+            .orElseThrow(OrganizationNotFoundException::new);
+        
+        if (invitationRepository.findByEmailAndOrganizationIdAndStatus(
+            request.email(), orgId, InvitationStatus.PENDING).isPresent()) {
+        throw new InvitationAlreadyPendingException();
+        }
+        
         Invitation invitation = new Invitation();
         invitation.setOrganization(organization);
         invitation.setEmail(request.email());
@@ -42,40 +47,40 @@ public class InvitationService {
     }
 
     public InvitationResponse accept(String token) {
-    Invitation invitation = invitationRepository.findByToken(token)
-        .orElseThrow(() -> new RuntimeException("Invitation not found"));
+        Invitation invitation = invitationRepository.findByToken(token)
+            .orElseThrow(InvitationNotFoundException::new);
 
-    if (invitation.getStatus() != InvitationStatus.PENDING) {
-        throw new RuntimeException("Invitation is not pending");
-    }
+        if (invitation.getStatus() != InvitationStatus.PENDING) {
+            throw new InvitationNotPendingException();
+        }
 
-    if (invitation.getExpiresAt().isBefore(LocalDateTime.now())) {
-        invitation.setStatus(InvitationStatus.EXPIRED);
+        if (invitation.getExpiresAt().isBefore(LocalDateTime.now())) {
+            invitation.setStatus(InvitationStatus.EXPIRED);
+            invitationRepository.save(invitation);
+            throw new InvitationExpiredException();
+        }
+
+        Organization organization = invitation.getOrganization();
+
+        User user = userRepository.findByEmail(invitation.getEmail())
+            .orElseThrow(() -> new NoAccountFoundException(token));
+            //FRONTED : redirection to register page /register?invitationToken=xxx
+
+        if (organizationMemberRepository.findByUserIdAndOrganizationId(user.getId(), organization.getId()).isPresent())
+            throw new UserAlreadyMemberException();
+
+        OrganizationMember organizationMember = new OrganizationMember();
+        organizationMember.setUser(user);
+        organizationMember.setOrganization(organization);
+        organizationMember.setRole(invitation.getRole());
+
+        organizationMemberRepository.save(organizationMember);
+        invitation.setStatus(InvitationStatus.ACCEPTED);
         invitationRepository.save(invitation);
-        throw new RuntimeException("Invitation expired");
+
+        return toResponse(invitation);
     }
 
-    Organization organization = invitation.getOrganization();
-
-    User user = userRepository.findByEmail(invitation.getEmail())
-        .orElseThrow(() -> new NoAccountFoundException("No account found for this email"));
-        //FRONTED : redirection to register page /register?invitationToken=xxx
-        
-    if (organizationMemberRepository.findByUserIdAndOrganizationId(user.getId(), organization.getId()).isPresent())
-        throw new RuntimeException("User is already a member of this organization");
-    
-    OrganizationMember organizationMember = new OrganizationMember();
-    organizationMember.setUser(user);
-    organizationMember.setOrganization(organization);
-    organizationMember.setRole(invitation.getRole());
-
-    organizationMemberRepository.save(organizationMember);
-    invitation.setStatus(InvitationStatus.ACCEPTED); 
-    invitationRepository.save(invitation);
-
-    return toResponse(invitation);
-    
-    }
     public List<InvitationResponse> getByOrganization(Long orgId) {
         return invitationRepository.findByOrganizationId(orgId)
             .stream()

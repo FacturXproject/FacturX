@@ -32,4 +32,46 @@ public class OrganizationExceptionHandler {
                 "message", "Ce membre n'existe pas dans l'organisation."
         ));
     }
+
+    //ana was here
+    @ExceptionHandler(InvitationNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleInvitationNotFound() {
+    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+            "error", "INVITATION_NOT_FOUND",
+            "message", "Cette invitation n'existe pas."
+    ));
+    }
+
+    @ExceptionHandler(InvitationExpiredException.class)
+    public ResponseEntity<Map<String, String>> handleInvitationExpired() {
+        return ResponseEntity.status(HttpStatus.GONE).body(Map.of(
+                "error", "INVITATION_EXPIRED",
+                "message", "Cette invitation a expiré."
+    ));
+    }
+
+    @ExceptionHandler(InvitationNotPendingException.class)
+    public ResponseEntity<Map<String, String>> handleInvitationNotPending() {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+            "error", "INVITATION_NOT_PENDING",
+            "message", "Cette invitation a déjà été traitée."
+    ));
+    }
+
+    @ExceptionHandler(NoAccountFoundException.class)
+    public ResponseEntity<Map<String, String>> handleNoAccountFound(NoAccountFoundException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+            "error", "NO_ACCOUNT_FOUND",
+            "message", "Aucun compte trouvé pour cet email.",
+            "redirectUrl", "/register?invitationToken=" + ex.getMessage()
+    ));
+    }
+    @ExceptionHandler(InvitationAlreadyPendingException.class)
+    public ResponseEntity<Map<String, String>> handleInvitationAlreadyPending() {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+            "error", "INVITATION_ALREADY_PENDING",
+            "message", "Une invitation est déjà en attente pour cet email."
+    ));
+}
+    
 }
