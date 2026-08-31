@@ -28,15 +28,25 @@ public class InvitationService {
     public InvitationResponse create(Long orgId, InvitationRequest request, Long currentUserId) {
         Organization organization = organizationRepository.findById(orgId)
             .orElseThrow(OrganizationNotFoundException::new);
-        
-        OrganizationMember requester = organizationMemberRepository.findByUserIdAndOrganizationId(currentUserId, orgId)
+
+        OrganizationMember requester = organizationMemberRepository
+            .findByUserIdAndOrganizationId(currentUserId, orgId)
             .orElseThrow(MemberNotFoundException::new);
+
         if (requester.getRole() != Role.ADMIN) {
             throw new InsufficientPermissionException();
         }
-        
+
+        userRepository.findByEmail(request.email()).ifPresent(existingUser -> {
+            if (organizationMemberRepository
+                    .findByUserIdAndOrganizationId(existingUser.getId(), orgId)
+                    .isPresent()) {
+                throw new UserAlreadyMemberException();
+            }
+        });
+
         if (invitationRepository.findByEmailAndOrganizationIdAndStatus(
-            request.email(), orgId, InvitationStatus.PENDING).isPresent()) {
+                request.email(), orgId, InvitationStatus.PENDING).isPresent()) {
             throw new InvitationAlreadyPendingException();
         }
 
@@ -52,7 +62,9 @@ public class InvitationService {
         return toResponse(invitation);
     }
 
-    public InvitationResponse accept(String token) {
+    // PUBLIC : consultation de l'invitation avant authentification
+    // (utilisé par le frontend pour afficher l'email/rôle et rediriger vers login/register)
+    public InvitationResponse check(String token) {
         Invitation invitation = invitationRepository.findByToken(token)
             .orElseThrow(InvitationNotFoundException::new);
 
@@ -66,28 +78,56 @@ public class InvitationService {
             throw new InvitationExpiredException();
         }
 
+        return toResponse(invitation);
+    }
+
+    // AUTHENTIFIÉ : accepte réellement l'invitation
+    public InvitationResponse accept(String token, Long currentUserId) {
+        Invitation invitation = invitationRepository.findByToken(token)
+            .orElseThrow(InvitationNotFoundException::new);
+
+        if (invitation.getStatus() != InvitationStatus.PENDING) {
+            throw new InvitationNotPendingException();
+        }
+
+        if (invitation.getExpiresAt().isBefore(LocalDateTime.now())) {
+            invitation.setStatus(InvitationStatus.EXPIRED);
+            invitationRepository.save(invitation);
+            throw new InvitationExpiredException();
+        }
+
+        User user = userRepository.findById(currentUserId)
+            .orElseThrow(MemberNotFoundException::new);
+
+        if (!user.getEmail().equalsIgnoreCase(invitation.getEmail())) {
+            throw new InsufficientPermissionException();
+        }
+
         Organization organization = invitation.getOrganization();
 
-        User user = userRepository.findByEmail(invitation.getEmail())
-            .orElseThrow(() -> new NoAccountFoundException(token));
-            //FRONTED : redirection to register page /register?invitationToken=xxx
-
-        if (organizationMemberRepository.findByUserIdAndOrganizationId(user.getId(), organization.getId()).isPresent())
+        if (organizationMemberRepository
+                .findByUserIdAndOrganizationId(user.getId(), organization.getId())
+                .isPresent()) {
             throw new UserAlreadyMemberException();
+        }
 
-        OrganizationMember organizationMember = new OrganizationMember();
-        organizationMember.setUser(user);
-        organizationMember.setOrganization(organization);
-        organizationMember.setRole(invitation.getRole());
+        OrganizationMember member = new OrganizationMember();
+        member.setUser(user);
+        member.setOrganization(organization);
+        member.setRole(invitation.getRole());
+        organizationMemberRepository.save(member);
 
-        organizationMemberRepository.save(organizationMember);
         invitation.setStatus(InvitationStatus.ACCEPTED);
         invitationRepository.save(invitation);
 
         return toResponse(invitation);
     }
 
-    public List<InvitationResponse> getByOrganization(Long orgId) {
+    public List<InvitationResponse> getByOrganization(Long orgId, Long currentUserId) {
+        organizationMemberRepository
+            .findByUserIdAndOrganizationId(currentUserId, orgId)
+            .orElseThrow(MemberNotFoundException::new);
+
         return invitationRepository.findByOrganizationId(orgId)
             .stream()
             .map(this::toResponse)
@@ -103,5 +143,4 @@ public class InvitationService {
             invitation.getExpiresAt()
         );
     }
-
 }
