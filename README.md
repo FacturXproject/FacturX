@@ -1,237 +1,153 @@
- # FacturX App 
+# FacturX App
 
-FacturX is a full-stack web application built with a React frontend, a Spring Boot backend, and PostgreSQL.
+FacturX is a full-stack web application built with a React frontend, a Spring Boot backend, PostgreSQL, Nginx, Docker Compose, and GitHub Actions.
 
+The application follows an incremental architecture. Spring Boot is the main API exposed to the frontend, while specialized Python processing can later be delegated internally to a FastAPI service when required.
 
+---
 
-The application follows an incremental architecture: Spring Boot is the main API exposed to the frontend, while specialized Python processing can later be delegated internally to a FastAPI service when required.
+# Tech Stack
 
-## Tech Stack
-
-### Frontend
+## Frontend
 
 - React
 - Vite
 - JavaScript
 - Tailwind CSS
 
-### Backend
+## Backend
 
-- Java
+- Java 21
 - Spring Boot
 - Spring Web
 - Spring Data JPA
 - Hibernate
+- Spring Security
+- Spring Session JDBC
 - Maven
 
-### Internal Python Service
-
-Planned for features requiring specialized Python processing:
-
-- Python
-- FastAPI
-
-FastAPI is not directly exposed to the frontend. Spring Boot remains the main API and delegates specific processing tasks to FastAPI when needed.
-
-### Database
+## Database
 
 - PostgreSQL
 
-### Infrastructure
+## Infrastructure
 
 - Nginx
 - Docker
 - Docker Compose
 - GitHub Actions
 
-Nginx is the single public entry point and terminates HTTPS. The subject requires that
-any connection reaching the backend from outside use HTTPS, so the browser never talks
-to Vite or Spring Boot directly in the deployed stack.
+## Internal Python Service
+
+A FastAPI service can be introduced for features requiring specialized Python processing, such as:
+
+- PDF extraction
+- Factur-X generation
+
+FastAPI remains internal. The frontend communicates only with Spring Boot.
 
 ---
 
 # Architecture
 
-The frontend communicates only with the Spring Boot API.
+Nginx is the single public entry point of the Docker stack and terminates HTTPS.
 
-Spring Boot handles the main application logic, database access, authentication, permissions, document management, and orchestration of internal services.
+The browser does not communicate directly with Vite, Spring Boot, PostgreSQL, or the internal FastAPI service.
 
 ```text
 Browser
    ↓
-HTTPS
+HTTP :8080
    ↓
 Nginx
-Single public entry point
-TLS termination
    ↓
-   ├── static assets ──→ Frontend
-   │                     React + Vite
+301 redirect
+   ↓
+HTTPS :8443
+   ↓
+Nginx
+   ├── /      ─────────────→ Frontend
+   │                         React + Vite
+   │                         Port 5173
    │
-   └── /api/* ─────────→ Backend
-                         Spring Boot
-                         ↓
-                         ├──────────────→ PostgreSQL
-                         │                Port 5432
-                         │
-                         └──────────────→ FastAPI
-                                          Internal Python service
-                                          Specialized processing
+   └── /api/* ─────────────→ Backend
+                             Spring Boot
+                             Port 8080
+                                ↓
+                                ├── PostgreSQL
+                                │   Port 5432
+                                │
+                                └── FastAPI
+                                    Internal service
 ```
 
-Only Nginx is exposed to the host. The frontend, the backend, PostgreSQL and the
-future FastAPI service all live on the internal Docker network.
+Only Nginx publishes ports to the host.
 
-The main communication flow is:
+The host-to-container mappings are:
 
 ```text
-Frontend
-   ↓ HTTP / JSON
-Spring Boot
-   ↓
-   ├── JPA / Hibernate → PostgreSQL
-   │
-   └── HTTP / JSON → FastAPI
-                     when Python processing is required
+Host :8080 → Nginx container :80
+Host :8443 → Nginx container :443
 ```
 
-The frontend does not communicate directly with FastAPI.
-
-Spring Boot acts as the central API and decides whether a request:
-
-- is handled directly in Java;
-- requires access to PostgreSQL;
-- or must be delegated to the internal Python service.
+The frontend, backend, PostgreSQL, and FastAPI remain on the internal Docker network.
 
 ---
 
-# Backend Responsibilities
+# Communication Flow
 
-Spring Boot is responsible for the main application API and business logic.
-
-Examples include:
+For standard application features:
 
 ```text
-Authentication
-Organizations
-Users
-Roles and permissions
-Documents
-Validation
-Reports
-Database access
-API error handling
-Internal service orchestration
-```
-
-The typical backend flow is:
-
-```text
-Client Request
-      ↓
-Controller
-      ↓
+React
+   ↓
+Nginx
+   ↓
+Spring Boot
+   ↓
 Service
-      ↓
+   ↓
 Repository
-      ↓
+   ↓
 JPA / Hibernate
-      ↓
+   ↓
 PostgreSQL
 ```
 
-For features requiring Python:
+For features requiring Python processing:
 
 ```text
-Client Request
-      ↓
-Spring Boot Controller
-      ↓
-Spring Boot Service
-      ↓
-FastAPI internal service
-      ↓
-Processing result
-      ↓
+React
+   ↓
+Nginx
+   ↓
 Spring Boot
-      ↓
+   ↓
+FastAPI
+   ↓
+Spring Boot
+   ↓
 PostgreSQL if persistence is required
-      ↓
-Response to frontend
+   ↓
+Response to React
 ```
 
-This keeps the API exposed to the frontend stable while allowing specialized processing to use Python when it provides a technical advantage.
+Spring Boot is responsible for:
 
----
-
-# FastAPI Internal Service
-
-FastAPI will be introduced when features require specialized Python processing.
-
-Examples include:
-
-```text
-PDF extraction
-Factur-X generation
-```
-
-A typical flow for PDF extraction will be:
-
-```text
-React
-   ↓
-Spring Boot
-   ↓
-Validate user / permissions / document
-   ↓
-FastAPI
-   ↓
-Extract invoice information
-   ↓
-Return structured JSON
-   ↓
-Spring Boot
-   ↓
-Persist required data in PostgreSQL
-   ↓
-Return response to React
-```
-
-For Factur-X generation:
-
-```text
-React
-   ↓
-Spring Boot
-   ↓
-FastAPI
-Generate XML / Factur-X document
-   ↓
-Spring Boot
-   ↓
-Java validation
-   ↓
-PostgreSQL
-Store status / report
-   ↓
-React
-```
-
-Spring Boot remains responsible for the public API contract and application-level authorization.
-
-FastAPI focuses only on specialized processing.
+- the public API;
+- authentication;
+- authorization;
+- business logic;
+- database access;
+- orchestration of internal services.
 
 ---
 
 # Incremental Architecture
 
-FastAPI is not required for the initial technical baseline.
-
-The project evolves incrementally.
+The initial baseline is:
 
 ```text
-Initial baseline
-
 React
    ↓
 Spring Boot
@@ -239,7 +155,7 @@ Spring Boot
 PostgreSQL
 ```
 
-Then, when Python-specific features are implemented:
+When Python-specific features are required, the architecture becomes:
 
 ```text
 React
@@ -250,22 +166,6 @@ Spring Boot
    │
    └── FastAPI
 ```
-
-This allows the initial baseline to remain simple and stable while adding Python only when a feature requires it.
-
-## Open point: when the FastAPI container appears
-
-Two positions were discussed. Adding the container in the baseline proves the Docker
-network path, the third image in CI, and the compose orchestration early — those are
-the parts that cost a day when discovered late, not the HTTP call itself. Adding it at
-F11 keeps the baseline smaller and avoids paying for complexity before a feature needs
-it.
-
-A middle option: a skeleton container in the baseline that answers `/health` and
-nothing else, roughly thirty lines, with the real extraction logic arriving at F11.
-
-To be decided as a team. It is a scheduling question, not an architectural one — the
-architecture above holds either way.
 
 ---
 
@@ -278,8 +178,9 @@ FacturX/
 │
 ├── README.md
 ├── docker-compose.yml
+├── .env
 ├── .env.example
-├── .gitignore              (.env is ignored)
+├── .gitignore
 │
 ├── .github/
 │   └── workflows/
@@ -299,6 +200,7 @@ FacturX/
 ├── frontend/
 │   ├── Dockerfile
 │   ├── package.json
+│   ├── vite.config.js
 │   └── src/
 │
 ├── backend/
@@ -311,29 +213,6 @@ FacturX/
 └── database/
 ```
 
-The architecture can later evolve to:
-
-```text
-FacturX/
-│
-├── README.md
-├── docker-compose.yml
-├── .env.example
-│
-├── nginx/
-│
-├── frontend/
-│
-├── backend/
-│
-└── python-service/
-    ├── Dockerfile
-    ├── requirements.txt
-    └── app/
-```
-
-The exact FastAPI directory structure will be defined when the first Python feature is implemented.
-
 For detailed backend architecture and development instructions, see:
 
 [Backend README](./backend/README.md)
@@ -342,9 +221,7 @@ For detailed backend architecture and development instructions, see:
 
 # Quick Start With Docker
 
-The easiest way to run the current baseline is with Docker Compose.
-
-From the project root, first create your local environment file:
+From the project root, create the local environment file if needed:
 
 ```bash
 cp .env.example .env
@@ -356,7 +233,7 @@ Generate the local TLS certificates if they are not already present:
 ./scripts/generate-certs.sh
 ```
 
-Then start the stack:
+Start the full stack:
 
 ```bash
 docker compose up --build
@@ -371,103 +248,115 @@ backend
 postgres
 ```
 
-The application is available at a single address:
+The HTTPS application entry point is:
 
 ```text
-https://localhost
+https://localhost:8443
 ```
 
-Test the health endpoint:
+The HTTP entry point is:
+
+```text
+http://localhost:8080
+```
+
+HTTP redirects to HTTPS:
+
+```text
+http://localhost:8080
+        ↓
+https://localhost:8443
+```
+
+---
+
+# Health Check
+
+The backend health endpoint is:
+
+```http
+GET /api/healthcheck
+```
+
+Through the full Docker stack:
 
 ```bash
-curl -k https://localhost/api/healthcheck
+curl -k https://localhost:8443/api/healthcheck
 ```
 
-The current health check response is:
+Current response:
 
 ```text
 Yess i'm working
 ```
 
-FastAPI will be added to Docker Compose when the first Python-based feature is
-implemented.
-
 ---
 
-# Environment variables
+# PostgreSQL Healthcheck
 
-Real values live in `.env`, which is **ignored by Git**. A committed `.env.example`
-holds the same keys with placeholder values, so anyone cloning the repository knows
-what to fill in. Both are explicit subject requirements.
+Docker Compose checks PostgreSQL availability using:
 
-```bash
-# .env.example
-POSTGRES_DB=facturx
-POSTGRES_USER=facturx
-POSTGRES_PASSWORD=changeme
-SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/facturx
+```text
+pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}
 ```
 
-Never commit a real `.env`. If one was ever committed, deleting the file is not enough
-— the credentials must be rotated, because they remain in the Git history.
+The healthcheck uses the PostgreSQL user and database defined in the environment configuration.
 
 ---
 
-# Docker Architecture
+# Docker Network
 
-Inside the current Docker Compose environment:
+The current Docker network is:
 
 ```text
 facturx-network
 │
 ├── nginx
-│      ↓
-│   the only container exposed to the host (:80 and :443)
-│      ↓
-│   frontend, backend
+│   ├── host :8080 → container :80
+│   └── host :8443 → container :443
 │
 ├── frontend
+│   └── internal port 5173
 │
 ├── backend
-│      ↓
-│   postgres:5432
+│   └── internal port 8080
 │
 └── postgres
+    └── internal port 5432
 ```
 
-The backend communicates with PostgreSQL using the Docker service name:
+Only Nginx is published to the host.
+
+The backend reaches PostgreSQL using the Docker service name:
 
 ```text
 postgres
 ```
 
-instead of:
+Each Docker container has its own network namespace, so services communicate through Docker service names.
 
-```text
-localhost
+---
+
+# Environment Variables
+
+The project uses `.env` for local values and `.env.example` as the reference template.
+
+Example:
+
+```env
+POSTGRES_DB=facturx
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
 ```
 
-because each Docker container has its own network namespace.
+For the current development branch, `.env` is kept available to simplify development across team machines.
 
-When FastAPI is introduced, it will also run inside the internal Docker network:
+Before the final project submission:
 
 ```text
-facturx-network
-│
-├── nginx          ← only container published to the host
-│
-├── frontend
-│
-├── backend
-│      ├── postgres:5432
-│      └── fastapi:<internal-port>
-│
-├── postgres
-│
-└── fastapi
+.env          → ignored
+.env.example  → versioned
 ```
-
-The FastAPI service does not need to be directly exposed to the browser.
 
 ---
 
@@ -486,78 +375,66 @@ cd frontend
 Install dependencies:
 
 ```bash
-npm install
+npm ci
 ```
 
-Start the Vite development server:
+Start Vite:
 
 ```bash
 npm run dev
 ```
 
-Frontend:
+The standalone frontend runs on:
 
 ```text
 http://localhost:5173
 ```
 
----
-
-## Backend
-
-For backend development instructions, database configuration, architecture, and API development conventions, see:
-
-[Backend README](./backend/README.md)
-
-The backend normally runs on:
+In standalone development, Vite proxies `/api/*` requests to the local Spring Boot backend:
 
 ```text
 http://localhost:8080
 ```
 
----
-
-# Current Development Architecture
-
-The current baseline follows this structure:
+The frontend uses relative API paths such as:
 
 ```text
-Frontend
-   ↓
-REST API
-   ↓
-Spring Boot Controllers
-   ↓
-Services
-   ↓
-Repositories
-   ↓
-JPA / Hibernate
-   ↓
-PostgreSQL
+/api/users
+/api/healthcheck
+/api/auth/login
 ```
 
-Backend features are organized by domain.
+## Backend
 
-Example:
+From:
+
+```bash
+cd backend
+```
+
+Start Spring Boot:
+
+```bash
+./mvnw spring-boot:run
+```
+
+The standalone backend runs on:
 
 ```text
-auth/
-├── AuthController
-└── AuthService
-
-user/
-├── User
-├── UserController
-├── UserService
-└── UserRepository
+http://localhost:8080
 ```
 
-This keeps each feature and its related logic together.
+Test it directly:
 
-When Python-specific features are introduced, Spring Boot will orchestrate calls to the internal FastAPI service without changing the frontend API entry point.
+```bash
+curl http://localhost:8080/api/healthcheck
+```
 
-More details are documented in the backend-specific README.
+Expected response:
+
+```text
+Yess i'm working
+```
 
 ---
 
@@ -569,10 +446,24 @@ More details are documented in the backend-specific README.
 GET /api/healthcheck
 ```
 
-Example:
+Public endpoint.
+
+Docker stack:
 
 ```bash
-curl -k https://localhost/api/healthcheck
+curl -k https://localhost:8443/api/healthcheck
+```
+
+Standalone backend:
+
+```bash
+curl http://localhost:8080/api/healthcheck
+```
+
+Current response:
+
+```text
+Yess i'm working
 ```
 
 ---
@@ -583,6 +474,53 @@ curl -k https://localhost/api/healthcheck
 POST /api/auth/register
 ```
 
+Public endpoint.
+
+Example request body:
+
+```json
+{
+  "email": "john@test.com",
+  "password": "strongpassword",
+  "firstName": "John",
+  "lastName": "Doe"
+}
+```
+
+---
+
+## Login
+
+```http
+POST /api/auth/login
+```
+
+Public endpoint.
+
+A successful login creates a server-side session.
+
+---
+
+## Current User
+
+```http
+GET /api/auth/me
+```
+
+Returns the currently authenticated user.
+
+Authentication is required.
+
+---
+
+## Logout
+
+```http
+POST /api/auth/logout
+```
+
+Invalidates the current authenticated session.
+
 ---
 
 ## Get Users
@@ -591,58 +529,149 @@ POST /api/auth/register
 GET /api/users
 ```
 
-> **Temporary — to be replaced in F02.** This endpoint returns every user in the
-> system. Once organisations exist, that would let an accountant from one firm list
-> the clients of another. Hiding the page in the UI is not access control: anyone can
-> call the endpoint with curl.
->
-> It will become:
->
-> ```http
-> GET /api/organizations/{id}/members
-> ```
->
-> authorised by membership, with the query filtered by `organization_id`.
+Authentication is required.
+
+The endpoint returns a JSON array directly:
+
+```text
+List<User>
+```
+
+Example response:
+
+```json
+[
+  {
+    "id": 1,
+    "email": "user@test.com",
+    "firstName": "John",
+    "lastName": "Doe",
+    "status": "active"
+  }
+]
+```
+
+This endpoint is temporary and will be replaced by organization-scoped membership access when tenant isolation is introduced.
 
 ---
 
-# Local Development Rules
+# Authentication
 
-## Tenant isolation
+Authentication is based on server-side sessions.
 
-Once organisations exist, **every query touching organisation data must filter by
-`organization_id`**, and every sensitive route must check permissions **server side**.
-This is not defensive style — the permissions module is one of our Major modules and
-will be probed directly at the evaluation.
-
-## Continuous Integration
-
-Every change goes through a Pull Request. `main` is protected: a PR merges only when
-the pipeline is green.
+The general flow is:
 
 ```text
-Feature branch → Pull Request → CI → Merge → main
+Browser
+   ↓
+POST /api/auth/login
+   ↓
+Nginx
+   ↓
+Spring Security
+   ↓
+AuthService
+   ↓
+UserRepository
+   ↓
+PostgreSQL
+   ↓
+Server-side session
+   ↓
+Session cookie returned to browser
 ```
 
-The pipeline runs:
+Spring Session JDBC stores session data in PostgreSQL.
+
+The application also uses CSRF protection for state-changing requests.
+
+The frontend API client sends credentials and the CSRF token automatically.
+
+---
+
+# Current Backend Structure
+
+Backend features are organized by domain.
+
+Example:
 
 ```text
-build frontend
-build backend
-build images
-start the stack
-health check
-tests
+auth/
+├── AuthController
+├── AuthService
+└── ...
+
+user/
+├── User
+├── UserController
+├── UserService
+└── UserRepository
 ```
 
-CI is what keeps `main` deployable while five people work in parallel. It also gives a
-clear signal before a merge, instead of discovering an integration problem days later.
+The typical backend flow is:
+
+```text
+Client Request
+      ↓
+Controller
+      ↓
+Service
+      ↓
+Repository
+      ↓
+JPA / Hibernate
+      ↓
+PostgreSQL
+```
+
+Business logic belongs in services, while data access belongs in repositories.
+
+---
+
+# Continuous Integration
+
+Every change goes through a Pull Request.
+
+The workflow is:
+
+```text
+Feature branch
+      ↓
+Pull Request
+      ↓
+CI
+      ↓
+Review
+      ↓
+Merge
+      ↓
+main
+```
+
+The CI pipeline validates:
+
+```text
+backend tests
+frontend dependencies
+frontend lint
+frontend build
+Docker Compose configuration
+Docker image build
+container startup
+HTTPS backend healthcheck
+```
+
+The HTTPS healthcheck uses:
+
+```text
+https://localhost:8443/api/healthcheck
+```
 
 ---
 
 # Development Principle
 
-When adding a feature, first define the use case and the complete data flow.
+When adding a new feature, start from the use case and define the complete data flow.
 
 For a standard backend feature:
 
@@ -658,7 +687,7 @@ Repository
 Database
 ```
 
-For a feature requiring Python processing:
+For a feature requiring Python:
 
 ```text
 Client Request
@@ -676,25 +705,19 @@ Repository / Database
 Client Response
 ```
 
-Avoid putting business logic directly in controllers.
-
-Avoid exposing internal implementation details to the frontend.
-
-The frontend communicates with Spring Boot, while Spring Boot is responsible for coordinating the different internal components of the application.
-
-Backend-specific conventions and examples are available in:
-
-[Backend README](./backend/README.md)
+The frontend communicates with Spring Boot only.
 
 ---
 
 # Stop the Docker Environment
 
+Stop the stack:
+
 ```bash
 docker compose down
 ```
 
-To rebuild after changing Docker configuration or dependencies:
+Rebuild after changing Docker configuration or dependencies:
 
 ```bash
 docker compose up --build
