@@ -10,16 +10,3 @@ public enum Permission {
     DELETE_ANY_DOCUMENT,
     DELETE_OWN_PENDING_DOCUMENT
 }
-/*
-Role.java
-
-
-package com.facturx.app.organization;
-
-public enum Role {
-    ADMIN,
-    ACCOUNTANT,
-    CLIENT
-}
-
-*/
