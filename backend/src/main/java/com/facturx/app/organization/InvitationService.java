@@ -25,15 +25,21 @@ public class InvitationService {
         this.organizationMemberRepository = organizationMemberRepository;
     }
 
-    public InvitationResponse create(Long orgId, InvitationRequest request) {
+    public InvitationResponse create(Long orgId, InvitationRequest request, Long currentUserId) {
         Organization organization = organizationRepository.findById(orgId)
             .orElseThrow(OrganizationNotFoundException::new);
         
-        if (invitationRepository.findByEmailAndOrganizationIdAndStatus(
-            request.email(), orgId, InvitationStatus.PENDING).isPresent()) {
-        throw new InvitationAlreadyPendingException();
+        OrganizationMember requester = organizationMemberRepository.findByUserIdAndOrganizationId(currentUserId, orgId)
+            .orElseThrow(MemberNotFoundException::new);
+        if (requester.getRole() != Role.ADMIN) {
+            throw new InsufficientPermissionException();
         }
         
+        if (invitationRepository.findByEmailAndOrganizationIdAndStatus(
+            request.email(), orgId, InvitationStatus.PENDING).isPresent()) {
+            throw new InvitationAlreadyPendingException();
+        }
+
         Invitation invitation = new Invitation();
         invitation.setOrganization(organization);
         invitation.setEmail(request.email());
@@ -97,4 +103,5 @@ public class InvitationService {
             invitation.getExpiresAt()
         );
     }
+
 }

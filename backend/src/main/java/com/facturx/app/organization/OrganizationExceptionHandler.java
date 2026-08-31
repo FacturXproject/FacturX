@@ -72,6 +72,14 @@ public class OrganizationExceptionHandler {
             "error", "INVITATION_ALREADY_PENDING",
             "message", "Une invitation est déjà en attente pour cet email."
     ));
-}
+    }
+
+    @ExceptionHandler(InsufficientPermissionException.class)
+    public ResponseEntity<Map<String, String>> handleInsufficientPermission() {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+            "error", "INSUFFICIENT_PERMISSION",
+            "message", "Vous n'avez pas les droits nécessaires pour cette action."
+    ));
+    }
     
 }
