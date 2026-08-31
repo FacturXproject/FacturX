@@ -24,6 +24,18 @@ jobs:
         working-directory: backend
         run: ./mvnw -B test
 
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint frontend
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
       - name: Validate Docker Compose
         run: docker compose config -q
 
@@ -39,7 +51,7 @@ jobs:
       - name: Test backend healthcheck
         run: |
           for i in {1..20}; do
-            if curl -k --fail https://localhost/api/healthcheck; then
+            if curl -k --fail https://localhost:8443/api/healthcheck; then
               echo "Backend healthcheck passed"
               exit 0
             fi
