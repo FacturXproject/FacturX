@@ -16,34 +16,35 @@ public class PermissionService {
 
 	private static final Map<Role, Set<Permission>> ROLE_PERMISSIONS = Map.of(
 
-        Role.ADMIN, EnumSet.of(
-            Permission.UPLOAD_DOCUMENT,
-            Permission.VIEW_ALL_DOCUMENTS,
-            Permission.VIEW_OWN_DOCUMENTS,
-            Permission.VALIDATE_DOCUMENT,
-            Permission.INVITE_MEMBER,
-            Permission.MANAGE_MEMBERS,
-            Permission.DELETE_ANY_DOCUMENT
-        ),
+		Role.ADMIN, EnumSet.of(
+			Permission.UPLOAD_DOCUMENT,
+			Permission.VIEW_ALL_DOCUMENTS,
+			Permission.VIEW_OWN_DOCUMENTS,
+			Permission.VALIDATE_DOCUMENT,
+			Permission.INVITE_MEMBER,
+			Permission.MANAGE_MEMBERS,
+			Permission.DELETE_ANY_DOCUMENT,
+			Permission.DELETE_OWN_PENDING_DOCUMENT
+		),
 
-        Role.ACCOUNTANT, EnumSet.of(
-            Permission.UPLOAD_DOCUMENT,
-            Permission.VIEW_ALL_DOCUMENTS,
-            Permission.VIEW_OWN_DOCUMENTS,
-            Permission.VALIDATE_DOCUMENT,
-            Permission.DELETE_OWN_PENDING_DOCUMENT
-        ),
+		Role.ACCOUNTANT, EnumSet.of(
+			Permission.UPLOAD_DOCUMENT,
+			Permission.VIEW_ALL_DOCUMENTS,
+			Permission.VIEW_OWN_DOCUMENTS,
+			Permission.VALIDATE_DOCUMENT,
+			Permission.DELETE_OWN_PENDING_DOCUMENT
+		),
 
-        Role.CLIENT, EnumSet.of(
-            Permission.UPLOAD_DOCUMENT,
-            Permission.VIEW_OWN_DOCUMENTS,
-            Permission.DELETE_OWN_PENDING_DOCUMENT
-        )
-    );
+		Role.CLIENT, EnumSet.of(
+			Permission.UPLOAD_DOCUMENT,
+			Permission.VIEW_OWN_DOCUMENTS,
+			Permission.DELETE_OWN_PENDING_DOCUMENT
+		)
+	);
 
-    public PermissionService(OrganizationMemberRepository memberRepository) {
-        this.memberRepository = memberRepository;
-    }
+	public PermissionService(OrganizationMemberRepository memberRepository) {
+		this.memberRepository = memberRepository;
+	}
 
 	public boolean hasPermission(
 			Long userId,
@@ -59,13 +60,13 @@ public class PermissionService {
 			.orElse(false);
 	}
 
-    public void requirePermission(
-            Long userId,
-            Long organizationId,
-            Permission permission) {
+	public void requirePermission(
+			Long userId,
+			Long organizationId,
+			Permission permission) {
 
-        if (!hasPermission(userId, organizationId, permission)) {
-            throw new AccessDeniedException();
-        }
-    }
+		if (!hasPermission(userId, organizationId, permission)) {
+			throw new AccessDeniedException();
+		}
+	}
 }
