@@ -8,8 +8,8 @@ services:
     container_name: facturx-nginx
 
     ports:
-      - "80:80"
-      - "443:443"
+      - "8080:80"
+      - "8443:443"
 
     volumes:
       - ./nginx/certs/localhost.crt:/etc/nginx/certs/localhost.crt:ro
@@ -78,7 +78,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
 
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d facturx"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5

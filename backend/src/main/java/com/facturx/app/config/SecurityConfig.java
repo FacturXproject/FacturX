@@ -67,7 +67,14 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("https://localhost", "https://127.0.0.1"));
+        configuration.setAllowedOrigins(
+            List.of(
+            "https://localhost",
+            "https://127.0.0.1",
+            "https://localhost:8443",
+            "https://127.0.0.1:8443"
+    )
+);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true); // cookies are the auth - CORS must allow them
