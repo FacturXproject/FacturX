@@ -1,9 +1,10 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, CheckCircle, RefreshCw, FileCode2, LogOut, FileCheck } from 'lucide-react';
+import { LayoutDashboard, CheckCircle, RefreshCw, FileCode2, LogOut, FileCheck, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Tableau de bord' },
+  { to: '/invitations', icon: Users, label: 'Invitations' },
   { to: '/verifier', icon: CheckCircle, label: 'Vérifier' },
   { to: '/convertir', icon: RefreshCw, label: 'Convertir' },
   { to: '/lecture-xml', icon: FileCode2, label: 'Lecture XML' },

@@ -13,6 +13,7 @@ import UploadPage from './pages/UploadPage';
 import HealthCheck from './pages/HealthCheck';
 import Users from './pages/Users';
 import Layout from './components/Layout';
+import Invitations from './pages/Invitations';
 
 function Protected({ children }) {
   return (
@@ -35,6 +36,7 @@ export default function App() {
 
           <Route path="/" element={<Protected><Dashboard /></Protected>} />
           <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
+          <Route path="/invitations" element={<Protected><Invitations /></Protected>} />
           <Route path="/traitement" element={<Protected><Processing /></Protected>} />
           <Route path="/rapport" element={<Protected><ComplianceReport /></Protected>} />
           <Route path="/conversion" element={<Protected><Conversion /></Protected>} />
