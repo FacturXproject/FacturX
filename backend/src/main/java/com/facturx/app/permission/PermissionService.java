@@ -23,6 +23,7 @@ public class PermissionService {
 			Permission.VALIDATE_DOCUMENT,
 			Permission.INVITE_MEMBER,
 			Permission.MANAGE_MEMBERS,
+			Permission.MANAGE_ORGANIZATION,
 			Permission.DELETE_ANY_DOCUMENT,
 			Permission.DELETE_OWN_PENDING_DOCUMENT
 		),

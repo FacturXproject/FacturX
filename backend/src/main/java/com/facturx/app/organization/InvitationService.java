@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.UUID;
 import com.facturx.app.user.User;
 import com.facturx.app.user.UserRepository;
+import com.facturx.app.permission.Permission;
+import com.facturx.app.permission.PermissionService;
 
 @Service
 public class InvitationService {
@@ -14,28 +16,31 @@ public class InvitationService {
     private final OrganizationRepository organizationRepository;
     private final UserRepository userRepository;
     private final OrganizationMemberRepository organizationMemberRepository;
+    private final PermissionService permissionService;
 
-    public InvitationService(InvitationRepository invitationRepository,
-                              OrganizationRepository organizationRepository,
-                              UserRepository userRepository,
-                              OrganizationMemberRepository organizationMemberRepository) {
+    public InvitationService(
+            InvitationRepository invitationRepository,
+            OrganizationRepository organizationRepository,
+            UserRepository userRepository,
+            OrganizationMemberRepository organizationMemberRepository,
+            PermissionService permissionService) {
+
         this.invitationRepository = invitationRepository;
         this.organizationRepository = organizationRepository;
         this.userRepository = userRepository;
         this.organizationMemberRepository = organizationMemberRepository;
+        this.permissionService = permissionService;
     }
 
     public InvitationResponse create(Long orgId, InvitationRequest request, Long currentUserId) {
         Organization organization = organizationRepository.findById(orgId)
             .orElseThrow(OrganizationNotFoundException::new);
 
-        OrganizationMember requester = organizationMemberRepository
-            .findByUserIdAndOrganizationId(currentUserId, orgId)
-            .orElseThrow(MemberNotFoundException::new);
-
-        if (requester.getRole() != Role.ADMIN) {
-            throw new InsufficientPermissionException();
-        }
+        permissionService.requirePermission(
+            currentUserId,
+            orgId,
+            Permission.INVITE_MEMBER
+        );
 
         userRepository.findByEmail(request.email()).ifPresent(existingUser -> {
             if (organizationMemberRepository
@@ -100,7 +105,7 @@ public class InvitationService {
             .orElseThrow(MemberNotFoundException::new);
 
         if (!user.getEmail().equalsIgnoreCase(invitation.getEmail())) {
-            throw new InsufficientPermissionException();
+            throw new InvitationNotForCurrentUserException();
         }
 
         Organization organization = invitation.getOrganization();
@@ -122,7 +127,7 @@ public class InvitationService {
 
         return toResponse(invitation);
     }
-    
+
     public InvitationResponse revoke(Long invitationId, Long currentUserId) {
 
         Invitation invitation = invitationRepository.findById(invitationId)
@@ -140,24 +145,24 @@ public class InvitationService {
 
         Organization organization = invitation.getOrganization();
 
-        OrganizationMember requester = organizationMemberRepository
-            .findByUserIdAndOrganizationId(currentUserId, organization.getId())
-            .orElseThrow(MemberNotFoundException::new);
-
-        if (requester.getRole() != Role.ADMIN) {
-            throw new InsufficientPermissionException();
-        }
+        permissionService.requirePermission(
+            currentUserId,
+            organization.getId(),
+            Permission.INVITE_MEMBER
+        );
 
         invitation.setStatus(InvitationStatus.REVOKED);
         invitationRepository.save(invitation);
 
         return toResponse(invitation);
-    }   
+    }
 
     public List<InvitationResponse> getByOrganization(Long orgId, Long currentUserId) {
-        organizationMemberRepository
-            .findByUserIdAndOrganizationId(currentUserId, orgId)
-            .orElseThrow(MemberNotFoundException::new);
+        permissionService.requirePermission(
+            currentUserId,
+            orgId,
+            Permission.INVITE_MEMBER
+        );
 
         return invitationRepository.findByOrganizationId(orgId)
             .stream()

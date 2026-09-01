@@ -1,14 +1,3 @@
-/* ************************************************************************** */
-/*                                                                            */
-/*                                                        :::      ::::::::   */
-/*   OrganizationController.java                        :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: yseddiki <yseddiki@student.42.fr>                +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/08/25 by yseddiki                    #+#    #+#             */
-/*   Updated: 2026/08/25 by yseddiki                   ###   ########.fr       */
-/*                                                                            */
-/* ************************************************************************** */
 
 package com.facturx.app.organization;
 
@@ -25,7 +14,7 @@ public class OrganizationController {
 
     public OrganizationController(OrganizationService organizationService) {
         this.organizationService = organizationService;
-    } 
+    }
 
     // Recupere l'id de l'utilisateur connecte depuis la session
     private Long currentUserId(Authentication authentication) {
@@ -52,36 +41,76 @@ public class OrganizationController {
 
     // GET /api/organizations/{id}/members
     @GetMapping("/{id}/members")
-    public List<MemberResponse> getMembers(@PathVariable Long id) {
-        return organizationService.getMembers(id)
-                .stream()
-                .map(MemberResponse::from)
-                .toList();
+    public List<MemberResponse> getMembers(
+            @PathVariable Long id,
+            Authentication authentication) {
+
+        return organizationService.getMembers(
+                id,
+                currentUserId(authentication)
+            )
+            .stream()
+            .map(MemberResponse::from)
+            .toList();
     }
 
-    // POST /api/organizations/{id}/members?userId=2&role=ACCOUNTANT
-    @PostMapping("/{id}/members")
-    public MemberResponse addMember(@PathVariable Long id,
-                                     @RequestParam Long userId,
-                                     @RequestParam Role role) {
-        return MemberResponse.from(organizationService.addMember(id, userId, role));
-    }
 
     // DELETE /api/organizations/{id}/members/{userId}
     @DeleteMapping("/{id}/members/{userId}")
-    public void removeMember(@PathVariable Long id, @PathVariable Long userId) {
-        organizationService.removeMember(id, userId);
+    public void removeMember(
+            @PathVariable Long id,
+            @PathVariable Long userId,
+            Authentication authentication) {
+
+        organizationService.removeMember(
+            id,
+            userId,
+            currentUserId(authentication)
+        );
     }
 
     // PUT /api/organizations/{id}?name=NouveauNom
     @PutMapping("/{id}")
-    public OrganizationResponse update(@PathVariable Long id, @RequestParam String name) {
-        return OrganizationResponse.from(organizationService.updateOrganization(id, name));
+    public OrganizationResponse update(
+            @PathVariable Long id,
+            @RequestParam String name,
+            Authentication authentication) {
+
+        return OrganizationResponse.from(
+            organizationService.updateOrganization(
+                id,
+                name,
+                currentUserId(authentication)
+            )
+        );
     }
 
     // DELETE /api/organizations/{id}
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable Long id) {
-        organizationService.deleteOrganization(id);
+    public void delete(
+            @PathVariable Long id,
+            Authentication authentication) {
+
+        organizationService.deleteOrganization(
+            id,
+            currentUserId(authentication)
+        );
+    }
+
+    @PatchMapping("/{id}/members/{userId}/role")
+    public MemberResponse updateMemberRole(
+            @PathVariable Long id,
+            @PathVariable Long userId,
+            @RequestParam Role role,
+            Authentication authentication) {
+
+        return MemberResponse.from(
+            organizationService.updateMemberRole(
+                id,
+                userId,
+                role,
+                currentUserId(authentication)
+            )
+        );
     }
 }
