@@ -367,6 +367,56 @@ It is temporary and will evolve when organization membership and tenant isolatio
 
 ---
 
+## Invoice Validation (F08)
+
+Deterministic conformity engine: a file goes in, a structured pass/fail result with
+per-rule errors comes out. Built on Mustangproject, which runs four layers in a fixed
+order and stops going deeper once one of them fails hard - so a broken PDF never
+produces a wall of downstream XML noise.
+
+```text
+1. PDF/A-3 structure   (is the XML embedded? is the XMP metadata correct?)
+2. CII XSD              (is the embedded XML schema-valid?)
+3. Schematron EN 16931  (the CEN business rules, e.g. BR-CO-10, BR-DE-1)
+4. Factur-X profile     (BASIC / EN16931 / EXTENDED constraints)
+```
+
+```text
+POST /api/validate
+        ↓
+ValidationController
+        ↓
+FacturXValidationService
+        ↓
+MustangValidationClient  →  ZUGFeRDValidator.validate(bytes, filename)
+        ↓
+MustangReportParser      →  turns the raw report into ValidationError[]
+        ↓
+ValidationRun + ValidationErrorEntity saved
+        ↓
+ValidationResult { valid, layerReached, errors[] }
+```
+
+`layerReached` tells you how far processing actually got: `PDF_A3` means it never
+even reached the embedded XML; `SCHEMATRON` means PDF/A-3 and XSD both passed.
+Mustang's own report doesn't separate XSD failures from Schematron failures at the
+tag level, so today everything that gets as far as the XML stage is bucketed under
+`SCHEMATRON` - a known simplification, not a design decision, and easy to sharpen
+later with a sample that fails specifically at XSD.
+
+`rule_catalog` exists as a schema shell (`code`, `layer`, `rawText`) but isn't
+populated yet - F09 owns turning it into the human-readable French report.
+
+**Temporary endpoint.** `POST /api/validate` takes a raw file with no
+document/organisation/permission checks, because F06 (document upload) doesn't exist
+yet. Once it does, this becomes `POST /documents/{id}/validate`: the controller reads
+the file from storage and checks the caller's permissions before ever calling
+`FacturXValidationService`.
+
+Operations related to validation belong under the `validation` feature package.
+
+---
+
 # Authentication
 
 Authentication is session-based.
@@ -828,6 +878,47 @@ Example response:
 > `/api/users` currently returns users globally.
 >
 > When organizations and tenant isolation are fully introduced, user access must be scoped by organization membership instead of exposing a global user list.
+
+---
+
+## Validate Invoice (F08, temporary)
+
+```http
+POST /api/validate
+```
+
+Requires an authenticated session (send the session cookie and a matching CSRF
+header, same as any other POST). Multipart body, field name `file`. No
+document/organisation link yet - see "Invoice Validation (F08)" above.
+
+Example (after logging in and saving cookies to `cookies.txt`):
+
+```bash
+curl http://localhost:8080/api/validate \
+  -b cookies.txt \
+  -H "X-XSRF-TOKEN: $(grep XSRF-TOKEN cookies.txt | awk '{print $NF}')" \
+  -F "file=@invoice.pdf"
+```
+
+Response:
+
+```json
+{
+  "valid": false,
+  "layerReached": "PDF_A3",
+  "errors": [
+    {
+      "layer": "PDF_A3",
+      "severity": "ERROR",
+      "ruleCode": "MUSTANG-ERROR-23",
+      "message": "Not a PDF/A-3",
+      "field": null,
+      "actualValue": null,
+      "expectedValue": null
+    }
+  ]
+}
+```
 
 ---
 

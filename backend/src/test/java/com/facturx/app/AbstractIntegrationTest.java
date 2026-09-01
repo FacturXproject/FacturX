@@ -5,21 +5,26 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Boots the app against a real Postgres via Testcontainers, on a real embedded
  * servlet container (RANDOM_PORT) - MockMvc's default MOCK environment never wires
  * server.servlet.session.cookie.* into Spring Session's cookie serializer.
  */
-@Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public abstract class AbstractIntegrationTest {
 
-    @Container
+    // Singleton Container pattern, started manually instead of via @Testcontainers/
+    // @Container: those annotations stop this shared static container in whichever
+    // subclass happens to run first, which then breaks every later subclass reusing
+    // the cached Spring context (still pointing at the now-dead port). Never call
+    // .stop() ourselves - Testcontainers' Ryuk reaps it when the JVM/fork exits.
     @ServiceConnection
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17");
+    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17");
+
+    static {
+        postgres.start();
+    }
 
     @DynamicPropertySource
     static void sessionSchemaAlwaysOnTestDb(DynamicPropertyRegistry registry) {
