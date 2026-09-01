@@ -39,4 +39,15 @@ public class InvitationController {
         List<InvitationResponse> invitations = invitationService.getByOrganization(orgId, currentUserId(authentication));
         return ResponseEntity.ok(invitations);
     }
+    
+    @PatchMapping("/{invitationId}/revoke")
+    public ResponseEntity<InvitationResponse> revoke(
+        @PathVariable Long invitationId,
+        Authentication authentication) {
+        
+        InvitationResponse response = invitationService.revoke(
+                    invitationId, currentUserId(authentication));
+
+    return ResponseEntity.ok(response);
+}
 }

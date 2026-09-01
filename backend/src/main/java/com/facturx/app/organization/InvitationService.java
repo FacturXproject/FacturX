@@ -122,6 +122,37 @@ public class InvitationService {
 
         return toResponse(invitation);
     }
+    
+    public InvitationResponse revoke(Long invitationId, Long currentUserId) {
+
+        Invitation invitation = invitationRepository.findById(invitationId)
+            .orElseThrow(InvitationNotFoundException::new);
+
+        if (invitation.getStatus() != InvitationStatus.PENDING) {
+            throw new InvitationNotPendingException();
+        }
+
+        if (invitation.getExpiresAt().isBefore(LocalDateTime.now())) {
+            invitation.setStatus(InvitationStatus.EXPIRED);
+            invitationRepository.save(invitation);
+            throw new InvitationExpiredException();
+        }
+
+        Organization organization = invitation.getOrganization();
+
+        OrganizationMember requester = organizationMemberRepository
+            .findByUserIdAndOrganizationId(currentUserId, organization.getId())
+            .orElseThrow(MemberNotFoundException::new);
+
+        if (requester.getRole() != Role.ADMIN) {
+            throw new InsufficientPermissionException();
+        }
+
+        invitation.setStatus(InvitationStatus.REVOKED);
+        invitationRepository.save(invitation);
+
+        return toResponse(invitation);
+    }   
 
     public List<InvitationResponse> getByOrganization(Long orgId, Long currentUserId) {
         organizationMemberRepository
