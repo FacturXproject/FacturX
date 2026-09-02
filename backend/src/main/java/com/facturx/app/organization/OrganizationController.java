@@ -39,6 +39,20 @@ public class OrganizationController {
                 .toList();
     }
 
+    // GET /api/organizations/{id}
+    @GetMapping("/{id}")
+    public OrganizationResponse getOrganization(
+            @PathVariable Long id,
+            Authentication authentication) {
+
+        return OrganizationResponse.from(
+            organizationService.getOrganization(
+                id,
+                currentUserId(authentication)
+            )
+        );
+    }
+
     // GET /api/organizations/{id}/members
     @GetMapping("/{id}/members")
     public List<MemberResponse> getMembers(
@@ -53,7 +67,6 @@ public class OrganizationController {
             .map(MemberResponse::from)
             .toList();
     }
-
 
     // DELETE /api/organizations/{id}/members/{userId}
     @DeleteMapping("/{id}/members/{userId}")

@@ -412,6 +412,39 @@ class PermissionIntegrationTest extends AbstractIntegrationTest {
             .andExpect(status().isNotFound());
     }
 
+    @Test
+    void memberCanReadOrganizationButNonMemberCannot() throws Exception {
+        RegisteredUser admin = register("admin-get-org");
+        RegisteredUser accountant = register("accountant-get-org");
+        RegisteredUser outsider = register("outsider-get-org");
+
+        Organization organization = createOrganization(admin);
+
+        addMember(
+            organization,
+            accountant,
+            Role.ACCOUNTANT
+        );
+
+        mockMvc.perform(
+                get("/api/organizations/{id}", organization.getId())
+                    .cookie(admin.session())
+            )
+            .andExpect(status().isOk());
+
+        mockMvc.perform(
+                get("/api/organizations/{id}", organization.getId())
+                    .cookie(accountant.session())
+            )
+            .andExpect(status().isOk());
+
+        mockMvc.perform(
+                get("/api/organizations/{id}", organization.getId())
+                    .cookie(outsider.session())
+            )
+            .andExpect(status().isNotFound());
+    }
+
     private record RegisteredUser(
         User user,
         Cookie session

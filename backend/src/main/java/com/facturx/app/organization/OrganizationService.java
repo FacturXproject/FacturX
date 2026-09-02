@@ -63,6 +63,23 @@ public class OrganizationService {
         return memberRepository.findByOrganizationId(organizationId);
     }
 
+    //get organization
+    public Organization getOrganization(
+            Long organizationId,
+            Long currentUserId) {
+
+        Organization organization = organizationRepository
+            .findById(organizationId)
+            .orElseThrow(OrganizationNotFoundException::new);
+
+        memberRepository
+            .findByUserIdAndOrganizationId(currentUserId, organizationId)
+            .orElseThrow(MemberNotFoundException::new);
+
+        return organization;
+    }
+
+
     // Lister les organisations d'un utilisateur
     public List<OrganizationMember> getUserOrganizations(Long userId) {
         return memberRepository.findByUserId(userId);
