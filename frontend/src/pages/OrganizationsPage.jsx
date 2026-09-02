@@ -144,7 +144,7 @@ export default function OrganizationsPage() {
       if (filter === 'ADMIN') return org.role === 'ADMIN';
       return org.role !== 'ADMIN';
     })
-    .filter((org) => `organisation #${org.id}`.includes(search.toLowerCase()));
+    .filter((org) => `organisation #${org.organizationId ?? org.id}`.includes(search.toLowerCase()));
 
   const statCards = [
     { icon: Building2, iconBg: '#dbeafe', iconColor: '#2563eb', value: total, label: 'Organisations', sub: 'Au total' },
@@ -278,6 +278,7 @@ export default function OrganizationsPage() {
               {filtered.map((org, i) => {
                 const palette = orgIconPalette[i % orgIconPalette.length];
                 const badge = roleBadgeStyles[org.role] ?? { background: '#f3f4f6', color: '#374151' };
+                const realId = org.organizationId ?? org.id;
                 return (
                   <tr key={org.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                     <td style={{ padding: '14px 20px' }}>
@@ -289,8 +290,8 @@ export default function OrganizationsPage() {
                           <Building2 size={17} color={palette.color} />
                         </div>
                         <div>
-                          {/* TODO: remplacer par org.name quand disponible */}
-                          <div style={{ fontWeight: 500, color: '#111827' }}>Organisation #{org.id}</div>
+                          {/* TODO: remplacer par org.name quand disponible via GET /organizations/{id} */}
+                          <div style={{ fontWeight: 500, color: '#111827' }}>Organisation #{realId}</div>
                         </div>
                       </div>
                     </td>
@@ -305,7 +306,7 @@ export default function OrganizationsPage() {
                     <td style={{ padding: '14px 20px' }}>
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <button
-                          onClick={() => navigate(`/organisations/${org.organizationId ?? org.id}`)}
+                          onClick={() => navigate(`/organisations/${realId}`)}
                           style={{
                             display: 'flex', alignItems: 'center', gap: '5px',
                             padding: '6px 12px', border: '1px solid #d1d5db', borderRadius: '7px',
