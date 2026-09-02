@@ -1,15 +1,3 @@
-/* ************************************************************************** */
-/*                                                                            */
-/*                                                        :::      ::::::::   */
-/*   OrganizationService.java                           :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: yseddiki <yseddiki@student.42.fr>                +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/08/25 by yseddiki                    #+#    #+#             */
-/*   Updated: 2026/08/25 by yseddiki                   ###   ########.fr       */
-/*                                                                            */
-/* ************************************************************************** */
-
 package com.facturx.app.organization;
 
 import com.facturx.app.user.User;
@@ -17,6 +5,8 @@ import com.facturx.app.user.UserRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 import java.util.List;
+import com.facturx.app.permission.Permission;
+import com.facturx.app.permission.PermissionService;
 
 @Service
 public class OrganizationService {
@@ -24,13 +14,18 @@ public class OrganizationService {
     private final OrganizationRepository organizationRepository;
     private final OrganizationMemberRepository memberRepository;
     private final UserRepository userRepository;
+    private final PermissionService permissionService;
 
-    public OrganizationService(OrganizationRepository organizationRepository,
-                                OrganizationMemberRepository memberRepository,
-                                UserRepository userRepository) {
+    public OrganizationService(
+            OrganizationRepository organizationRepository,
+            OrganizationMemberRepository memberRepository,
+            UserRepository userRepository,
+            PermissionService permissionService) {
+
         this.organizationRepository = organizationRepository;
         this.memberRepository = memberRepository;
         this.userRepository = userRepository;
+        this.permissionService = permissionService;
     }
 
     // Creer une organisation et ajouter son createur comme ADMIN
@@ -52,62 +47,123 @@ public class OrganizationService {
         return organization;
     }
 
-    // Lister les membres d'une organisation
-    public List<OrganizationMember> getMembers(Long organizationId) {
+    // get members
+    public List<OrganizationMember> getMembers(
+            Long organizationId,
+            Long currentUserId) {
+
         if (!organizationRepository.existsById(organizationId)) {
             throw new OrganizationNotFoundException();
         }
+
+        memberRepository
+            .findByUserIdAndOrganizationId(currentUserId, organizationId)
+            .orElseThrow(MemberNotFoundException::new);
+
         return memberRepository.findByOrganizationId(organizationId);
     }
+
+    //get organization
+    public Organization getOrganization(
+            Long organizationId,
+            Long currentUserId) {
+
+        Organization organization = organizationRepository
+            .findById(organizationId)
+            .orElseThrow(OrganizationNotFoundException::new);
+
+        memberRepository
+            .findByUserIdAndOrganizationId(currentUserId, organizationId)
+            .orElseThrow(MemberNotFoundException::new);
+
+        return organization;
+    }
+
 
     // Lister les organisations d'un utilisateur
     public List<OrganizationMember> getUserOrganizations(Long userId) {
         return memberRepository.findByUserId(userId);
     }
 
-    // Ajouter un membre a une organisation
-    public OrganizationMember addMember(Long organizationId, Long userId, Role role) {
+    //MANAGE_ORGANIZATION
+    public Organization updateOrganization(
+            Long organizationId,
+            String newName,
+            Long currentUserId) {
+
+        permissionService.requirePermission(
+            currentUserId,
+            organizationId,
+            Permission.MANAGE_ORGANIZATION
+        );
+
         Organization organization = organizationRepository.findById(organizationId)
             .orElseThrow(OrganizationNotFoundException::new);
 
-        User user = userRepository.findById(userId)
-            .orElseThrow(MemberNotFoundException::new);
+        organization.setName(newName);
 
-        // Verifier que le user n'est pas deja membre
-        memberRepository.findByUserIdAndOrganizationId(userId, organizationId)
-            .ifPresent(existing -> { throw new UserAlreadyMemberException(); });
-
-        OrganizationMember member = new OrganizationMember();
-        member.setUser(user);
-        member.setOrganization(organization);
-        member.setRole(role);
-        return memberRepository.save(member);
+        return organizationRepository.save(organization);
     }
 
     // Retirer un membre d'une organisation
-    public void removeMember(Long organizationId, Long userId) {
+    public void removeMember(
+            Long organizationId,
+            Long userId,
+            Long currentUserId) {
+
+        permissionService.requirePermission(
+            currentUserId,
+            organizationId,
+            Permission.MANAGE_MEMBERS
+        );
+
         OrganizationMember member = memberRepository
             .findByUserIdAndOrganizationId(userId, organizationId)
             .orElseThrow(MemberNotFoundException::new);
+
         memberRepository.delete(member);
     }
 
-    // Renommer une organisation
-    public Organization updateOrganization(Long organizationId, String newName) {
-        Organization organization = organizationRepository.findById(organizationId)
-            .orElseThrow(OrganizationNotFoundException::new);
-        organization.setName(newName);
-        return organizationRepository.save(organization);
+    //update memberrole
+    public OrganizationMember updateMemberRole(
+        Long organizationId,
+        Long userId,
+        Role role,
+        Long currentUserId) {
+
+    permissionService.requirePermission(
+        currentUserId,
+        organizationId,
+        Permission.MANAGE_MEMBERS
+    );
+
+    OrganizationMember member = memberRepository
+        .findByUserIdAndOrganizationId(userId, organizationId)
+        .orElseThrow(MemberNotFoundException::new);
+
+    member.setRole(role);
+
+    return memberRepository.save(member);
     }
 
     // Supprimer une organisation et tous ses membres
     @Transactional
-    public void deleteOrganization(Long organizationId) {
+    public void deleteOrganization(
+            Long organizationId,
+            Long currentUserId) {
+
+        permissionService.requirePermission(
+            currentUserId,
+            organizationId,
+            Permission.MANAGE_ORGANIZATION
+        );
+
         Organization organization = organizationRepository.findById(organizationId)
             .orElseThrow(OrganizationNotFoundException::new);
 
-        // Supprimer d'abord les membres (cle etrangere vers l'organisation)
-        memberRepository.deleteAll(memberRepository.findByOrganizationId(organizationId));
+        memberRepository.deleteAll(
+            memberRepository.findByOrganizationId(organizationId)
+        );
 
         organizationRepository.delete(organization);
     }

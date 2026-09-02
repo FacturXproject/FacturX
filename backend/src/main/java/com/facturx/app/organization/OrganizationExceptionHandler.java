@@ -74,12 +74,12 @@ public class OrganizationExceptionHandler {
     ));
     }
 
-    @ExceptionHandler(InsufficientPermissionException.class)
-    public ResponseEntity<Map<String, String>> handleInsufficientPermission() {
+    @ExceptionHandler(InvitationNotForCurrentUserException.class)
+    public ResponseEntity<Map<String, String>> handleInvitationNotForCurrentUser() {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
-            "error", "INSUFFICIENT_PERMISSION",
-            "message", "Vous n'avez pas les droits nécessaires pour cette action."
-    ));
+            "error", "INVITATION_NOT_FOR_CURRENT_USER",
+            "message", "This invitation does not belong to the current user."
+        ));
     }
-    
+
 }
