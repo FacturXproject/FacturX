@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, UserPlus, Trash2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, UserPlus, Trash2, AlertTriangle, Mail, Clock } from 'lucide-react';
 import api from '../services/api';
 
 const roleLabels = {
@@ -19,12 +19,13 @@ export default function OrganizationMembersPage() {
   const { id } = useParams();
   const navigate = useNavigate();
 
+  const [orgName, setOrgName] = useState(null);
   const [members, setMembers] = useState([]);
-  const [allUsers, setAllUsers] = useState([]);
+  const [invitations, setInvitations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const [selectedUserId, setSelectedUserId] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
   const [selectedRole, setSelectedRole] = useState('CLIENT');
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState(null);
@@ -32,6 +33,15 @@ export default function OrganizationMembersPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+
+  const fetchOrganization = async () => {
+    try {
+      const response = await api.get(`/organizations/${id}`);
+      setOrgName(response.data.name);
+    } catch {
+      // fallback silencieux
+    }
+  };
 
   const fetchMembers = async () => {
     try {
@@ -45,35 +55,48 @@ export default function OrganizationMembersPage() {
     }
   };
 
-  const fetchAllUsers = async () => {
+  const fetchInvitations = async () => {
     try {
-      const response = await api.get('/users');
-      setAllUsers(response.data);
+      const response = await api.get(`/organizations/${id}/invitations`);
+      setInvitations(response.data.filter((inv) => inv.status === 'PENDING'));
     } catch {
-      // liste des users optionnelle pour le formulaire d'ajout, on ignore l'erreur ici
+      // liste optionnelle, on ignore l'erreur
     }
   };
 
   useEffect(() => {
+    fetchOrganization();
     fetchMembers();
-    fetchAllUsers();
+    fetchInvitations();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const handleAddMember = async (e) => {
+  const handleInvite = async (e) => {
     e.preventDefault();
-    if (!selectedUserId) return;
+    if (!inviteEmail.trim()) return;
 
     setAdding(true);
     setAddError(null);
     try {
-      await api.post(`/organizations/${id}/members?userId=${selectedUserId}&role=${selectedRole}`);
-      setSelectedUserId('');
-      fetchMembers();
+      await api.post(`/organizations/${id}/invitations`, {
+        email: inviteEmail.trim(),
+        role: selectedRole,
+      });
+      setInviteEmail('');
+      fetchInvitations();
     } catch (err) {
       setAddError(err.response?.data?.message ?? err.message);
     } finally {
       setAdding(false);
+    }
+  };
+
+  const handleRevokeInvitation = async (invitationId) => {
+    try {
+      await api.patch(`/organizations/${id}/invitations/${invitationId}/revoke`);
+      fetchInvitations();
+    } catch (err) {
+      setAddError(err.response?.data?.message ?? err.message);
     }
   };
 
@@ -98,10 +121,6 @@ export default function OrganizationMembersPage() {
     }
   };
 
-  // Users qui ne sont pas deja membres, pour ne pas proposer un doublon
-  const memberUserIds = new Set(members.map((m) => m.userId));
-  const availableUsers = allUsers.filter((u) => !memberUserIds.has(u.id));
-
   return (
     <div style={{ padding: '32px', maxWidth: '900px', margin: '0 auto' }}>
       <button
@@ -119,7 +138,7 @@ export default function OrganizationMembersPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '4px', color: '#111827' }}>
-            Membres de l'organisation #{id}
+            Membres de {orgName ?? `l'organisation #${id}`}
           </h1>
           <p style={{ color: '#6b7280', marginBottom: '24px', fontSize: '14px' }}>
             Gérez qui appartient à cette organisation et avec quel rôle.
@@ -200,30 +219,63 @@ export default function OrganizationMembersPage() {
         </div>
       )}
 
-      {/* Formulaire d'ajout */}
+      {/* Invitations en attente */}
+      {invitations.length > 0 && (
+        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', overflow: 'hidden', marginBottom: '24px' }}>
+          <div style={{ padding: '14px 16px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Clock size={16} color="#6b7280" />
+            <span style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>Invitations en attente</span>
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}>
+            <tbody>
+              {invitations.map((inv) => (
+                <tr key={inv.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  <td style={{ padding: '10px 16px', color: '#374151' }}>{inv.email}</td>
+                  <td style={{ padding: '10px 16px' }}>
+                    <span style={{
+                      background: '#fef3c7', color: '#a16207',
+                      padding: '3px 10px', borderRadius: '999px', fontSize: '12px', fontWeight: 500,
+                    }}>
+                      {roleLabels[inv.role] ?? inv.role}
+                    </span>
+                  </td>
+                  <td style={{ padding: '10px 16px' }}>
+                    <button
+                      onClick={() => handleRevokeInvitation(inv.id)}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: '#dc2626', fontSize: '12.5px', padding: '4px 8px', borderRadius: '6px',
+                      }}
+                    >
+                      Révoquer
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Formulaire d'invitation */}
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '20px' }}>
         <h2 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '14px', color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <UserPlus size={17} />
-          Ajouter un membre
+          <Mail size={17} />
+          Inviter un membre
         </h2>
 
-        <form onSubmit={handleAddMember} style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <form onSubmit={handleInvite} style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: '200px' }}>
             <label style={{ display: 'block', fontSize: '12.5px', color: '#374151', marginBottom: '5px' }}>
-              Utilisateur
+              Adresse email
             </label>
-            <select
-              value={selectedUserId}
-              onChange={(e) => setSelectedUserId(e.target.value)}
+            <input
+              type="email"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              placeholder="email@exemple.fr"
               style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13.5px', boxSizing: 'border-box' }}
-            >
-              <option value="">Sélectionner un utilisateur</option>
-              {availableUsers.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.firstName} {u.lastName} ({u.email})
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           <div style={{ minWidth: '150px' }}>
@@ -243,14 +295,14 @@ export default function OrganizationMembersPage() {
 
           <button
             type="submit"
-            disabled={adding || !selectedUserId}
+            disabled={adding || !inviteEmail.trim()}
             style={{
               padding: '9px 18px', borderRadius: '8px', border: 'none',
-              background: adding || !selectedUserId ? '#9ca3af' : '#1a2744',
-              color: '#fff', cursor: adding || !selectedUserId ? 'not-allowed' : 'pointer', fontSize: '13.5px',
+              background: adding || !inviteEmail.trim() ? '#9ca3af' : '#1a2744',
+              color: '#fff', cursor: adding || !inviteEmail.trim() ? 'not-allowed' : 'pointer', fontSize: '13.5px',
             }}
           >
-            {adding ? 'Ajout...' : 'Ajouter'}
+            {adding ? 'Envoi...' : 'Inviter'}
           </button>
         </form>
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Building2, Users, Star, Plus, X, Search, Filter, Eye, MoreVertical, ChevronLeft, ChevronRight, Info } from 'lucide-react';
+import { Building2, Users, Star, Plus, X, Search, Filter, Eye, MoreVertical, ChevronLeft, ChevronRight, Info, Pencil, Trash2, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
@@ -106,14 +106,163 @@ function CreateOrganizationModal({ onClose, onCreated }) {
   );
 }
 
+function RenameOrganizationModal({ currentName, onClose, onRenamed }) {
+  const [name, setName] = useState(currentName ?? '');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onRenamed(name.trim());
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.message ?? err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50,
+    }}>
+      <div style={{ background: '#fff', borderRadius: '12px', padding: '24px', width: '380px', boxShadow: '0 10px 30px rgba(0,0,0,0.15)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '17px', fontWeight: 600, color: '#111827', margin: 0 }}>
+            Renommer l'organisation
+          </h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <label style={{ display: 'block', fontSize: '13px', color: '#374151', marginBottom: '6px' }}>
+            Nouveau nom
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoFocus
+            style={{
+              width: '100%', padding: '9px 12px', border: '1px solid #d1d5db',
+              borderRadius: '8px', fontSize: '14px', marginBottom: '12px', boxSizing: 'border-box',
+            }}
+          />
+
+          {error && (
+            <div style={{ background: '#fee2e2', color: '#991b1b', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', marginBottom: '12px' }}>
+              {error}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontSize: '13.5px', color: '#374151' }}
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={submitting || !name.trim()}
+              style={{
+                padding: '8px 16px', borderRadius: '8px', border: 'none',
+                background: submitting || !name.trim() ? '#9ca3af' : '#1a2744',
+                color: '#fff', cursor: submitting || !name.trim() ? 'not-allowed' : 'pointer', fontSize: '13.5px',
+              }}
+            >
+              {submitting ? 'Renommage...' : 'Renommer'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function DeleteOrganizationConfirm({ onClose, onConfirm }) {
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    setError(null);
+    try {
+      await onConfirm();
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.message ?? err.message);
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50,
+    }}>
+      <div style={{ background: '#fff', borderRadius: '12px', padding: '24px', width: '380px', boxShadow: '0 10px 30px rgba(0,0,0,0.15)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+          <AlertTriangle size={20} color="#dc2626" />
+          <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#111827', margin: 0 }}>
+            Supprimer cette organisation ?
+          </h2>
+        </div>
+        <p style={{ color: '#6b7280', fontSize: '13.5px', marginBottom: '16px' }}>
+          Cette action est irréversible. Tous les membres seront retirés et l'organisation sera définitivement supprimée.
+        </p>
+
+        {error && (
+          <div style={{ background: '#fee2e2', color: '#991b1b', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', marginBottom: '12px' }}>
+            {error}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+          <button
+            onClick={onClose}
+            style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontSize: '13.5px', color: '#374151' }}
+          >
+            Annuler
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            style={{
+              padding: '8px 16px', borderRadius: '8px', border: 'none',
+              background: '#dc2626', color: '#fff',
+              cursor: deleting ? 'not-allowed' : 'pointer', fontSize: '13.5px',
+            }}
+          >
+            {deleting ? 'Suppression...' : 'Supprimer définitivement'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function OrganizationsPage() {
   const navigate = useNavigate();
   const [organizations, setOrganizations] = useState([]);
+  const [orgNames, setOrgNames] = useState({});
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('ALL');
   const [search, setSearch] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const [renameTarget, setRenameTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const fetchOrganizations = async () => {
     try {
@@ -127,10 +276,44 @@ export default function OrganizationsPage() {
     }
   };
 
-  useEffect(() => { fetchOrganizations(); }, []);
+  useEffect(() => {
+    fetchOrganizations();
+  }, []);
+
+  useEffect(() => {
+    const fetchNames = async () => {
+      const names = {};
+      await Promise.all(
+        organizations.map(async (org) => {
+          const realId = org.organizationId ?? org.id;
+          try {
+            const response = await api.get(`/organizations/${realId}`);
+            names[realId] = response.data.name;
+          } catch {
+            // fallback silencieux
+          }
+        })
+      );
+      setOrgNames(names);
+    };
+
+    if (organizations.length > 0) {
+      fetchNames();
+    }
+  }, [organizations]);
 
   const handleCreated = () => {
     setLoading(true);
+    fetchOrganizations();
+  };
+
+  const handleRename = async (realId, newName) => {
+    await api.put(`/organizations/${realId}?name=${encodeURIComponent(newName)}`);
+    setOrgNames((prev) => ({ ...prev, [realId]: newName }));
+  };
+
+  const handleDelete = async (realId) => {
+    await api.delete(`/organizations/${realId}`);
     fetchOrganizations();
   };
 
@@ -144,7 +327,11 @@ export default function OrganizationsPage() {
       if (filter === 'ADMIN') return org.role === 'ADMIN';
       return org.role !== 'ADMIN';
     })
-    .filter((org) => `organisation #${org.organizationId ?? org.id}`.includes(search.toLowerCase()));
+    .filter((org) => {
+      const realId = org.organizationId ?? org.id;
+      const name = orgNames[realId] ?? `organisation #${realId}`;
+      return name.toLowerCase().includes(search.toLowerCase());
+    });
 
   const statCards = [
     { icon: Building2, iconBg: '#dbeafe', iconColor: '#2563eb', value: total, label: 'Organisations', sub: 'Au total' },
@@ -153,7 +340,7 @@ export default function OrganizationsPage() {
   ];
 
   return (
-    <div style={{ padding: '32px 40px', maxWidth: '1200px', margin: '0 auto', background: '#f8f9fa', minHeight: '100vh' }}>
+    <div style={{ padding: '32px 40px', maxWidth: '1200px', margin: '0 auto', background: '#f8f9fa', minHeight: '100vh' }} onClick={() => setOpenMenuId(null)}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
@@ -204,7 +391,7 @@ export default function OrganizationsPage() {
       </div>
 
       {/* Card principale : tabs + recherche + tableau */}
-      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', overflow: 'hidden' }}>
+      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', overflow: 'visible' }}>
         {/* Tabs + recherche */}
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -279,8 +466,10 @@ export default function OrganizationsPage() {
                 const palette = orgIconPalette[i % orgIconPalette.length];
                 const badge = roleBadgeStyles[org.role] ?? { background: '#f3f4f6', color: '#374151' };
                 const realId = org.organizationId ?? org.id;
+                const currentName = orgNames[realId] ?? `Organisation #${realId}`;
+                const isAdmin = org.role === 'ADMIN';
                 return (
-                  <tr key={org.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  <tr key={org.id} style={{ borderBottom: '1px solid #f3f4f6', position: 'relative' }}>
                     <td style={{ padding: '14px 20px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{
@@ -290,8 +479,7 @@ export default function OrganizationsPage() {
                           <Building2 size={17} color={palette.color} />
                         </div>
                         <div>
-                          {/* TODO: remplacer par org.name quand disponible via GET /organizations/{id} */}
-                          <div style={{ fontWeight: 500, color: '#111827' }}>Organisation #{realId}</div>
+                          <div style={{ fontWeight: 500, color: '#111827' }}>{currentName}</div>
                         </div>
                       </div>
                     </td>
@@ -303,7 +491,7 @@ export default function OrganizationsPage() {
                         {roleLabels[org.role] ?? org.role}
                       </span>
                     </td>
-                    <td style={{ padding: '14px 20px' }}>
+                    <td style={{ padding: '14px 20px', position: 'relative' }}>
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <button
                           onClick={() => navigate(`/organisations/${realId}`)}
@@ -316,12 +504,63 @@ export default function OrganizationsPage() {
                           <Eye size={13} />
                           Voir
                         </button>
-                        <button style={{
-                          padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: '7px',
-                          background: '#fff', cursor: 'pointer', color: '#6b7280',
-                        }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMenuId(openMenuId === realId ? null : realId);
+                          }}
+                          style={{
+                            padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: '7px',
+                            background: '#fff', cursor: 'pointer', color: '#6b7280',
+                          }}
+                        >
                           <MoreVertical size={14} />
                         </button>
+
+                        {openMenuId === realId && (
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              position: 'absolute', right: '20px', top: '42px', zIndex: 20,
+                              background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.1)', minWidth: '160px', overflow: 'hidden',
+                            }}
+                          >
+                            <button
+                              onClick={() => {
+                                setRenameTarget({ id: realId, name: currentName });
+                                setOpenMenuId(null);
+                              }}
+                              disabled={!isAdmin}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
+                                padding: '9px 12px', background: 'none', border: 'none',
+                                cursor: isAdmin ? 'pointer' : 'not-allowed', fontSize: '13px',
+                                color: isAdmin ? '#374151' : '#d1d5db', textAlign: 'left',
+                              }}
+                            >
+                              <Pencil size={14} />
+                              Renommer
+                            </button>
+                            <button
+                              onClick={() => {
+                                setDeleteTarget(realId);
+                                setOpenMenuId(null);
+                              }}
+                              disabled={!isAdmin}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
+                                padding: '9px 12px', background: 'none', border: 'none',
+                                cursor: isAdmin ? 'pointer' : 'not-allowed', fontSize: '13px',
+                                color: isAdmin ? '#dc2626' : '#d1d5db', textAlign: 'left',
+                                borderTop: '1px solid #f3f4f6',
+                              }}
+                            >
+                              <Trash2 size={14} />
+                              Supprimer
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -379,6 +618,21 @@ export default function OrganizationsPage() {
         <CreateOrganizationModal
           onClose={() => setShowCreateModal(false)}
           onCreated={handleCreated}
+        />
+      )}
+
+      {renameTarget && (
+        <RenameOrganizationModal
+          currentName={renameTarget.name}
+          onClose={() => setRenameTarget(null)}
+          onRenamed={(newName) => handleRename(renameTarget.id, newName)}
+        />
+      )}
+
+      {deleteTarget && (
+        <DeleteOrganizationConfirm
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={() => handleDelete(deleteTarget)}
         />
       )}
     </div>
