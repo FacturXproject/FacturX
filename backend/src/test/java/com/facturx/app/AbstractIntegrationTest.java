@@ -6,6 +6,11 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 
+/**
+ * Boots the app against a real Postgres via Testcontainers, on a real embedded
+ * servlet container (RANDOM_PORT) - MockMvc's default MOCK environment never wires
+ * server.servlet.session.cookie.* into Spring Session's cookie serializer.
+ */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public abstract class AbstractIntegrationTest {
 
