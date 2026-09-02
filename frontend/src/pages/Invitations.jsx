@@ -1,4 +1,18 @@
+import { useEffect, useState } from 'react';
+
+import { useAuth } from '../context/AuthContext';
+
+import { FileCheck } from 'lucide-react';
+
 export default function Invitations() {
+
+  const [invitations, setInvitations] = useState([]);
+
+  useEffect(() => {
+    fetch(`/api/organizations/${orgId}/invitations`)
+      .then(response => response.json())
+      .then(data => setInvitations(data));
+  }, [orgId]);
 
   return (
     <div style={{
