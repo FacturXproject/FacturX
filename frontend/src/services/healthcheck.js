@@ -1,10 +1,7 @@
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+import api from './api';
+
 export const checkHealth = async () => {
-    const response = await fetch(`${API_URL}/api/healthcheck`);
+  const response = await api.get('/healthcheck');
 
-    if (!response.ok) {
-        throw new Error(`Health check failed: ${response.status}`);
-    }
-
-    return await response.text();
+  return response.data;
 };
