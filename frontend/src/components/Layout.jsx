@@ -1,13 +1,14 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, CheckCircle, RefreshCw, FileCode2, LogOut, FileCheck, Users } from 'lucide-react';
+import { ShieldCheck, Building2, FileCheck2, RefreshCw, ScanLine, LogOut, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const navItems = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Tableau de bord' },
+  { to: '/dashboard', icon: ShieldCheck, label: 'Tableau de bord' },
+  { to: '/organisations', icon: Building2, label: 'Organisations' },
   { to: '/invitations', icon: Users, label: 'Invitations' },
-  { to: '/verifier', icon: CheckCircle, label: 'Vérifier' },
+  { to: '/verifier', icon: FileCheck2, label: 'Vérifier' },
   { to: '/convertir', icon: RefreshCw, label: 'Convertir' },
-  { to: '/lecture-xml', icon: FileCode2, label: 'Lecture XML' },
+  { to: '/lecture-xml', icon: ScanLine, label: 'Lecture XML' },
 ];
 
 export default function Layout({ children }) {
@@ -26,26 +27,26 @@ export default function Layout({ children }) {
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f8f9fa' }}>
       {/* Sidebar */}
       <aside style={{
-        width: '220px',
+        width: '240px',
         flexShrink: 0,
-        background: '#1a2744',
+        background: '#ffffff',
         display: 'flex',
         flexDirection: 'column',
-        borderRight: '1px solid #0f1a33',
+        borderRight: '1px solid #e5e7eb',
       }}>
         {/* Logo */}
-        <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <FileCheck size={20} color="#4a9eff" />
+        <div style={{ padding: '22px 16px 18px', borderBottom: '1px solid #f3f4f6' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+            <ShieldCheck size={24} color="#1a2744" strokeWidth={2.2} />
             <div>
-              <div style={{ color: '#fff', fontWeight: 700, fontSize: '15px', letterSpacing: '-0.3px' }}>Factur-X</div>
-              <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '11px' }}>Conformité & Conversion</div>
+              <div style={{ color: '#111827', fontWeight: 700, fontSize: '17px', letterSpacing: '-0.3px' }}>Factur-X</div>
+              <div style={{ color: '#6b7280', fontSize: '12px' }}>Conformité & Conversion</div>
             </div>
           </div>
         </div>
 
         {/* Nav */}
-        <nav style={{ flex: 1, padding: '8px 0' }}>
+        <nav style={{ flex: 1, padding: '10px 0' }}>
           {navItems.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
@@ -53,42 +54,42 @@ export default function Layout({ children }) {
               style={({ isActive }) => ({
                 display: 'flex',
                 alignItems: 'center',
-                gap: '10px',
-                padding: '9px 16px',
+                gap: '11px',
+                padding: '11px 16px',
                 textDecoration: 'none',
-                fontSize: '13.5px',
-                color: isActive ? '#fff' : 'rgba(255,255,255,0.55)',
-                background: isActive ? 'rgba(74,158,255,0.15)' : 'transparent',
+                fontSize: '15.5px',
+                color: isActive ? '#1a2744' : '#6b7280',
+                background: isActive ? '#eff6ff' : 'transparent',
                 borderLeft: isActive ? '3px solid #4a9eff' : '3px solid transparent',
-                fontWeight: isActive ? 500 : 400,
+                fontWeight: isActive ? 550 : 450,
                 transition: 'all 0.15s',
               })}
             >
-              <Icon size={15} />
+              <Icon size={18} />
               {label}
             </NavLink>
           ))}
         </nav>
 
         {/* Logout */}
-        <div style={{ padding: '12px 0', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{ padding: '12px 0', borderTop: '1px solid #f3f4f6' }}>
           <button
             onClick={handleLogout}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '10px',
-              padding: '9px 16px',
+              gap: '11px',
+              padding: '11px 16px',
               width: '100%',
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              color: 'rgba(255,255,255,0.45)',
-              fontSize: '13.5px',
+              color: '#6b7280',
+              fontSize: '15.5px',
               textAlign: 'left',
             }}
           >
-            <LogOut size={15} />
+            <LogOut size={18} />
             Déconnexion
           </button>
         </div>
