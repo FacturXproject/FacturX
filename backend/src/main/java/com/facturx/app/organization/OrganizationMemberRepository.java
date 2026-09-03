@@ -1,14 +1,3 @@
-/* ************************************************************************** */
-/*                                                                            */
-/*                                                        :::      ::::::::   */
-/*   OrganizationMemberRepository.java                  :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: yseddiki <yseddiki@student.42.fr>                +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/08/19 17:28:28 by yseddiki             #+#    #+#             */
-/*   Updated: 2026/08/19 17:28:29 by yseddiki            ###   ########.fr       */
-/*                                                                            */
-/* ************************************************************************** */
 
 package com.facturx.app.organization;
 
@@ -23,4 +12,6 @@ public interface OrganizationMemberRepository extends JpaRepository<Organization
     List<OrganizationMember> findByUserId(Long userId);
 
     Optional<OrganizationMember> findByUserIdAndOrganizationId(Long userId, Long organizationId);
+
+    long countByOrganizationIdAndRole(Long organizationId, Role role);
 }

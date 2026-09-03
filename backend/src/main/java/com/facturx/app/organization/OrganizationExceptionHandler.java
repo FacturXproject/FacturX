@@ -78,7 +78,15 @@ public class OrganizationExceptionHandler {
     public ResponseEntity<Map<String, String>> handleInvitationNotForCurrentUser() {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
             "error", "INVITATION_NOT_FOR_CURRENT_USER",
-            "message", "This invitation does not belong to the current user."
+            "message", "Cette invitation n'appartient pas à l'utilisateur connecté."
+        ));
+    }
+
+    @ExceptionHandler(LastAdminRequiredException.class)
+    public ResponseEntity<Map<String, String>> handleLastAdminRequired() {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+            "error", "LAST_ADMIN_REQUIRED",
+            "message", "Une organisation doit toujours avoir au moins un administrateur."
         ));
     }
 
