@@ -1,85 +1,60 @@
 import { useEffect, useState } from 'react';
+import api from '../services/api';
 
 import {
-  Users,
-  Send,
-  Clock3,
-  CircleCheck,
-  Building2,
-  Search,
-  SlidersHorizontal,
-  RefreshCw,
-  Trash2,
-  ChevronLeft,
-  ChevronRight,
-  Info
+  Users, Send, Clock3, CircleCheck, Building2,
+  Search, SlidersHorizontal, RefreshCw, Trash2,
+  ChevronLeft, ChevronRight, Info
 } from 'lucide-react';
 
 export default function Invitations() {
-
-  const [organizations, setOrganizations] = useState([]);
   const [invitations, setInvitations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchAllInvitations = async () => {
+    try {
+      const orgsResponse = await api.get('/organizations');
+      const orgs = orgsResponse.data;
+
+      let allInvitations = [];
+
+      for (const org of orgs) {
+        const invResponse = await api.get(`/organizations/${org.id}/invitations`);
+        const withOrgName = invResponse.data.map(inv => ({
+          ...inv,
+          organisation: org.name
+        }));
+        allInvitations = allInvitations.concat(withOrgName);
+      }
+
+      setInvitations(allInvitations);
+    } catch (err) {
+      setError(err.response?.data?.message ?? err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    fetch('/api/organizations')
-      .then(response => response.json())
-      .then(data => {
-        console.log('ORGANIZATIONS:', data);
-        setOrganizations(data);
-      })
-      .catch(error => console.error(error));
+    fetchAllInvitations();
   }, []);
 
-  const rows = [
-    {
-      email: 'jean.dupont@example.com',
-      organisation: 'TransCompany',
-      description: 'Transports & Logistique',
-      role: 'Administrateur',
-      status: 'En attente',
-      sent: '28 juil. 2026',
-      expires: '04 août 2026'
-    },
-    {
-      email: 'marie.martin@example.com',
-      organisation: 'TransCompany',
-      description: 'Transports & Logistique',
-      role: 'Comptable',
-      status: 'En attente',
-      sent: '27 juil. 2026',
-      expires: '03 août 2026'
-    },
-    {
-      email: 'lucas.bernard@example.com',
-      organisation: 'FacturX Partners',
-      description: 'Services',
-      role: 'Membre',
-      status: 'Acceptée',
-      sent: '25 juil. 2026',
-      expires: '01 août 2026'
-    },
-    {
-      email: 'sophie.durand@example.com',
-      organisation: 'TransCompany',
-      description: 'Transports & Logistique',
-      role: 'Client',
-      status: 'Expirée',
-      sent: '20 juil. 2026',
-      expires: '27 juil. 2026'
-    },
-    {
-      email: 'paul.moreau@example.com',
-      organisation: 'FacturX Partners',
-      description: 'Services',
-      role: 'Membre',
-      status: 'Acceptée',
-      sent: '18 juil. 2026',
-      expires: '25 juil. 2026'
-    }
-  ];
+  const statusLabels = {
+    PENDING: 'En attente',
+    ACCEPTED: 'Acceptée',
+    EXPIRED: 'Expirée',
+    REVOKED: 'Révoquée'
+  };
+
+  const roleLabels = {
+    ADMIN: 'Administrateur',
+    ACCOUNTANT: 'Comptable',
+    CLIENT: 'Client'
+  };
 
   const statusStyle = (status) => {
-    if (status === 'En attente') {
+    if (status === 'PENDING') {
       return {
         background: '#fff7df',
         color: '#d78b13',
@@ -87,7 +62,7 @@ export default function Invitations() {
       };
     }
 
-    if (status === 'Acceptée') {
+    if (status === 'ACCEPTED') {
       return {
         background: '#eafaf1',
         color: '#28a76a',
@@ -198,7 +173,7 @@ export default function Invitations() {
               fontSize: '23px',
               fontWeight: 700
             }}>
-              8
+              {invitations.length}
             </div>
 
             <div style={{ fontSize: '12px' }}>
@@ -245,7 +220,7 @@ export default function Invitations() {
               fontSize: '23px',
               fontWeight: 700
             }}>
-              5
+              {invitations.filter(inv => inv.status === 'PENDING').length}
             </div>
 
             <div style={{ fontSize: '12px' }}>
@@ -292,7 +267,7 @@ export default function Invitations() {
               fontSize: '23px',
               fontWeight: 700
             }}>
-              3
+              {invitations.filter(inv => inv.status === 'ACCEPTED').length}
             </div>
 
             <div style={{ fontSize: '12px' }}>
@@ -457,7 +432,7 @@ export default function Invitations() {
 
             <tbody>
 
-              {rows.map((row, index) => (
+              {invitations.map((row, index) => (
 
                 <tr key={index} style={{
                   borderBottom: '1px solid #edf0f3'
@@ -490,21 +465,11 @@ export default function Invitations() {
                         />
                       </div>
 
-                      <div>
-                        <div style={{
-                          color: '#253044',
-                          fontWeight: 500
-                        }}>
-                          {row.organisation}
-                        </div>
-
-                        <div style={{
-                          fontSize: '10px',
-                          color: '#8b93a1',
-                          marginTop: '3px'
-                        }}>
-                          {row.description}
-                        </div>
+                      <div style={{
+                        color: '#253044',
+                        fontWeight: 500
+                      }}>
+                        {row.organisation}
                       </div>
 
                     </div>
@@ -519,7 +484,7 @@ export default function Invitations() {
                       borderRadius: '4px',
                       fontSize: '10px'
                     }}>
-                      {row.role}
+                      {roleLabels[row.role] ?? row.role}
                     </span>
                   </td>
 
@@ -531,24 +496,24 @@ export default function Invitations() {
                       borderRadius: '4px',
                       fontSize: '10px'
                     }}>
-                      {row.status}
+                      {statusLabels[row.status] ?? row.status}
                     </span>
                   </td>
 
 
                   <td style={{ padding: '14px 12px' }}>
-                    {row.sent}
+                    —
                   </td>
 
 
                   <td style={{ padding: '14px 12px' }}>
-                    {row.expires}
+                    {row.expiresAt}
                   </td>
 
 
                   <td style={{ padding: '14px 12px' }}>
 
-                    {row.status === 'Acceptée' ? (
+                    {row.status === 'ACCEPTED' ? (
                       <span style={{ color: '#9ca3af' }}>
                         —
                       </span>
@@ -569,7 +534,7 @@ export default function Invitations() {
                           <RefreshCw size={13} />
                         </button>
 
-                        {row.status === 'En attente' && (
+                        {row.status === 'PENDING' && (
                           <button style={{
                             width: '30px',
                             height: '30px',

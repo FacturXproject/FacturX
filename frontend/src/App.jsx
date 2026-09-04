@@ -16,7 +16,7 @@ import Users from './pages/Users';
 import Layout from './components/Layout';
 import Invitations from './pages/Invitations';
 import OrganizationMembersPage from './pages/OrganizationMembersPage';
-import OrganizationMembersPage from './pages/OrganizationMembersPage';
+
 
 function Protected({ children }) {
   return (

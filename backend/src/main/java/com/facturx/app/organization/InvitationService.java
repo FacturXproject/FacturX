@@ -176,6 +176,7 @@ public class InvitationService {
             invitation.getEmail(),
             invitation.getRole(),
             invitation.getStatus(),
+            invitation.getCreatedAt(),
             invitation.getExpiresAt()
         );
     }
