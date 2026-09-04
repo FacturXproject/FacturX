@@ -1,3 +1,4 @@
+import Profile from './pages/Profile';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -13,6 +14,8 @@ import UploadPage from './pages/UploadPage';
 import HealthCheck from './pages/HealthCheck';
 import Users from './pages/Users';
 import Layout from './components/Layout';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import Terms from './pages/Terms';
 
 function Protected({ children }) {
   return (
@@ -32,12 +35,15 @@ export default function App() {
 
           <Route path="/healthcheck" element={<HealthCheck />} />
           <Route path="/users" element={<Users />} />
+         <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<Terms />} />
 
           <Route path="/" element={<Protected><Dashboard /></Protected>} />
           <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
           <Route path="/traitement" element={<Protected><Processing /></Protected>} />
           <Route path="/rapport" element={<Protected><ComplianceReport /></Protected>} />
           <Route path="/conversion" element={<Protected><Conversion /></Protected>} />
+		  <Route path="/profile" element={<Protected><Profile /></Protected>} />
           <Route path="/succes" element={<Protected><Success /></Protected>} />
           <Route path="/lecture-xml" element={<Protected><XmlReader /></Protected>} />
           <Route path="/verifier" element={<Protected><UploadPage mode="verifier" /></Protected>} />

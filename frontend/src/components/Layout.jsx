@@ -1,12 +1,14 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, CheckCircle, RefreshCw, FileCode2, LogOut, FileCheck } from 'lucide-react';
+import { LayoutDashboard, CheckCircle, RefreshCw, FileCode2, LogOut, FileCheck, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import Footer from './Footer';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Tableau de bord' },
   { to: '/verifier', icon: CheckCircle, label: 'Vérifier' },
   { to: '/convertir', icon: RefreshCw, label: 'Convertir' },
   { to: '/lecture-xml', icon: FileCode2, label: 'Lecture XML' },
+  { to: '/profile', icon: User, label: 'Profil' },
 ];
 
 export default function Layout({ children }) {
@@ -94,9 +96,20 @@ export default function Layout({ children }) {
       </aside>
 
       {/* Main content */}
-      <main style={{ flex: 1, overflow: 'auto' }}>
-        {children}
-      </main>
+      <main
+		style={{
+			flex: 1,
+			overflow: 'auto',
+			display: 'flex',
+			flexDirection: 'column',
+		}}
+		>
+		<div style={{ flex: 1 }}>
+			{children}
+		</div>
+
+		<Footer />
+	  </main>
     </div>
   );
 }
