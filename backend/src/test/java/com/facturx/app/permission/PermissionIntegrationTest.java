@@ -1,5 +1,8 @@
 package com.facturx.app.permission;
 
+import com.facturx.app.organization.EmailService;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -49,6 +52,9 @@ class PermissionIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private InvitationRepository invitationRepository;
+
+    @MockitoBean
+    private EmailService emailService;
 
     private static String uniqueEmail(String label) {
         return label + "-" + UUID.randomUUID() + "@x.fr";
