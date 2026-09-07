@@ -62,7 +62,19 @@ services:
 
     networks:
       - facturx-network
+  
+  mailpit:
+    image: axllent/mailpit
+    
+    container_name: facturx-mailpit
 
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    
+
+    networks:
+      - facturx-network
 
   postgres:
     image: postgres:17
