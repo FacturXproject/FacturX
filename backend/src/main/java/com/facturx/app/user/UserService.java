@@ -14,7 +14,13 @@ public class UserService {
 
         return userRepository.findAll();
         
+    }
+	 public User updateProfile(User user, String firstName, String lastName) {
 
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
+
+        return userRepository.save(user);
     }
 
 }
