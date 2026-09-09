@@ -26,10 +26,12 @@ public class DocumentController {
         return principal.getUser().getId();
     }
 
-    // POST /api/documents (multipart/form-data, champ "file")
+    // POST /api/documents?organizationId=... (multipart/form-data, champ "file")
     @PostMapping
-    public DocumentResponse upload(@RequestParam("file") MultipartFile file, Authentication authentication) {
-        Document document = documentService.upload(file, currentUserId(authentication));
+    public DocumentResponse upload(@RequestParam("file") MultipartFile file,
+                                    @RequestParam Long organizationId,
+                                    Authentication authentication) {
+        Document document = documentService.upload(file, organizationId, currentUserId(authentication));
         return DocumentResponse.from(document);
     }
 
@@ -46,11 +48,12 @@ public class DocumentController {
     @GetMapping("/{id}")
     public ResponseEntity<ByteArrayResource> download(@PathVariable Long id) {
         Document document = documentService.getDocument(id);
+        byte[] bytes = documentService.readFileBytes(document);
 
-        ByteArrayResource resource = new ByteArrayResource(document.getData());
+        ByteArrayResource resource = new ByteArrayResource(bytes);
 
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(document.getContentType()))
+                .contentType(MediaType.parseMediaType(document.getType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         ContentDisposition.attachment().filename(document.getFilename()).build().toString())
                 .body(resource);

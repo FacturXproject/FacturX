@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import tools.jackson.databind.ObjectMapper;
@@ -25,6 +26,7 @@ import tools.jackson.databind.ObjectMapper;
  * Couvre les scenarios principaux de la feature Depot de documents (F06).
  */
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 class DocumentFlowTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -56,6 +58,17 @@ class DocumentFlowTest extends AbstractIntegrationTest {
         return sessionCookie(result);
     }
 
+    private long createOrganization(Cookie session) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/organizations?name=Cabinet Test")
+                        .with(csrf())
+                        .cookie(session))
+                .andExpect(status().isOk())
+                .andReturn();
+        return new ObjectMapper()
+                .readTree(result.getResponse().getContentAsString())
+                .get("id").asLong();
+    }
+
     private static byte[] validPdfBytes() {
         return "%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>".getBytes();
     }
@@ -71,27 +84,31 @@ class DocumentFlowTest extends AbstractIntegrationTest {
     @Test
     void uploadingAValidPdfSucceeds() throws Exception {
         Cookie session = registerAndLogin("doc-pdf");
+        long orgId = createOrganization(session);
 
         MockMultipartFile file = new MockMultipartFile(
                 "file", "facture.pdf", "application/pdf", validPdfBytes());
 
-        mockMvc.perform(multipart("/api/documents")
+        mockMvc.perform(multipart("/api/documents?organizationId=" + orgId)
                         .file(file)
                         .with(csrf())
                         .cookie(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.filename").value("facture.pdf"))
-                .andExpect(jsonPath("$.contentType").value("application/pdf"));
+                .andExpect(jsonPath("$.type").value("application/pdf"))
+                .andExpect(jsonPath("$.status").value("UPLOADED"))
+                .andExpect(jsonPath("$.organizationId").value(orgId));
     }
 
     @Test
     void uploadingAValidXmlSucceeds() throws Exception {
         Cookie session = registerAndLogin("doc-xml");
+        long orgId = createOrganization(session);
 
         MockMultipartFile file = new MockMultipartFile(
                 "file", "facture.xml", "application/xml", validXmlBytes());
 
-        mockMvc.perform(multipart("/api/documents")
+        mockMvc.perform(multipart("/api/documents?organizationId=" + orgId)
                         .file(file)
                         .with(csrf())
                         .cookie(session))
@@ -102,11 +119,12 @@ class DocumentFlowTest extends AbstractIntegrationTest {
     @Test
     void uploadingAnInvalidFileTypeIsRejected() throws Exception {
         Cookie session = registerAndLogin("doc-invalid");
+        long orgId = createOrganization(session);
 
         MockMultipartFile file = new MockMultipartFile(
                 "file", "fake.pdf", "application/pdf", invalidFileBytes());
 
-        mockMvc.perform(multipart("/api/documents")
+        mockMvc.perform(multipart("/api/documents?organizationId=" + orgId)
                         .file(file)
                         .with(csrf())
                         .cookie(session))
@@ -119,18 +137,19 @@ class DocumentFlowTest extends AbstractIntegrationTest {
         MockMultipartFile file = new MockMultipartFile(
                 "file", "facture.pdf", "application/pdf", validPdfBytes());
 
-        mockMvc.perform(multipart("/api/documents").file(file).with(csrf()))
+        mockMvc.perform(multipart("/api/documents?organizationId=1").file(file).with(csrf()))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void listingDocumentsReturnsUploadedFiles() throws Exception {
         Cookie session = registerAndLogin("doc-list");
+        long orgId = createOrganization(session);
 
         MockMultipartFile file = new MockMultipartFile(
                 "file", "facture.pdf", "application/pdf", validPdfBytes());
 
-        mockMvc.perform(multipart("/api/documents").file(file).with(csrf()).cookie(session))
+        mockMvc.perform(multipart("/api/documents?organizationId=" + orgId).file(file).with(csrf()).cookie(session))
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/documents").cookie(session))
@@ -141,11 +160,12 @@ class DocumentFlowTest extends AbstractIntegrationTest {
     @Test
     void downloadingAndDeletingADocumentWorks() throws Exception {
         Cookie session = registerAndLogin("doc-delete");
+        long orgId = createOrganization(session);
 
         MockMultipartFile file = new MockMultipartFile(
                 "file", "facture.pdf", "application/pdf", validPdfBytes());
 
-        MvcResult uploaded = mockMvc.perform(multipart("/api/documents").file(file).with(csrf()).cookie(session))
+        MvcResult uploaded = mockMvc.perform(multipart("/api/documents?organizationId=" + orgId).file(file).with(csrf()).cookie(session))
                 .andExpect(status().isOk())
                 .andReturn();
 

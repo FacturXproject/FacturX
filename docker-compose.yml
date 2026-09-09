@@ -56,6 +56,9 @@ services:
       - DB_USER=${POSTGRES_USER}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
 
+    volumes:
+      - documents-storage:/app/uploads
+
     depends_on:
       postgres:
         condition: service_healthy
@@ -89,6 +92,7 @@ services:
 
 volumes:
   postgres-data:
+  documents-storage:
 
 
 networks:

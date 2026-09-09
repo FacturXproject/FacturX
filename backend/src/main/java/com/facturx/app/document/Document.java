@@ -1,9 +1,8 @@
 package com.facturx.app.document;
 
+import com.facturx.app.organization.Organization;
 import com.facturx.app.user.User;
 import jakarta.persistence.*;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 
 @Entity
@@ -14,18 +13,24 @@ public class Document {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @ManyToOne
+    @JoinColumn(name = "organization_id")
+    private Organization organization;
+
+    @ManyToOne
+    @JoinColumn(name = "owner_id")
+    private User owner;
+
     private String filename;
 
-    private String contentType;
+    private String type;
 
     private long size;
 
-    @JdbcTypeCode(SqlTypes.VARBINARY)
-    private byte[] data;
+    @Enumerated(EnumType.STRING)
+    private DocumentStatus status = DocumentStatus.UPLOADED;
 
-    @ManyToOne
-    @JoinColumn(name = "uploaded_by")
-    private User uploadedBy;
+    private String storagePath;
 
     private LocalDateTime uploadedAt = LocalDateTime.now();
 
@@ -33,17 +38,21 @@ public class Document {
 
     // getters
     public Long getId() { return id; }
+    public Organization getOrganization() { return organization; }
+    public User getOwner() { return owner; }
     public String getFilename() { return filename; }
-    public String getContentType() { return contentType; }
+    public String getType() { return type; }
     public long getSize() { return size; }
-    public byte[] getData() { return data; }
-    public User getUploadedBy() { return uploadedBy; }
+    public DocumentStatus getStatus() { return status; }
+    public String getStoragePath() { return storagePath; }
     public LocalDateTime getUploadedAt() { return uploadedAt; }
 
     // setters
+    public void setOrganization(Organization organization) { this.organization = organization; }
+    public void setOwner(User owner) { this.owner = owner; }
     public void setFilename(String filename) { this.filename = filename; }
-    public void setContentType(String contentType) { this.contentType = contentType; }
+    public void setType(String type) { this.type = type; }
     public void setSize(long size) { this.size = size; }
-    public void setData(byte[] data) { this.data = data; }
-    public void setUploadedBy(User uploadedBy) { this.uploadedBy = uploadedBy; }
+    public void setStatus(DocumentStatus status) { this.status = status; }
+    public void setStoragePath(String storagePath) { this.storagePath = storagePath; }
 }
