@@ -1,5 +1,6 @@
 package com.facturx.app.organization;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
@@ -8,9 +9,17 @@ import org.springframework.stereotype.Service;
 public class EmailService {
 
     private final JavaMailSender mailSender;
+    private final String mailFrom;
+    private final String appBaseUrl;
 
-    public EmailService(JavaMailSender mailSender) {
+    public EmailService(
+            JavaMailSender mailSender,
+            @Value("${app.mail.from}") String mailFrom,
+            @Value("${app.base-url}") String appBaseUrl) {
+
         this.mailSender = mailSender;
+        this.mailFrom = mailFrom;
+        this.appBaseUrl = appBaseUrl;
     }
 
     public void sendInvitation(
@@ -19,18 +28,21 @@ public class EmailService {
             String token) {
 
         String invitationLink =
-            "https://localhost:8443/invitations/" + token;
+            appBaseUrl + "/invitations/" + token;
 
         SimpleMailMessage message = new SimpleMailMessage();
 
+        message.setFrom(mailFrom);
         message.setTo(email);
-        message.setSubject("Invitation à rejoindre " + organizationName);
+        message.setSubject(
+            "Invitation to join " + organizationName
+        );
 
         message.setText(
-            "Vous avez été invité à rejoindre l'organisation "
+            "You have been invited to join "
             + organizationName
             + ".\n\n"
-            + "Cliquez sur ce lien pour accepter l'invitation :\n"
+            + "Click the following link to accept the invitation:\n"
             + invitationLink
         );
 
