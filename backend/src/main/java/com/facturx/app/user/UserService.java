@@ -15,13 +15,22 @@ public class UserService {
         return userRepository.findAll();
         
     }
-	 public User updateProfile(User user, String firstName, String lastName) {
+	public User updateProfile(User user, String firstName, String lastName) {
 
-        user.setFirstName(firstName);
-        user.setLastName(lastName);
+    System.out.println("=== UPDATE PROFILE ===");
+    System.out.println("ID: " + user.getId());
+    System.out.println("PRIMA: " + user.getFirstName() + " " + user.getLastName());
 
-        return userRepository.save(user);
-    }
+    user.setFirstName(firstName);
+    user.setLastName(lastName);
+
+    User savedUser = userRepository.save(user);
+
+    System.out.println("DOPO SAVE: " +
+            savedUser.getFirstName() + " " + savedUser.getLastName());
+
+    return savedUser;
+}
 
 }
 

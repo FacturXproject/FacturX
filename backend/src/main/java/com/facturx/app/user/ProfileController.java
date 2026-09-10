@@ -10,28 +10,37 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.facturx.app.user.UserRepository;
 
 @RestController
 @RequestMapping("/api")
 public class ProfileController {
 
     private final UserService userService;
+	private final UserRepository userRepository;
 
-    public ProfileController(UserService userService) {
-        this.userService = userService;
-    }
+	public ProfileController(
+			UserService userService,
+			UserRepository userRepository) {
+		this.userService = userService;
+		this.userRepository = userRepository;
+	}
 
     @GetMapping("/me")
-    public ResponseEntity<UserResponse> getMe(
-            Authentication authentication) {
+	public ResponseEntity<UserResponse> getMe(
+			Authentication authentication) {
 
-        AppUserPrincipal principal =
-                (AppUserPrincipal) authentication.getPrincipal();
+		AppUserPrincipal principal =
+				(AppUserPrincipal) authentication.getPrincipal();
 
-        return ResponseEntity.ok(
-                UserResponse.from(principal.getUser())
-        );
-    }
+		User user = userRepository.findById(
+				principal.getUser().getId()
+		).orElseThrow();
+
+		return ResponseEntity.ok(
+				UserResponse.from(user)
+		);
+	}
 
     @PutMapping("/me")
     public ResponseEntity<UserResponse> updateMe(

@@ -2,12 +2,14 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import './Profile.css';
 
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -17,59 +19,92 @@ export default function Profile() {
   }, [user]);
 
   const handleSave = async () => {
-    try {
-      const response = await api.put('/me', {
-        firstName: firstName,
-        lastName: lastName,
-      });
+	try {
+		setSaving(true);
 
-      console.log('Profil mis à jour :', response.data);
-      alert('Profil sauvegardé !');
+		const response = await api.put('/me', {
+		firstName: firstName,
+		lastName: lastName,
+		});
+		setUser(response.data);
+		
+		console.log('Profil mis à jour :', response.data);
+		alert('Profil sauvegardé !');
 
-    } catch (error) {
-      console.error('Erreur lors de la sauvegarde :', error);
-      alert('Erreur lors de la sauvegarde du profil.');
-    }
-  };
+	} catch (error) {
+		console.error('Erreur lors de la sauvegarde :', error);
+		alert('Erreur lors de la sauvegarde du profil.');
+
+	} finally {
+		setSaving(false);
+	}
+	};
 
   return (
-    <div style={{ padding: '32px' }}>
-      <h1>Mon profil</h1>
+	<div className="profile-page">
+		<div className="profile-card">
+			<div className="profile-header">
+				<div className="profile-avatar">
+					{user?.firstName?.charAt(0).toUpperCase() ?? '?'}
+					{user?.lastName?.charAt(0).toUpperCase() ?? '?'}
+				</div>
 
-      <div style={{ marginTop: '24px' }}>
-        <div>
-          <strong>Email</strong>
-          <p>{user?.email ?? '—'}</p>
-        </div>
+				<div>
+					<h1>Mon profil</h1>
+					<p>Informations personnelles</p>
+				</div>
+			</div>
 
-        <div>
-          <strong>Prénom</strong>
-          <input
-            type="text"
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-          />
-        </div>
+			<div className="profile-fields">
+				<div className="profile-field">
+					<label>Email</label>
+					<div className="profile-input disabled">
+					<p>{user?.email ?? '—'}</p>
+					</div>
+				</div>
 
-        <div>
-          <strong>Nom</strong>
-          <input
-            type="text"
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-          />
-        </div>
+				<div className="profile-field">
+					<label>Prénom</label>
+					<div className="profile-input">
+					<input
+						type="text"
+						value={firstName}
+						onChange={(e) => setFirstName(e.target.value)}
+					/>
+					</div>
+				</div>
 
-        <div>
-          <strong>Organisation active</strong>
-          <p>—</p>
-        </div>
+				<div className="profile-field">
+					<label>Nom</label>
+					<div className="profile-input">
+					<input
+						type="text"
+						value={lastName}
+						onChange={(e) => setLastName(e.target.value)}
+					/>
+					</div>
+				</div>
 
-        <button onClick={handleSave}>
-          Sauvegarder
-        </button>
-      </div>
-    </div>
+				<div className="profile-field">
+					<label>Organisation active</label>
+					<div className="profile-input disabled">
+					<p>—</p>
+					</div>
+				</div>
+
+			</div>
+			<div className="profile-actions">
+				<button
+					type="button"
+					onClick={handleSave}
+					disabled={saving}
+					className="save-button"
+				>
+					{saving ? 'Enregistrement...' : '✓ Sauvegarder'}
+				</button>
+			</div>
+		</div>
+	</div>
   );
 }
 
