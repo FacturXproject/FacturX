@@ -3,6 +3,24 @@ import { useNavigate } from 'react-router-dom';
 import { Mail } from 'lucide-react';
 import api from '../services/api';
 
+const getErrorMessage = (err, fallback) => {
+  const status = err.response?.status;
+
+  if (status === 403) {
+    return 'Vous n’avez pas les permissions nécessaires pour effectuer cette action.';
+  }
+
+  if (status === 404) {
+    return 'La ressource demandée est introuvable.';
+  }
+
+  if (status === 401) {
+    return 'Votre session a expiré. Veuillez vous reconnecter.';
+  }
+
+  return fallback;
+};
+
 export default function NewInvitation() {
 
   const navigate = useNavigate();
@@ -11,7 +29,6 @@ export default function NewInvitation() {
   const [organizationId, setOrganizationId] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('CLIENT');
-
   const [error, setError] = useState(null);
 
 
@@ -22,27 +39,33 @@ export default function NewInvitation() {
 
         const response = await api.get('/organizations');
 
+        const adminOrganizations = response.data.filter(
+          (org) => org.role === 'ADMIN'
+        );
+
         const organizationsWithNames = await Promise.all(
-          response.data.map(async (org) => {
+          adminOrganizations.map(async (org) => {
 
             const id = org.organizationId ?? org.id;
 
             const details = await api.get(`/organizations/${id}`);
 
             return {
-              id: id,
+              id,
               name: details.data.name
             };
-
           })
         );
 
         setOrganizations(organizationsWithNames);
 
       } catch (err) {
-
-        console.error(err);
-
+        setError(
+          getErrorMessage(
+            err,
+            'Impossible de charger les organisations.'
+          )
+        );
       }
     };
 
@@ -54,11 +77,21 @@ export default function NewInvitation() {
     try {
       setError(null);
 
+      if (!organizationId) {
+        setError('Veuillez choisir une organisation.');
+        return;
+      }
+
+      if (!email.trim()) {
+        setError('Veuillez saisir une adresse email.');
+        return;
+      }
+
       await api.post(
         `/organizations/${organizationId}/invitations`,
         {
           email: email.trim(),
-          role: role
+          role
         }
       );
 
@@ -66,12 +99,13 @@ export default function NewInvitation() {
 
     } catch (err) {
       setError(
-        err.response?.data?.message ??
-        'Impossible d’envoyer l’invitation.'
+        getErrorMessage(
+          err,
+          'Impossible d’envoyer l’invitation.'
+        )
       );
     }
   };
-
 
   return (
     <div

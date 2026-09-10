@@ -24,34 +24,61 @@ export default function Invitations() {
   const [invitations, setInvitations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [adminOrganizations, setAdminOrganizations] = useState([]);
 
   const [searching, setSearching] = useState('');
   const [activeTab, setActiveTab] = useState('Toutes');
 
+const getErrorMessage = (err, fallback) => {
+  const status = err.response?.status;
 
-  const fetchAllInvitations = async () => {
+  if (status === 403) {
+    return 'Vous n’avez pas les permissions nécessaires pour effectuer cette action.';  }
+
+  if (status === 404) {
+    return 'La ressource demandée est introuvable.';
+  }
+
+  if (status === 401) {
+    return 'Votre session a expiré. Veuillez vous reconnecter.';
+  }
+
+  return fallback;
+};
+
+const fetchAllInvitations = async () => {
   try {
+    setError(null);
+    setLoading(true);
 
     const orgsResponse = await api.get('/organizations');
-    const orgs = orgsResponse.data;
+
+    const adminOrgs = orgsResponse.data.filter(
+      (org) => org.role === 'ADMIN'
+    );
+
+    setAdminOrganizations(adminOrgs);
 
     let allInvitations = [];
 
-    for (const org of orgs) {
-
+    for (const org of adminOrgs) {
       const orgId = org.organizationId ?? org.id;
 
-      const orgDetails = await api.get(`/organizations/${orgId}`);
+      const orgDetails = await api.get(
+        `/organizations/${orgId}`
+      );
 
       const invResponse = await api.get(
         `/organizations/${orgId}/invitations`
       );
 
-      const withOrgName = invResponse.data.map((invitation) => ({
-        ...invitation,
-        organisation: orgDetails.data.name,
-        organizationId: orgId
-      }));
+      const withOrgName = invResponse.data.map(
+        (invitation) => ({
+          ...invitation,
+          organisation: orgDetails.data.name,
+          organizationId: orgId
+        })
+      );
 
       allInvitations = allInvitations.concat(withOrgName);
     }
@@ -59,13 +86,15 @@ export default function Invitations() {
     setInvitations(allInvitations);
 
   } catch (err) {
-
-    setError(err.response?.data?.message ?? err.message);
+    setError(
+      getErrorMessage(
+        err,
+      'Impossible de charger les invitations.'
+      )
+    );
 
   } finally {
-
     setLoading(false);
-
   }
 };
 
@@ -129,13 +158,13 @@ export default function Invitations() {
       border: '1px solid #ffd1d1'
     };
   };
-    
+
     const formatDate = (date) => {
       if (!date) return '—';
 
       return new Date(date).toLocaleDateString('fr-FR');
   };
-      
+
   const handleRevoke = async (organizationId, invitationId) => {
       try {
 
@@ -148,10 +177,11 @@ export default function Invitations() {
       } catch (err) {
 
         setError(
-          err.response?.data?.message ??
+          getErrorMessage(
+            err,
           'Impossible de révoquer l’invitation.'
+          )
         );
-
       }
     };
 
@@ -167,8 +197,10 @@ export default function Invitations() {
         } catch (err) {
 
           setError(
-            err.response?.data?.message ??
+            getErrorMessage(
+              err,
             'Impossible de renvoyer l’invitation.'
+            )
           );
 
         }
@@ -231,7 +263,7 @@ export default function Invitations() {
 
         </div>
 
-
+      {adminOrganizations.length > 0 && (
         <button
           onClick={() => navigate('/invitations/new')}
           style={{
@@ -250,6 +282,7 @@ export default function Invitations() {
           <span style={{ fontSize: '18px' }}>+</span>
           Envoyer une invitation
         </button>
+      )}
 
       </div>
 
