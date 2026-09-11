@@ -1,10 +1,11 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { ShieldCheck, Building2, FileCheck2, RefreshCw, ScanLine, LogOut } from 'lucide-react';
+import { ShieldCheck, Building2, FileCheck2, RefreshCw, ScanLine, LogOut, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const navItems = [
   { to: '/dashboard', icon: ShieldCheck, label: 'Tableau de bord' },
   { to: '/organisations', icon: Building2, label: 'Organisations' },
+  { to: '/invitations', icon: Users, label: 'Invitations' },
   { to: '/verifier', icon: FileCheck2, label: 'Vérifier' },
   { to: '/convertir', icon: RefreshCw, label: 'Convertir' },
   { to: '/lecture-xml', icon: ScanLine, label: 'Lecture XML' },

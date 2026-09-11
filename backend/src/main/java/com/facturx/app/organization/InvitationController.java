@@ -5,7 +5,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
 import com.facturx.app.auth.AppUserPrincipal;
+
 import java.util.List;
 
 @RestController
@@ -18,36 +20,75 @@ public class InvitationController {
         this.invitationService = invitationService;
     }
 
+
     private Long currentUserId(Authentication authentication) {
-        AppUserPrincipal principal = (AppUserPrincipal) authentication.getPrincipal();
+        AppUserPrincipal principal =
+            (AppUserPrincipal) authentication.getPrincipal();
+
         return principal.getUser().getId();
     }
+
 
     @PostMapping
     public ResponseEntity<InvitationResponse> create(
             @PathVariable Long orgId,
             @Valid @RequestBody InvitationRequest request,
             Authentication authentication) {
-        InvitationResponse response = invitationService.create(orgId, request, currentUserId(authentication));
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+
+        InvitationResponse response =
+            invitationService.create(
+                orgId,
+                request,
+                currentUserId(authentication)
+            );
+
+        return ResponseEntity
+            .status(HttpStatus.CREATED)
+            .body(response);
     }
+
 
     @GetMapping
     public ResponseEntity<List<InvitationResponse>> list(
             @PathVariable Long orgId,
             Authentication authentication) {
-        List<InvitationResponse> invitations = invitationService.getByOrganization(orgId, currentUserId(authentication));
+
+        List<InvitationResponse> invitations =
+            invitationService.getByOrganization(
+                orgId,
+                currentUserId(authentication)
+            );
+
         return ResponseEntity.ok(invitations);
     }
-    
+
+
     @PatchMapping("/{invitationId}/revoke")
     public ResponseEntity<InvitationResponse> revoke(
-        @PathVariable Long invitationId,
-        Authentication authentication) {
-        
-        InvitationResponse response = invitationService.revoke(
-                    invitationId, currentUserId(authentication));
+            @PathVariable Long invitationId,
+            Authentication authentication) {
 
-    return ResponseEntity.ok(response);
-}
+        InvitationResponse response =
+            invitationService.revoke(
+                invitationId,
+                currentUserId(authentication)
+            );
+
+        return ResponseEntity.ok(response);
+    }
+
+
+    @PatchMapping("/{invitationId}/resend")
+    public ResponseEntity<InvitationResponse> resend(
+            @PathVariable Long invitationId,
+            Authentication authentication) {
+
+        InvitationResponse response =
+            invitationService.resend(
+                invitationId,
+                currentUserId(authentication)
+            );
+
+        return ResponseEntity.ok(response);
+    }
 }

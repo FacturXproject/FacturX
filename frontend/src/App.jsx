@@ -14,7 +14,12 @@ import HealthCheck from './pages/HealthCheck';
 import OrganizationsPage from './pages/OrganizationsPage';
 import Users from './pages/Users';
 import Layout from './components/Layout';
+import Invitations from './pages/Invitations';
 import OrganizationMembersPage from './pages/OrganizationMembersPage';
+import NewInvitation from './pages/NewInvitation';
+import InvitationCheck from './pages/InvitationCheck';
+
+
 
 function Protected({ children }) {
   return (
@@ -37,6 +42,9 @@ export default function App() {
           <Route path="/organisations/:id" element={<Protected><OrganizationMembersPage /></Protected>} />
           <Route path="/" element={<Protected><Dashboard /></Protected>} />
           <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
+          <Route path="/invitations/new" element={<Protected><NewInvitation /></Protected>} />
+          <Route path="/invitations" element={<Protected><Invitations /></Protected>} />
+          <Route path="/invitations/:token" element={<InvitationCheck />} />
           <Route path="/traitement" element={<Protected><Processing /></Protected>} />
           <Route path="/rapport" element={<Protected><ComplianceReport /></Protected>} />
           <Route path="/conversion" element={<Protected><Conversion /></Protected>} />
