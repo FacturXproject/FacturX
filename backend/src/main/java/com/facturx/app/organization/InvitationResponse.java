@@ -7,5 +7,6 @@ public record InvitationResponse(
     String email,
     Role role,
     InvitationStatus status,
+    LocalDateTime createdAt,
     LocalDateTime expiresAt
 ) {}

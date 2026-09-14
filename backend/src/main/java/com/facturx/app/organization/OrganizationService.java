@@ -121,29 +121,48 @@ public class OrganizationService {
             .findByUserIdAndOrganizationId(userId, organizationId)
             .orElseThrow(MemberNotFoundException::new);
 
+        if (member.getRole() == Role.ADMIN
+                && memberRepository.countByOrganizationIdAndRole(
+                    organizationId,
+                    Role.ADMIN
+                ) == 1) {
+
+            throw new LastAdminRequiredException();
+        }
+
         memberRepository.delete(member);
     }
 
     //update memberrole
     public OrganizationMember updateMemberRole(
-        Long organizationId,
-        Long userId,
-        Role role,
-        Long currentUserId) {
+            Long organizationId,
+            Long userId,
+            Role role,
+            Long currentUserId) {
 
-    permissionService.requirePermission(
-        currentUserId,
-        organizationId,
-        Permission.MANAGE_MEMBERS
-    );
+        permissionService.requirePermission(
+            currentUserId,
+            organizationId,
+            Permission.MANAGE_MEMBERS
+        );
 
-    OrganizationMember member = memberRepository
-        .findByUserIdAndOrganizationId(userId, organizationId)
-        .orElseThrow(MemberNotFoundException::new);
+        OrganizationMember member = memberRepository
+            .findByUserIdAndOrganizationId(userId, organizationId)
+            .orElseThrow(MemberNotFoundException::new);
 
-    member.setRole(role);
+        if (member.getRole() == Role.ADMIN
+                && role != Role.ADMIN
+                && memberRepository.countByOrganizationIdAndRole(
+                    organizationId,
+                    Role.ADMIN
+                ) == 1) {
 
-    return memberRepository.save(member);
+            throw new LastAdminRequiredException();
+        }
+
+        member.setRole(role);
+
+        return memberRepository.save(member);
     }
 
     // Supprimer une organisation et tous ses membres
