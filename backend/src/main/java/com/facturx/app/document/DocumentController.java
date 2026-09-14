@@ -35,8 +35,8 @@ public class DocumentController {
         return DocumentResponse.from(document);
     }
 
-    // GET /api/documents - mes documents
-    @GetMapping
+    // GET /api/documents/mine - mes documents
+    @GetMapping("/mine")
     public List<DocumentResponse> getMyDocuments(Authentication authentication) {
         return documentService.getMyDocuments(currentUserId(authentication))
                 .stream()
