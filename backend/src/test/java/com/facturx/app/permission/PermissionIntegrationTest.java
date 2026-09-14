@@ -1,5 +1,8 @@
 package com.facturx.app.permission;
 
+import com.facturx.app.organization.EmailService;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -7,6 +10,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 import com.facturx.app.AbstractIntegrationTest;
 import com.facturx.app.organization.Invitation;
@@ -48,6 +52,9 @@ class PermissionIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private InvitationRepository invitationRepository;
+
+    @MockitoBean
+    private EmailService emailService;
 
     private static String uniqueEmail(String label) {
         return label + "-" + UUID.randomUUID() + "@x.fr";
@@ -443,6 +450,45 @@ class PermissionIntegrationTest extends AbstractIntegrationTest {
                     .cookie(outsider.session())
             )
             .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void cannotDemoteLastAdmin() throws Exception {
+        RegisteredUser admin = register("last-admin-demote");
+
+        Organization organization = createOrganization(admin);
+
+        mockMvc.perform(
+                patch(
+                    "/api/organizations/{orgId}/members/{userId}/role",
+                    organization.getId(),
+                    admin.user().getId()
+                )
+                    .with(csrf())
+                    .cookie(admin.session())
+                    .param("role", "ACCOUNTANT")
+            )
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.error").value("LAST_ADMIN_REQUIRED"));
+    }
+
+    @Test
+    void cannotRemoveLastAdmin() throws Exception {
+        RegisteredUser admin = register("last-admin-remove");
+
+        Organization organization = createOrganization(admin);
+
+        mockMvc.perform(
+                delete(
+                    "/api/organizations/{orgId}/members/{userId}",
+                    organization.getId(),
+                    admin.user().getId()
+                )
+                    .with(csrf())
+                    .cookie(admin.session())
+            )
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.error").value("LAST_ADMIN_REQUIRED"));
     }
 
     private record RegisteredUser(

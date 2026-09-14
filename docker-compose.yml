@@ -18,6 +18,7 @@ services:
     depends_on:
       - frontend
       - backend
+      - mailpit
 
     networks:
       - facturx-network
@@ -56,12 +57,31 @@ services:
       - DB_USER=${POSTGRES_USER}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
 
+      - MAIL_HOST=${MAIL_HOST}
+      - MAIL_PORT=${MAIL_PORT}
+      - MAIL_FROM=${MAIL_FROM}
+      - APP_BASE_URL=${APP_BASE_URL}
+
     volumes:
       - documents-storage:/app/uploads
 
     depends_on:
       postgres:
         condition: service_healthy
+      mailpit:
+        condition: service_started
+
+    networks:
+      - facturx-network
+
+
+  mailpit:
+    image: axllent/mailpit
+
+    container_name: facturx-mailpit
+
+    environment:
+      - MP_WEBROOT=/mailpit/
 
     networks:
       - facturx-network
