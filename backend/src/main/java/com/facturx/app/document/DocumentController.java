@@ -16,10 +16,13 @@ import java.util.List;
 public class DocumentController {
 
     private final DocumentService documentService;
+    private final InvoiceViewService invoiceViewService;//F10
 
-    public DocumentController(DocumentService documentService) {
+    public DocumentController(DocumentService documentService, InvoiceViewService invoiceViewService)
+    {
         this.documentService = documentService;
-    }
+        this.invoiceViewService = invoiceViewService;
+    }//F10
 
     private Long currentUserId(Authentication authentication) {
         AppUserPrincipal principal = (AppUserPrincipal) authentication.getPrincipal();
@@ -57,6 +60,12 @@ public class DocumentController {
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         ContentDisposition.attachment().filename(document.getFilename()).build().toString())
                 .body(resource);
+    }
+
+    //GET /api/documents/{id}/invoice-view   F10
+    @GetMapping("/{id}/invoice-view")
+    public InvoiceViewResponse getInvoiceView(@PathVariable Long id) {
+        return invoiceViewService.getInvoiceView(id);
     }
 
     // DELETE /api/documents/{id}
