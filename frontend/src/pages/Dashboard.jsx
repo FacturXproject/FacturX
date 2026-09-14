@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef,} from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Upload, CheckCircle, RefreshCw } from 'lucide-react';
-import { recentDocuments } from '../mockData';
+import api from '../services/api';
 
 function StatusBadge({ status, label }) {
   const colors = {
@@ -26,10 +26,22 @@ function StatusBadge({ status, label }) {
   );
 }
 
+
+;
+
 export default function Dashboard({ onFileSelect }) {
   const navigate = useNavigate();
   const [dragging, setDragging] = useState(false);
   const fileRef = useRef();
+  const [documents, setDocuments] = useState([]);
+
+  const organizationId = 1; //de ce
+  useEffect(() => {
+    api.get(`/documents?organizationId=${organizationId}`)
+        .then(response => {
+            setDocuments(response.data.content);
+        });
+}, [])
 
   const handleAction = (type) => {
     if (onFileSelect) onFileSelect('FACT-2026-00142.pdf');
@@ -135,12 +147,12 @@ export default function Dashboard({ onFileSelect }) {
               </tr>
             </thead>
             <tbody>
-              {recentDocuments.map((doc, i) => (
+              {documents.map((doc, i) => (
                 <tr
                   key={doc.id}
                   onClick={() => handleRowClick(doc)}
                   style={{
-                    borderBottom: i < recentDocuments.length - 1 ? '1px solid #f3f4f6' : 'none',
+                    borderBottom: i <documents.length - 1 ? '1px solid #f3f4f6' : 'none',
                     cursor: 'pointer',
                     transition: 'background 0.1s',
                   }}
@@ -150,10 +162,10 @@ export default function Dashboard({ onFileSelect }) {
                   <td style={{ padding: '10px 14px', color: '#1a1a2e', fontWeight: 450 }}>
                     <span className="mono" style={{ fontSize: '12.5px' }}>{doc.filename}</span>
                   </td>
-                  <td style={{ padding: '10px 14px', color: '#6b7280' }}>{doc.date}</td>
-                  <td style={{ padding: '10px 14px', color: '#4b5563' }}>{doc.action}</td>
+                  <td style={{ padding: '10px 14px', color: '#6b7280' }}>{doc.uploadedAt}</td>
+                  <td style={{ padding: '10px 14px', color: '#4b5563' }}>{doc.type}</td>
                   <td style={{ padding: '10px 14px' }}>
-                    <StatusBadge status={doc.status} label={doc.statusLabel} />
+                    <StatusBadge status={doc.status} label={doc.status} />
                   </td>
                 </tr>
               ))}
