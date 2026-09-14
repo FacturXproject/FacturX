@@ -62,6 +62,9 @@ services:
       - MAIL_FROM=${MAIL_FROM}
       - APP_BASE_URL=${APP_BASE_URL}
 
+    volumes:
+      - documents-storage:/app/uploads
+
     depends_on:
       postgres:
         condition: service_healthy
@@ -109,6 +112,7 @@ services:
 
 volumes:
   postgres-data:
+  documents-storage:
 
 
 networks:
