@@ -21,6 +21,7 @@ import InvitationCheck from './pages/InvitationCheck';
 
 
 
+
 function Protected({ children }) {
   return (
     <ProtectedRoute>

@@ -38,8 +38,8 @@ public class DocumentController {
         return DocumentResponse.from(document);
     }
 
-    // GET /api/documents - mes documents
-    @GetMapping
+    // GET /api/documents/mine - mes documents
+    @GetMapping("/mine")
     public List<DocumentResponse> getMyDocuments(Authentication authentication) {
         return documentService.getMyDocuments(currentUserId(authentication))
                 .stream()
@@ -48,7 +48,7 @@ public class DocumentController {
     }
 
     // GET /api/documents/{id} - telecharger le fichier
-    @GetMapping("/{id}")
+    @GetMapping("/{id}/download")
     public ResponseEntity<ByteArrayResource> download(@PathVariable Long id) {
         Document document = documentService.getDocument(id);
         byte[] bytes = documentService.readFileBytes(document);
