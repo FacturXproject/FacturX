@@ -1,4 +1,4 @@
-package com.facturx.app.document;
+package com.facturx.app.invoice;
 
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;

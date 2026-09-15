@@ -1,4 +1,4 @@
-package com.facturx.app.document;
+package com.facturx.app.invoice;
 
 public class InvalidInvoiceXmlException extends RuntimeException {
 
