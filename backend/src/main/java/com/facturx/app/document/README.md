@@ -1,260 +1,202 @@
-# Feature : Depot de documents (F06)
+Session de travail : Depot de documents (F06) — front + backend
 
-**Auteur** : Yseddiki
-**Branche** : `feature/organization_yseddiki`
-**Module sujet** : Systeme de gestion de fichiers
+Branche : feature/documents_yseddiki Module sujet : Systeme de gestion de fichiers
 
----
+Ce document explique tout ce qui a ete construit et teste pour la feature de depot de documents, pour que l'equipe puisse s'y reperer, l'utiliser et l'integrer a ses propres features (F07, F03).
 
-## 1. Ce que ca permet de faire
+1. Vue d'ensemble
 
-Un utilisateur connecte peut deposer des factures au format PDF ou XML dans une organisation dont il est membre. La feature couvre le cycle complet : depot, listing, telechargement, suppression.
+L'objectif : permettre a un membre autorise d'une organisation de deposer une facture (PDF, XML ou Factur-X), avec verification du fichier, stockage sur volume, et creation d'un enregistrement en base.
 
-### Endpoints
-
-| Action | Endpoint | Detail |
-|---|---|---|
-| Deposer un fichier | `POST /api/documents?organizationId={id}` | multipart/form-data, champ `file` |
-| Lister mes documents | `GET /api/documents` | Documents de l'utilisateur connecte, du plus recent au plus ancien |
-| Telecharger un document | `GET /api/documents/{id}` | Renvoie le fichier avec son type MIME et son nom d'origine |
-| Supprimer un document | `DELETE /api/documents/{id}` | Supprime la ligne en base ET le fichier physique |
-
-Toutes les routes exigent d'etre connecte (session).
-
----
-
-## 2. Comment c'est construit
-
-```
-document/
-├── Document.java                  -> table "documents"
-├── DocumentStatus.java             -> enum des statuts possibles
+Utilisateur -> drag-and-drop / selection -> verification client
+           -> POST /api/documents -> verification serveur (taille, type reel)
+           -> ecriture sur le volume Docker -> ligne creee en base (status UPLOADED)
+2. Backend
+Structure des fichiers
+backend/src/main/java/com/facturx/app/document/
+├── Document.java                  entite JPA, table "documents"
+├── DocumentStatus.java             enum des statuts
 ├── DocumentRepository.java
-├── FileValidator.java              -> verification du type reel du fichier
-├── DocumentService.java            -> logique metier (validation, ecriture/lecture disque)
-├── DocumentController.java         -> les 4 endpoints
-├── DocumentResponse.java           -> ce qui est renvoye au front
+├── FileValidator.java              verification de la signature reelle du fichier
+├── DocumentService.java            logique metier (validation, ecriture/lecture disque)
+├── DocumentController.java         les 4 endpoints HTTP
+├── DocumentResponse.java           DTO renvoye au front
 ├── DocumentExceptionHandler.java
 ├── DocumentNotFoundException.java
 ├── InvalidFileTypeException.java
 └── FileTooLargeException.java
-```
+Schema de la table documents
+Colonne	Type	Description
+id	bigint	Cle primaire
+organization_id	bigint	FK vers organizations
+owner_id	bigint	FK vers users — qui a depose le fichier
+filename	varchar	Nom d'origine
+type	varchar	Type MIME (application/pdf, application/xml)
+size	bigint	Taille en octets
+status	varchar	UPLOADED / QUEUED / PROCESSING / VALID / INVALID / FAILED (contrainte CHECK)
+storage_path	varchar	Chemin du fichier sur le volume
+uploaded_at	timestamp	Date de depot
 
-### Le schema de la table `documents`
+Le contenu du fichier n'est jamais stocke en base : seul son chemin (storage_path) l'est. Le fichier physique vit sur un volume Docker dedie (documents-storage, monte sur /app/uploads dans le container backend). Ce choix a ete fait pour respecter les requirements du sujet ("file stored on a volume"), apres une premiere version qui stockait le contenu directement en base (bytea) — abandonnee car non conforme.
 
-| Colonne | Type | Description |
-|---|---|---|
-| id | bigint | Cle primaire |
-| organization_id | bigint | FK vers `organizations` — a quelle orga appartient le document |
-| owner_id | bigint | FK vers `users` — qui l'a depose |
-| filename | varchar | Nom d'origine du fichier |
-| type | varchar | Type MIME (`application/pdf`, `application/xml`) |
-| size | bigint | Taille en octets |
-| status | varchar | Un des 6 statuts (voir plus bas), contrainte CHECK en base |
-| storage_path | varchar | Chemin vers le fichier physique sur le volume |
-| uploaded_at | timestamp | Date de depot |
+Endpoints
+Methode	Route	Description
+POST	/api/documents?organizationId={id}	Upload d'un fichier (multipart, champ "file")
+GET	/api/documents?organizationId={id}	Liste des documents de l'organisation, reponse paginee
+GET	/api/documents/{id}	Telechargement du fichier
+DELETE	/api/documents/{id}	Suppression (base + fichier physique)
 
-### Les statuts
+Toutes les routes exigent une session active.
 
-```java
-public enum DocumentStatus {
-    UPLOADED, QUEUED, PROCESSING, VALID, INVALID, FAILED
-}
-```
+Validation
 
-Un document est cree avec le statut `UPLOADED`. Les transitions suivantes (`QUEUED` -> `PROCESSING` -> `VALID`/`INVALID`/`FAILED`) relevent de la feature de validation de conformite Factur-X, geree ailleurs dans le projet — cette feature ne fait que poser le statut initial.
+Deux controles independants avant tout stockage, dans FileValidator.java :
 
-### Validation du fichier
+Taille : 10 Mo maximum
+Type reel : lecture des premiers octets du fichier (signature %PDF- pour un PDF, <?xml ou < pour un XML) — jamais l'extension ou le nom, qui peuvent etre falsifies.
+Erreurs renvoyees
+Cas	Code HTTP	Erreur
+Type de fichier invalide	415	INVALID_FILE_TYPE
+Fichier trop volumineux	413	FILE_TOO_LARGE
+Document introuvable	404	DOCUMENT_NOT_FOUND
+Pas connecte	401	UNAUTHENTICATED
+Tests backend
 
-Deux controles independants avant tout stockage, dans `FileValidator.java` :
+DocumentFlowTest.java (JUnit + MockMvc), 8 tests : upload PDF valide, upload XML valide, fichier invalide rejete, upload sans session rejete, liste, telechargement puis suppression, plus deux tests ajoutes lors de l'integration avec la feature F07.
 
-- **Taille** : 10 Mo maximum
-- **Type** : verification du contenu reel du fichier (les premiers octets — signature `%PDF-` pour un PDF, `<?xml` ou `<` pour un XML), jamais de son extension ou de son nom. Un fichier renomme en `.pdf` qui n'est pas un vrai PDF est rejete.
+Ces tests tournent hors Docker et ont besoin d'un profil de configuration separe pour ecrire dans un dossier temporaire plutot que dans le volume reel :
 
-Cette verification est une validation de **format**, pas de contenu metier : elle ne lit pas et n'interprete pas les donnees de la facture (montants, conformite EN 16931...).
+backend/src/test/resources/application-test.properties :
 
-### Stockage sur volume
+app.storage.path=/tmp/facturx-test-uploads
+bash
+cd backend
+./mvnw test -Dtest=DocumentFlowTest
+3. Frontend
+Repartition des responsabilites (convenue avec l'equipe)
 
-Le fichier est ecrit physiquement sur un volume Docker, avec un nom unique genere (`UUID + nom original`) pour eviter toute collision entre deux fichiers du meme nom.
+La partie front de F06/F07 est partagee :
 
-```java
-// DocumentService.java
-String uniqueName = UUID.randomUUID() + "_" + file.getOriginalFilename();
-Path targetPath = storageDir.resolve(uniqueName);
-Files.write(targetPath, bytes);
-document.setStoragePath(targetPath.toString());
-```
+Cote F06 (cette session) : upload, selection de fichier, progression, erreurs de validation
+Cote F07 (avalent2) : page historique/liste des documents, tableau, badges de statut, pagination, page detail
+Composant DocumentUploadForm.jsx
+frontend/src/components/DocumentUploadForm.jsx
 
-Seul le **chemin** (`storagePath`) est stocke en base — jamais le contenu binaire.
+Composant reutilisable, integrable dans n'importe quelle page qui connait un organizationId.
 
-Le telechargement et la suppression relisent/effacent le fichier a partir de ce chemin :
+Props
 
-```java
-public byte[] readFileBytes(Document document) {
-    return Files.readAllBytes(Paths.get(document.getStoragePath()));
-}
-```
+organizationId (obligatoire) : l'organisation dans laquelle deposer le document
+onUploaded (optionnel) : callback appele avec les donnees du document apres un upload reussi, utile pour rafraichir une liste ailleurs dans l'app
 
-### Les erreurs renvoyees
+Fonctionnalites
 
-| Cas | Code HTTP | Erreur |
-|---|---|---|
-| Fichier ni PDF ni XML | 415 | `INVALID_FILE_TYPE` |
-| Fichier trop volumineux | 413 | `FILE_TOO_LARGE` |
-| Document introuvable | 404 | `DOCUMENT_NOT_FOUND` |
-| Pas connecte | 401 | `UNAUTHENTICATED` |
+Zone de drag-and-drop, avec fallback clic pour ouvrir le selecteur de fichiers
+Selection multiple de fichiers
+Validation cote client avant envoi : taille (10 Mo), type (extension/MIME declare)
+Barre de progression individuelle par fichier pendant l'upload (via onUploadProgress d'axios)
+Retrait d'un fichier de la liste avant envoi (valide ou en erreur)
+Affichage des erreurs, qu'elles viennent du client (validation immediate) ou du serveur (reponse d'echec)
+Confirmation visuelle (icone) une fois l'upload termine
 
----
+Utilisation
 
-## 3. Docker Compose
+jsx
+import DocumentUploadForm from '../components/DocumentUploadForm';
 
-Le fichier physique vit dans un volume Docker dedie, monte dans le container backend.
+<DocumentUploadForm
+  organizationId={id}
+  onUploaded={(doc) => /* rafraichir une liste, etc. */}
+/>
 
-```yaml
-services:
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: facturx-backend
-    environment:
-      - DB_HOST=postgres
-      - DB_USER=${POSTGRES_USER}
-      - DB_PASSWORD=${POSTGRES_PASSWORD}
-    volumes:
-      - documents-storage:/app/uploads
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - facturx-network
+Actuellement integre dans OrganizationMembersPage.jsx, dans un bloc "Deposer un document", accessible a tout membre de l'organisation (pas restreint par role pour l'instant).
+
+Point important sur la validation cote client
+
+La verification cote client (taille, type declare par le navigateur) sert uniquement a donner un retour rapide a l'utilisateur avant l'envoi. Elle n'est pas fiable en soi : un fichier peut avoir un nom et un type MIME corrects sans que son contenu reel corresponde. La securite reelle vient toujours du serveur, qui inspecte les octets du fichier (FileValidator.java). Ce comportement est verifie explicitement par un test dedie (voir plus bas).
+
+Tests frontend
+
+DocumentUploadForm.test.jsx (Vitest + React Testing Library), 20 tests repartis en plusieurs groupes :
+
+Affichage initial
+
+Presence du texte d'invite au depot
+Aucune liste de fichiers avant toute selection
+
+Selection de fichiers valides
+
+Ajout d'un PDF valide, d'un XML valide
+Selection multiple en une fois
+Cumul de plusieurs selections successives
+
+Validation cote client
+
+Rejet d'un fichier trop volumineux (>10 Mo)
+Acceptation d'un fichier juste en dessous de la limite
+Rejet d'un type de fichier non autorise
+Absence du bouton de depot si tous les fichiers sont invalides
+Melange de fichiers valides et invalides dans une meme selection
+
+Suppression avant envoi
+
+Retrait d'un fichier valide
+Retrait d'un fichier en erreur
+Disparition du bouton de depot quand plus aucun fichier n'est valide
+
+Envoi reel au backend
+
+Appel de l'API avec le bon endpoint et le bon organizationId
+Declenchement du callback onUploaded avec les donnees recues
+Envoi de plusieurs fichiers en parallele
+Affichage d'une confirmation visuelle apres succes
+
+Gestion des erreurs serveur
+
+Affichage du message d'erreur renvoye par le serveur
+Le scenario cle : un fichier accepte cote client (nom et type declare corrects) mais dont le contenu reel est invalide — verifie que le serveur reste le dernier rempart, meme quand le client se trompe
+Message generique en l'absence de reponse structuree (erreur reseau)
+Possibilite de retirer un fichier en echec et de reessayer
+
+Lancer les tests :
+
+bash
+cd frontend
+npx vitest run DocumentUploadForm
+
+Mise en place technique necessaire (le projet n'avait aucun framework de test frontend au depart) :
+
+Installation de vitest, @testing-library/react, @testing-library/jest-dom, @testing-library/dom, jsdom (versions fixees pour compatibilite avec l'environnement Node du projet)
+Configuration dans vite.config.js (section test)
+Fichier de setup : frontend/src/test-organization/setup.js
+4. Docker Compose
+yaml
+backend:
+  volumes:
+    - documents-storage:/app/uploads
+  depends_on:
+    postgres:
+      condition: service_healthy
+    mailpit:
+      condition: service_started
 
 volumes:
   postgres-data:
   documents-storage:
-```
 
-Le chemin `/app/uploads` a l'interieur du container correspond a la propriete `app.storage.path` configurable dans le backend :
+Verifications utiles :
 
-```java
-@Value("${app.storage.path:/app/uploads}")
-private String storageBasePath;
-```
-
-Verifier que le volume est bien cree :
-```bash
+bash
 docker volume ls | grep documents-storage
-```
-
-Verifier le contenu du dossier de stockage a l'interieur du container :
-```bash
 docker exec -it facturx-backend ls -la /app/uploads
-```
-
----
-
-## 4. Deroulement des tests
-
-### Tests automatises (JUnit + MockMvc)
-
-`DocumentFlowTest.java`, 6 scenarios :
-
-1. Upload d'un PDF valide -> succes, statut `UPLOADED`, `organizationId` correct
-2. Upload d'un XML valide -> succes
-3. Upload d'un fichier invalide (faux PDF) -> rejete en 415
-4. Upload sans etre connecte -> rejete en 401
-5. Liste des documents -> le fichier depose apparait
-6. Telechargement puis suppression -> le document redevient introuvable (404) apres suppression
-
-Ces tests tournent hors Docker, directement sur la machine. Ils ont donc besoin d'un chemin de stockage local different de celui du container :
-
-`src/test/resources/application-test.properties` :
-```properties
-app.storage.path=/tmp/facturx-test-uploads
-```
-
-Et la classe de test active ce profil :
-```java
-@AutoConfigureMockMvc
-@ActiveProfiles("test")
-class DocumentFlowTest extends AbstractIntegrationTest {
-```
-
-Lancer les tests :
-```bash
-cd backend
-./mvnw test -Dtest=DocumentFlowTest
-```
-
-Resultat attendu :
-```
-Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
-BUILD SUCCESS
-```
-
-### Tests manuels (curl)
-
-Batterie complete utilisee pour valider le flow reel via l'API HTTPS (nginx + backend) :
-
-```bash
-# 1. Cookie CSRF + login
-curl -c cookies.txt https://localhost:8443/api/healthcheck -k
-TOKEN=$(grep XSRF-TOKEN cookies.txt | awk '{print $7}')
-curl -X POST https://localhost:8443/api/auth/login -k \
-  -H "Content-Type: application/json" -H "X-XSRF-TOKEN: $TOKEN" \
-  -c cookies.txt -b cookies.txt \
-  -d '{"email": "...", "password": "..."}'
-TOKEN=$(grep XSRF-TOKEN cookies.txt | awk '{print $7}')
-
-# 2. Upload PDF valide (necessite un organizationId existant)
-curl -X POST "https://localhost:8443/api/documents?organizationId=87" -k \
-  -H "X-XSRF-TOKEN: $TOKEN" -b cookies.txt -c cookies.txt \
-  -F "file=@/tmp/test.pdf"
-
-# 3. Upload fichier invalide (doit renvoyer 415)
-curl -X POST "https://localhost:8443/api/documents?organizationId=87" -k \
-  -H "X-XSRF-TOKEN: $TOKEN" -b cookies.txt -c cookies.txt \
-  -F "file=@/tmp/fake.pdf"
-
-# 4. Liste
-curl "https://localhost:8443/api/documents" -k -H "X-XSRF-TOKEN: $TOKEN" -b cookies.txt -c cookies.txt
-
-# 5. Telechargement (verifie que le fichier recu est un vrai PDF)
-curl "https://localhost:8443/api/documents/1" -k -H "X-XSRF-TOKEN: $TOKEN" -b cookies.txt -c cookies.txt -o /tmp/downloaded.pdf
-file /tmp/downloaded.pdf
-
-# 6. Suppression puis verification (404 attendu)
-curl -X DELETE "https://localhost:8443/api/documents/1" -k -H "X-XSRF-TOKEN: $TOKEN" -b cookies.txt -c cookies.txt
-curl "https://localhost:8443/api/documents/1" -k -H "X-XSRF-TOKEN: $TOKEN" -b cookies.txt -c cookies.txt
-```
-
-Verification directe sur le volume et en base, en parallele des tests curl :
-
-```bash
-# le fichier apparait/disparait bien sur le disque
-docker exec -it facturx-backend ls -la /app/uploads
-
-# le schema de la table respecte les requirements F06
 docker exec -it facturx-postgres psql -U postgres -d facturx -c "\d documents"
-```
-
-### Resultats obtenus
-
-| Test | Resultat |
-|---|---|
-| Upload PDF valide | 200, `status: UPLOADED` |
-| Upload XML valide | 200 |
-| Fichier invalide | 415, `INVALID_FILE_TYPE` |
-| Fichier trop volumineux | 413, `FILE_TOO_LARGE` |
-| Liste | tableau correct |
-| Telechargement | fichier recupere, confirme PDF valide par la commande `file` |
-| Suppression | fichier disparait du volume ET de la base |
-| Acces sans session | 401, `UNAUTHENTICATED` |
-
----
-
-## 5. Ce qui n'est pas couvert par cette feature
-
-- La lecture/interpretation du contenu metier du document (conformite Factur-X, extraction des montants, validation EN 16931) : c'est une autre feature de l'equipe, qui s'appuie sur les fichiers stockes ici via `storage_path`
-- Les transitions de `status` au-dela de `UPLOADED` : posees par la feature de validation
-- Les permissions fines (qui a le droit de deposer/voir/supprimer un document selon son role dans l'organisation) : a integrer avec la feature Permissions
+5. Ce qui n'est pas couvert par cette feature
+La lecture/interpretation du contenu metier du document (conformite Factur-X, montants, EN 16931) : une autre feature de l'equipe, qui s'appuie sur les fichiers stockes ici via storage_path
+Les transitions de status au-dela de UPLOADED
+L'affichage de la liste, des badges de statut et la pagination : geres par F07
+Les permissions fines sur qui peut deposer/voir/supprimer un document selon son role : a integrer avec la feature Permissions
+6. Points de coordination avec l'equipe
+organization_id ajoute dans MemberResponse (fix commun avec la feature Permissions)
+Endpoint GET /organizations/{id} ajoute pour permettre l'affichage des vrais noms d'organisation
+GET /api/documents exige desormais organizationId et renvoie une reponse paginee (modification apportee lors de l'integration avec F07)
+Le composant DocumentUploadForm est concu pour etre reutilise tel quel dans la page liste de F07, via sa prop onUploaded
