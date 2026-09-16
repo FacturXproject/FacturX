@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Trash2, AlertTriangle, Mail, Clock } from 'lucide-react';
 import api from '../services/api';
+import DocumentUploadForm from '../components/DocumentUploadForm';
 
 const roleLabels = {
   ADMIN: 'Administrateur',
@@ -356,7 +357,7 @@ export default function OrganizationMembersPage() {
 
       {/* Formulaire d'invitation */}
       {isAdmin && (
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '20px' }}>
+        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
           <h2
             style={{
               fontSize: '15px',
@@ -421,6 +422,17 @@ export default function OrganizationMembersPage() {
         )}
       </div>
     )}
+
+      {/* Depot de documents (F06) */}
+      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
+        <h2 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '14px', color: '#111827' }}>
+          Déposer un document
+        </h2>
+        <DocumentUploadForm
+          organizationId={id}
+          onUploaded={(doc) => console.log('Uploadé:', doc)}
+        />
+      </div>
 
       {isAdmin && showDeleteConfirm && (
         <div style={{
