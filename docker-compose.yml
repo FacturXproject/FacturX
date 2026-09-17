@@ -56,11 +56,13 @@ services:
       - DB_HOST=postgres
       - DB_USER=${POSTGRES_USER}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
-
       - MAIL_HOST=${MAIL_HOST}
       - MAIL_PORT=${MAIL_PORT}
       - MAIL_FROM=${MAIL_FROM}
       - APP_BASE_URL=${APP_BASE_URL}
+
+    volumes:
+      - documents-storage:/app/uploads
 
     depends_on:
       postgres:
@@ -109,6 +111,7 @@ services:
 
 volumes:
   postgres-data:
+  documents-storage:
 
 
 networks:
