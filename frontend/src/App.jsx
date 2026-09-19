@@ -18,6 +18,7 @@ import Invitations from './pages/Invitations';
 import OrganizationMembersPage from './pages/OrganizationMembersPage';
 import NewInvitation from './pages/NewInvitation';
 import InvitationCheck from './pages/InvitationCheck';
+import DocumentDetail from './pages/DocumentDetail'
 
 
 
@@ -43,6 +44,7 @@ export default function App() {
           <Route path="/organisations/:id" element={<Protected><OrganizationMembersPage /></Protected>} />
           <Route path="/" element={<Protected><Dashboard /></Protected>} />
           <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
+          <Route path="/documents/:id" element={<Protected><DocumentDetail /></Protected>} />
           <Route path="/invitations/new" element={<Protected><NewInvitation /></Protected>} />
           <Route path="/invitations" element={<Protected><Invitations /></Protected>} />
           <Route path="/invitations/:token" element={<InvitationCheck />} />

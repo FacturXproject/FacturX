@@ -269,7 +269,7 @@ export default function Dashboard({ onFileSelect }) {
           >
             <thead>
               <tr style={{ background: '#f9fafb' }}>
-                {['Fichier', 'Date', 'Type', 'Statut', ''].map((title) => (
+                {['Fichier', 'Date', 'Type', 'Utilisateur', 'Statut', 'Action'].map((title) => (
                   <th
                     key={title}
                     style={{
@@ -285,7 +285,7 @@ export default function Dashboard({ onFileSelect }) {
             </thead>
 
             <tbody>
-              {documents.map((doc, index) => (
+              {documents.map((doc) => (
                 <tr
                   key={doc.id}
                   onClick={() => handleRowClick(doc)}
@@ -304,6 +304,10 @@ export default function Dashboard({ onFileSelect }) {
 
                   <td style={{ padding: '10px 14px' }}>
                     {doc.type}
+                  </td>
+
+                   <td style={{ padding: '10px 14px' }}>
+                    {doc.ownerName}
                   </td>
 
                   <td style={{ padding: '10px 14px' }}>
@@ -332,7 +336,7 @@ export default function Dashboard({ onFileSelect }) {
               {documents.length === 0 && (
                 <tr>
                   <td
-                    colSpan="5"
+                    colSpan="6"
                     style={{
                       padding: '20px',
                       textAlign: 'center',
