@@ -22,6 +22,7 @@ import InvitationCheck from './pages/InvitationCheck';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import Terms from './pages/Terms';
 import LandingPage from './pages/LandingPage';
+import DocumentDetail from './pages/DocumentDetail';
 
 
 function Protected({ children }) {
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="/organisations/:id" element={<Protected><OrganizationMembersPage /></Protected>} />
           <Route path="/" element={<LandingPage />} />
           <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
+          <Route path="/documents/:id" element={<Protected><DocumentDetail /></Protected>} />
           <Route path="/invitations/new" element={<Protected><NewInvitation /></Protected>} />
           <Route path="/invitations" element={<Protected><Invitations /></Protected>} />
           <Route path="/invitations/:token" element={<InvitationCheck />} />

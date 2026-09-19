@@ -5,10 +5,12 @@ import java.time.LocalDateTime;
 public record DocumentHistoryResponse(
         Long id,
         Long organizationId,
+        String organizationName,
         Long ownerId,
+        String ownerName,
         String filename,
         String type,
-        //long size,
+        long size,
         DocumentStatus status,
         LocalDateTime uploadedAt
 ) {
@@ -16,10 +18,12 @@ public record DocumentHistoryResponse(
         return new DocumentHistoryResponse(
                 document.getId(),
                 document.getOrganization() != null ? document.getOrganization().getId() : null,
+                document.getOrganization() !=null ? document.getOrganization().getName() : null,
                 document.getOwner() != null ? document.getOwner().getId() : null,
+                document.getOwner() != null ? document.getOwner().getFirstName() + " " + document.getOwner().getLastName() : null,
                 document.getFilename(),
                 document.getType(),
-                //document.getSize(),
+                document.getSize(),
                 document.getStatus(),
                 document.getUploadedAt()
         );
