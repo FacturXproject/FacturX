@@ -103,9 +103,9 @@ export default function Dashboard({ onFileSelect }) {
     }
   };
 
-  const handleAction = (type) => {
+ /* const handleAction = (type) => {
     navigate(`/traitement?action=${type}`);
-  };
+  };*/
 
   const handleRowClick = (doc) => {
     if (onFileSelect) {
@@ -147,7 +147,7 @@ export default function Dashboard({ onFileSelect }) {
           Déposez une facture pour la vérifier ou la convertir en Factur-X
         </p>
       </div>
-
+      <br />
       {/* UPLOAD */}
       <div
         onDragOver={(event) => {
@@ -167,7 +167,7 @@ export default function Dashboard({ onFileSelect }) {
           textAlign: 'center',
           background: dragging ? '#f0f7ff' : '#fafafa',
           cursor: 'pointer',
-          marginBottom: '16px',
+          marginBottom: '32px',
         }}
       >
         <input
@@ -184,6 +184,7 @@ export default function Dashboard({ onFileSelect }) {
             fontWeight: 600,
             fontSize: '14px',
             color: '#1a1a2e',
+            
           }}
         >
           Déposez une facture ici
@@ -200,44 +201,7 @@ export default function Dashboard({ onFileSelect }) {
         </p>
       </div>
 
-      {/* BUTTONS */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '12px',
-          marginBottom: '32px',
-        }}
-      >
-        <button
-          onClick={() => handleAction('verifier')}
-          style={{
-            padding: '9px 18px',
-            background: '#1a2744',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '13.5px',
-            cursor: 'pointer',
-          }}
-        >
-          Vérifier la conformité
-        </button>
-
-        <button
-          onClick={() => handleAction('convertir')}
-          style={{
-            padding: '9px 18px',
-            background: '#fff',
-            color: '#1a2744',
-            border: '1px solid #d1d5db',
-            borderRadius: '6px',
-            fontSize: '13.5px',
-            cursor: 'pointer',
-          }}
-        >
-          Convertir en Factur-X
-        </button>
-      </div>
+     
 
       {/* DOCUMENTS */}
       <div>
@@ -269,7 +233,7 @@ export default function Dashboard({ onFileSelect }) {
           >
             <thead>
               <tr style={{ background: '#f9fafb' }}>
-                {['Fichier', 'Date', 'Type', 'Statut', ''].map((title) => (
+                {['Fichier', 'Date', 'Type', 'Utilisateur', 'Statut', 'Action'].map((title) => (
                   <th
                     key={title}
                     style={{
@@ -285,7 +249,7 @@ export default function Dashboard({ onFileSelect }) {
             </thead>
 
             <tbody>
-              {documents.map((doc, index) => (
+              {documents.map((doc) => (
                 <tr
                   key={doc.id}
                   onClick={() => handleRowClick(doc)}
@@ -304,6 +268,10 @@ export default function Dashboard({ onFileSelect }) {
 
                   <td style={{ padding: '10px 14px' }}>
                     {doc.type}
+                  </td>
+
+                   <td style={{ padding: '10px 14px' }}>
+                    {doc.ownerName}
                   </td>
 
                   <td style={{ padding: '10px 14px' }}>
@@ -332,7 +300,7 @@ export default function Dashboard({ onFileSelect }) {
               {documents.length === 0 && (
                 <tr>
                   <td
-                    colSpan="5"
+                    colSpan="6"
                     style={{
                       padding: '20px',
                       textAlign: 'center',
