@@ -285,50 +285,58 @@ export default function DocumentDetail() {
 
       {/* DOCUMENT INEXISTANT */}
       {!document && !loading && (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            padding: '60px 20px',
-          }}
-        >
-          <div
-            style={{
-              width: '420px',
-              padding: '40px',
-              background: '#fff',
-              border: '1px solid #e5e7eb',
-              borderRadius: '10px',
-              textAlign: 'center',
-            }}
-          >
-            <p
-              style={{
-                fontSize: '18px',
-                color: '#1a1a2e',
-                marginBottom: '24px',
-              }}
-            >
-              Document introuvable
-            </p>
+  <div
+    style={{
+      maxWidth: '700px',
+      margin: '40px auto',
+      padding: '0 24px',
+    }}
+  >
+    <button
+      onClick={() => navigate('/dashboard')}
+      style={{
+        background: 'transparent',
+        border: 'none',
+        padding: 0,
+        marginBottom: '18px',
+        color: '#6b7280',
+        cursor: 'pointer',
+        fontSize: '13px',
+      }}
+    >
+      ← Retour
+    </button>
 
-            <button
-              onClick={() => navigate('/dashboard')}
-              style={{
-                background: '#1a2744',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '6px',
-                padding: '10px 22px',
-                cursor: 'pointer',
-                fontSize: '14px',
-              }}
-            >
-              Retour
-            </button>
-          </div>
-        </div>
-      )}
+    <div
+      style={{
+        background: '#fff',
+        border: '1px solid #e5e7eb',
+        borderRadius: '8px',
+        padding: '24px',
+      }}
+    >
+      <h2
+        style={{
+          margin: '0 0 8px',
+          fontSize: '20px',
+          color: '#1a1a2e',
+        }}
+      >
+        Document
+      </h2>
+
+      <p
+        style={{
+          margin: 0,
+          fontSize: '13px',
+          color: '#b42318',
+        }}
+      >
+        Document introuvable.
+      </p>
     </div>
-  );
+  </div>
+)}
+</div>
+);
 }
