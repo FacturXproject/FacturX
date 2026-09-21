@@ -1,0 +1,14 @@
+package com.facturx.app.permission;
+
+public enum Permission {
+    UPLOAD_DOCUMENT,
+    VIEW_ALL_DOCUMENTS,
+    VIEW_OWN_DOCUMENTS,
+    VALIDATE_DOCUMENT,
+    INVITE_MEMBER,
+    MANAGE_MEMBERS,
+    MANAGE_ORGANIZATION,
+    DELETE_ANY_DOCUMENT,
+    DELETE_OWN_PENDING_DOCUMENT
+}
+
