@@ -9,14 +9,37 @@ export default function Profile() {
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [organization, setOrganization] = useState(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      setFirstName(user.firstName ?? '');
-      setLastName(user.lastName ?? '');
-    }
-  }, [user]);
+  const loadProfileData = async () => {
+		if (user) {
+		setFirstName(user.firstName ?? '');
+		setLastName(user.lastName ?? '');
+
+		try {
+			const response = await api.get('/organizations');
+
+			if (response.data && response.data.length > 0) {
+			const firstOrganization = response.data[0];
+			const organizationId =
+				firstOrganization.organizationId ?? firstOrganization.id;
+
+			const organizationResponse = await api.get(
+				`/organizations/${organizationId}`
+			);
+
+			setOrganization(organizationResponse.data);
+			}
+		} catch (error) {
+			console.error('Erreur lors du chargement de l’organisation :', error);
+		}
+		}
+	};
+
+	loadProfileData();
+	}, [user]);
 
   const handleSave = async () => {
 	try {
@@ -88,7 +111,7 @@ export default function Profile() {
 				<div className="profile-field">
 					<label>Organisation active</label>
 					<div className="profile-input disabled">
-					<p>—</p>
+					<p>{organization?.name ?? '—'}</p>
 					</div>
 				</div>
 

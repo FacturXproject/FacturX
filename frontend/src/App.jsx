@@ -21,7 +21,7 @@ import NewInvitation from './pages/NewInvitation';
 import InvitationCheck from './pages/InvitationCheck';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import Terms from './pages/Terms';
-
+import LandingPage from './pages/LandingPage';
 
 
 function Protected({ children }) {
@@ -46,7 +46,7 @@ export default function App() {
           <Route path="/terms" element={<Terms />} />
 
           <Route path="/organisations/:id" element={<Protected><OrganizationMembersPage /></Protected>} />
-          <Route path="/" element={<Protected><Dashboard /></Protected>} />
+          <Route path="/" element={<LandingPage />} />
           <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
           <Route path="/invitations/new" element={<Protected><NewInvitation /></Protected>} />
           <Route path="/invitations" element={<Protected><Invitations /></Protected>} />
