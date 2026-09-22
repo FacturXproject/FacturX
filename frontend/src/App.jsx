@@ -18,11 +18,10 @@ import Invitations from './pages/Invitations';
 import OrganizationMembersPage from './pages/OrganizationMembersPage';
 import NewInvitation from './pages/NewInvitation';
 import InvitationCheck from './pages/InvitationCheck';
-import InvoiceView from './pages/InvoiceView';
+
 import DocumentDetail from './pages/DocumentDetail'
-
-
-
+import XmlReader from './pages/XmlReader';
+import InvoiceView from './pages/InvoiceView';
 
 function Protected({ children }) {
   return (
@@ -49,6 +48,7 @@ export default function App() {
           <Route path="/invitations/new" element={<Protected><NewInvitation /></Protected>} />
           <Route path="/invitations" element={<Protected><Invitations /></Protected>} />
           <Route path="/invitations/:token" element={<InvitationCheck />} />
+          <Route path="/lecture-xml" element={<Protected><XmlReader /></Protected>} />
           <Route path="/documents/:id/invoice" element={<Protected><InvoiceView /></Protected>} />
           <Route path="/traitement" element={<Protected><Processing /></Protected>} />
           <Route path="/rapport" element={<Protected><ComplianceReport /></Protected>} />
