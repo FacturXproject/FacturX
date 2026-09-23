@@ -28,20 +28,70 @@ export default function DocumentDetail() {
     return `${mo.toFixed(1)} Mo`;
   };
 
+  // Affichage simple du type
+  const formatType = (type) => {
+    if (type === 'application/pdf') {
+      return 'PDF';
+    }
+
+    if (
+      type === 'application/xml' ||
+      type === 'text/xml'
+    ) {
+      return 'XML';
+    }
+
+    return type;
+  };
+
+  const getStatusStyle = (status) => {
+    switch (status) {
+      case 'VALID':
+        return {
+          background: '#dcfce7',
+          color: '#166534',
+        };
+
+      case 'INVALID':
+      case 'FAILED':
+        return {
+          background: '#fee2e2',
+          color: '#991b1b',
+        };
+
+      case 'PROCESSING':
+      case 'QUEUED':
+        return {
+          background: '#fef3c7',
+          color: '#92400e',
+        };
+
+      case 'UPLOADED':
+      default:
+        return {
+          background: '#f3f4f6',
+          color: '#374151',
+        };
+    }
+  };
+
   const loadDocument = async () => {
     try {
       const response = await api.get(`/documents/${id}`);
       setDocument(response.data || null);
     } catch (error) {
       console.error('Documents error:', error);
+      setDocument(null);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    setDocument(null);
+    setLoading(true);
     loadDocument();
-  }, []);
+  }, [id]);
 
   return (
     <div>
@@ -155,7 +205,7 @@ export default function DocumentDetail() {
                   Organisation
                 </span>
                 <span style={{ fontWeight: 500 }}>
-                  {document.organizationId}
+                  {document.organizationName}
                 </span>
               </div>
             </div>
@@ -197,7 +247,7 @@ export default function DocumentDetail() {
                   Type
                 </span>
                 <span style={{ fontWeight: 500 }}>
-                  {document.type}
+                  {formatType(document.type)}
                 </span>
 
                 <span style={{ color: '#6b7280' }}>
@@ -223,10 +273,9 @@ export default function DocumentDetail() {
                     width: 'fit-content',
                     padding: '2px 10px',
                     borderRadius: '12px',
-                    background: '#dcfce7',
-                    color: '#166534',
                     fontWeight: 500,
                     fontSize: '12px',
+                    ...getStatusStyle(document.status),
                   }}
                 >
                   {document.status}
@@ -287,45 +336,53 @@ export default function DocumentDetail() {
       {!document && !loading && (
         <div
           style={{
-            display: 'flex',
-            justifyContent: 'center',
-            padding: '60px 20px',
+            maxWidth: '700px',
+            margin: '40px auto',
+            padding: '0 24px',
           }}
         >
-          <div
+          <button
+            onClick={() => navigate('/dashboard')}
             style={{
-              width: '420px',
-              padding: '40px',
-              background: '#fff',
-              border: '1px solid #e5e7eb',
-              borderRadius: '10px',
-              textAlign: 'center',
+              background: 'transparent',
+              border: 'none',
+              padding: 0,
+              marginBottom: '18px',
+              color: '#6b7280',
+              cursor: 'pointer',
+              fontSize: '13px',
             }}
           >
+            ← Retour
+          </button>
+
+          <div
+            style={{
+              background: '#fff',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              padding: '24px',
+            }}
+          >
+            <h2
+              style={{
+                margin: '0 0 8px',
+                fontSize: '20px',
+                color: '#1a1a2e',
+              }}
+            >
+              Document
+            </h2>
+
             <p
               style={{
-                fontSize: '18px',
-                color: '#1a1a2e',
-                marginBottom: '24px',
+                margin: 0,
+                fontSize: '13px',
+                color: '#b42318',
               }}
             >
-              Document introuvable
+              Document introuvable.
             </p>
-
-            <button
-              onClick={() => navigate('/dashboard')}
-              style={{
-                background: '#1a2744',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '6px',
-                padding: '10px 22px',
-                cursor: 'pointer',
-                fontSize: '14px',
-              }}
-            >
-              Retour
-            </button>
           </div>
         </div>
       )}
