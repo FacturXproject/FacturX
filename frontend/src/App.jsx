@@ -1,3 +1,4 @@
+import Profile from './pages/Profile';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -18,8 +19,9 @@ import Invitations from './pages/Invitations';
 import OrganizationMembersPage from './pages/OrganizationMembersPage';
 import NewInvitation from './pages/NewInvitation';
 import InvitationCheck from './pages/InvitationCheck';
-
-
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import Terms from './pages/Terms';
+import LandingPage from './pages/LandingPage';
 
 
 function Protected({ children }) {
@@ -40,8 +42,11 @@ export default function App() {
 
           <Route path="/healthcheck" element={<HealthCheck />} />
           <Route path="/users" element={<Users />} />
+         <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<Terms />} />
+
           <Route path="/organisations/:id" element={<Protected><OrganizationMembersPage /></Protected>} />
-          <Route path="/" element={<Protected><Dashboard /></Protected>} />
+          <Route path="/" element={<LandingPage />} />
           <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
           <Route path="/invitations/new" element={<Protected><NewInvitation /></Protected>} />
           <Route path="/invitations" element={<Protected><Invitations /></Protected>} />
@@ -49,6 +54,7 @@ export default function App() {
           <Route path="/traitement" element={<Protected><Processing /></Protected>} />
           <Route path="/rapport" element={<Protected><ComplianceReport /></Protected>} />
           <Route path="/conversion" element={<Protected><Conversion /></Protected>} />
+		  <Route path="/profile" element={<Protected><Profile /></Protected>} />
           <Route path="/succes" element={<Protected><Success /></Protected>} />
           <Route path="/lecture-xml" element={<Protected><XmlReader /></Protected>} />
           <Route path="/verifier" element={<Protected><UploadPage mode="verifier" /></Protected>} />
