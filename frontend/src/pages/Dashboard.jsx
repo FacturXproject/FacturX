@@ -1,8 +1,43 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
 function StatusBadge({ status }) {
+  const getStatusStyle = () => {
+    switch (status) {
+      case 'VALID':
+        return {
+          background: '#dcfce7',
+          color: '#166534',
+          border: '1px solid #bbf7d0',
+        };
+
+      case 'INVALID':
+      case 'FAILED':
+        return {
+          background: '#fee2e2',
+          color: '#991b1b',
+          border: '1px solid #fecaca',
+        };
+
+      case 'PROCESSING':
+      case 'QUEUED':
+        return {
+          background: '#fef3c7',
+          color: '#92400e',
+          border: '1px solid #fde68a',
+        };
+
+      case 'UPLOADED':
+      default:
+        return {
+          background: '#f3f4f6',
+          color: '#374151',
+          border: '1px solid #d1d5db',
+        };
+    }
+  };
+
   return (
     <span
       style={{
@@ -11,9 +46,7 @@ function StatusBadge({ status }) {
         borderRadius: '4px',
         fontSize: '12px',
         fontWeight: 500,
-        background: '#f0fdf4',
-        color: '#166534',
-        border: '1px solid #bbf7d0',
+        ...getStatusStyle(),
       }}
     >
       {status}
@@ -24,15 +57,13 @@ function StatusBadge({ status }) {
 export default function Dashboard({ onFileSelect }) {
   const navigate = useNavigate();
 
-  const [dragging, setDragging] = useState(false);
   const [documents, setDocuments] = useState([]);
   const [organizationId, setOrganizationId] = useState(null);
 
-  const fileRef = useRef();
-
-  // 1. Récupérer l'organisation de l'utilisateur
+  // Récupérer l'organisation de l'utilisateur
   useEffect(() => {
-    api.get('/organizations')
+    api
+      .get('/organizations')
       .then((response) => {
         if (response.data.length > 0) {
           const org = response.data[0];
@@ -44,7 +75,7 @@ export default function Dashboard({ onFileSelect }) {
       });
   }, []);
 
-  // 2. Charger les documents quand on connaît l'organisation
+  // Charger les documents quand on connaît l'organisation
   useEffect(() => {
     if (!organizationId) return;
 
@@ -57,56 +88,40 @@ export default function Dashboard({ onFileSelect }) {
         `/documents?organizationId=${organizationId}`
       );
 
-      setDocuments(response.data.content || []);
+      const allDocuments = response.data.content || [];
+
+      // Garder seulement les 5 documents les plus récents
+      const recentDocuments = [...allDocuments]
+        .sort(
+          (a, b) =>
+            new Date(b.uploadedAt) - new Date(a.uploadedAt)
+        )
+        .slice(0, 5);
+
+      setDocuments(recentDocuments);
     } catch (error) {
       console.error('Documents error:', error);
     }
   };
 
-  // 3. Upload
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
-
-    if (!file || !organizationId) return;
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      await api.post(
-        `/documents?organizationId=${organizationId}`,
-        formData
-      );
-
-      await loadDocuments();
-
-      // permet de sélectionner à nouveau le même fichier
-      event.target.value = '';
-    } catch (error) {
-      console.error('Upload error:', error);
-    }
-  };
-
-  // 4. Delete
+  // Supprimer un document
   const handleDelete = async (event, documentId) => {
     event.stopPropagation();
 
     try {
       await api.delete(`/documents/${documentId}`);
 
-      // On retire directement le document du tableau
       setDocuments((previousDocuments) =>
-        previousDocuments.filter((doc) => doc.id !== documentId)
+        previousDocuments.filter(
+          (doc) => doc.id !== documentId
+        )
       );
     } catch (error) {
       console.error('Delete error:', error);
     }
   };
 
-  const handleAction = (type) => {
-    navigate(`/traitement?action=${type}`);
-  };
-
+  // Ouvrir le détail du document
   const handleRowClick = (doc) => {
     if (onFileSelect) {
       onFileSelect(doc.filename);
@@ -115,15 +130,46 @@ export default function Dashboard({ onFileSelect }) {
     navigate(`/documents/${doc.id}`);
   };
 
+  // Date uniquement
   const formatDate = (date) => {
     if (!date) return '';
 
-    return new Date(date).toLocaleString('fr-FR');
+    return new Date(date).toLocaleDateString('fr-FR');
+  };
+
+  // Heure uniquement
+  const formatTime = (date) => {
+    if (!date) return '';
+
+    return new Date(date).toLocaleTimeString('fr-FR', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  // Affichage simple du type
+  const formatType = (type) => {
+    if (type === 'application/pdf') {
+      return 'PDF';
+    }
+
+    if (
+      type === 'application/xml' ||
+      type === 'text/xml'
+    ) {
+      return 'XML';
+    }
+
+    return type;
   };
 
   return (
-    <div style={{ padding: '24px 28px', maxWidth: '900px' }}>
-
+    <div
+      style={{
+        padding: '24px 28px',
+        maxWidth: '900px',
+      }}
+    >
       {/* HEADER */}
       <div style={{ marginBottom: '24px' }}>
         <h1
@@ -144,103 +190,12 @@ export default function Dashboard({ onFileSelect }) {
             color: '#6b7280',
           }}
         >
-          Déposez une facture pour la vérifier ou la convertir en Factur-X
+          Consultez vos documents récents.
         </p>
-      </div>
-
-      {/* UPLOAD */}
-      <div
-        onDragOver={(event) => {
-          event.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(event) => {
-          event.preventDefault();
-          setDragging(false);
-        }}
-        onClick={() => fileRef.current?.click()}
-        style={{
-          border: `2px dashed ${dragging ? '#4a9eff' : '#d1d5db'}`,
-          borderRadius: '10px',
-          padding: '36px 24px',
-          textAlign: 'center',
-          background: dragging ? '#f0f7ff' : '#fafafa',
-          cursor: 'pointer',
-          marginBottom: '16px',
-        }}
-      >
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".pdf,.xml"
-          style={{ display: 'none' }}
-          onChange={handleFileUpload}
-        />
-
-        <p
-          style={{
-            margin: '0 0 4px',
-            fontWeight: 600,
-            fontSize: '14px',
-            color: '#1a1a2e',
-          }}
-        >
-          Déposez une facture ici
-        </p>
-
-        <p
-          style={{
-            margin: 0,
-            fontSize: '12.5px',
-            color: '#9ca3af',
-          }}
-        >
-          PDF ou XML — jusqu'à 10 Mo
-        </p>
-      </div>
-
-      {/* BUTTONS */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '12px',
-          marginBottom: '32px',
-        }}
-      >
-        <button
-          onClick={() => handleAction('verifier')}
-          style={{
-            padding: '9px 18px',
-            background: '#1a2744',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '13.5px',
-            cursor: 'pointer',
-          }}
-        >
-          Vérifier la conformité
-        </button>
-
-        <button
-          onClick={() => handleAction('convertir')}
-          style={{
-            padding: '9px 18px',
-            background: '#fff',
-            color: '#1a2744',
-            border: '1px solid #d1d5db',
-            borderRadius: '6px',
-            fontSize: '13.5px',
-            cursor: 'pointer',
-          }}
-        >
-          Convertir en Factur-X
-        </button>
       </div>
 
       {/* DOCUMENTS */}
-      <div>
+      <div style={{ marginTop: '32px' }}>
         <h2
           style={{
             margin: '0 0 12px',
@@ -249,7 +204,7 @@ export default function Dashboard({ onFileSelect }) {
             color: '#1a1a2e',
           }}
         >
-          Documents récents
+          5 derniers documents
         </h2>
 
         <div
@@ -269,7 +224,14 @@ export default function Dashboard({ onFileSelect }) {
           >
             <thead>
               <tr style={{ background: '#f9fafb' }}>
-                {['Fichier', 'Date', 'Type', 'Statut', ''].map((title) => (
+                {[
+                  'Fichier',
+                  'Date',
+                  'Heure',
+                  'Type',
+                  'Statut',
+                  'Action',
+                ].map((title) => (
                   <th
                     key={title}
                     style={{
@@ -285,16 +247,22 @@ export default function Dashboard({ onFileSelect }) {
             </thead>
 
             <tbody>
-              {documents.map((doc, index) => (
+              {documents.map((doc) => (
                 <tr
                   key={doc.id}
-                  onClick={() => handleRowClick(doc)}
                   style={{
                     borderTop: '1px solid #f3f4f6',
-                    cursor: 'pointer',
                   }}
                 >
-                  <td style={{ padding: '10px 14px' }}>
+                  {/* Seul le nom du fichier ouvre le détail */}
+                  <td
+                    onClick={() => handleRowClick(doc)}
+                    style={{
+                      padding: '10px 14px',
+                      cursor: 'pointer',
+                      fontWeight: 500,
+                    }}
+                  >
                     {doc.filename}
                   </td>
 
@@ -303,7 +271,11 @@ export default function Dashboard({ onFileSelect }) {
                   </td>
 
                   <td style={{ padding: '10px 14px' }}>
-                    {doc.type}
+                    {formatTime(doc.uploadedAt)}
+                  </td>
+
+                  <td style={{ padding: '10px 14px' }}>
+                    {formatType(doc.type)}
                   </td>
 
                   <td style={{ padding: '10px 14px' }}>
@@ -332,7 +304,7 @@ export default function Dashboard({ onFileSelect }) {
               {documents.length === 0 && (
                 <tr>
                   <td
-                    colSpan="5"
+                    colSpan="6"
                     style={{
                       padding: '20px',
                       textAlign: 'center',
