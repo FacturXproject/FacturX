@@ -7,6 +7,9 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import com.facturx.app.permission.Permission;
 import com.facturx.app.permission.PermissionService;
+import com.facturx.app.document.DocumentRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class OrganizationService {
@@ -15,17 +18,19 @@ public class OrganizationService {
     private final OrganizationMemberRepository memberRepository;
     private final UserRepository userRepository;
     private final PermissionService permissionService;
+    private final DocumentRepository documentRepository;
 
     public OrganizationService(
             OrganizationRepository organizationRepository,
             OrganizationMemberRepository memberRepository,
             UserRepository userRepository,
-            PermissionService permissionService) {
+            PermissionService permissionService, DocumentRepository documentRepository) {
 
         this.organizationRepository = organizationRepository;
         this.memberRepository = memberRepository;
         this.userRepository = userRepository;
         this.permissionService = permissionService;
+        this.documentRepository = documentRepository;
     }
 
     // Creer une organisation et ajouter son createur comme ADMIN
@@ -179,6 +184,13 @@ public class OrganizationService {
 
         Organization organization = organizationRepository.findById(organizationId)
             .orElseThrow(OrganizationNotFoundException::new);
+
+        if (documentRepository.existsByOrganizationId(organizationId)) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Organization contains documents"
+            );
+        }
 
         memberRepository.deleteAll(
             memberRepository.findByOrganizationId(organizationId)

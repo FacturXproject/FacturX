@@ -40,6 +40,11 @@ export default function InvoiceView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const [showXml, setShowXml] = useState(false);
+  const [xmlContent, setXmlContent] = useState('');
+  const [xmlLoading, setXmlLoading] = useState(false);
+  const [xmlError, setXmlError] = useState(null);
+
   useEffect(() => {
     async function loadInvoice() {
       try {
@@ -54,6 +59,34 @@ export default function InvoiceView() {
 
     loadInvoice();
   }, [id]);
+
+  const handleToggleXml = async () => {
+    if (showXml) {
+      setShowXml(false);
+      return;
+    }
+
+    setShowXml(true);
+
+    if (xmlContent) {
+      return;
+    }
+
+    try {
+      setXmlLoading(true);
+      setXmlError(null);
+
+      const response = await api.get(`/documents/${id}/xml`, {
+        responseType: 'text',
+      });
+
+      setXmlContent(response.data);
+    } catch {
+      setXmlError('Impossible de charger le fichier XML.');
+    } finally {
+      setXmlLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -88,7 +121,10 @@ export default function InvoiceView() {
           margin: '0 auto',
         }}
       >
-        <button onClick={() => navigate('/lecture-xml')} style={backButtonStyle}>
+        <button
+          onClick={() => navigate('/lecture-xml')}
+          style={backButtonStyle}
+        >
           <ArrowLeft size={15} />
           Retour à la lecture XML
         </button>
@@ -118,11 +154,15 @@ export default function InvoiceView() {
         minHeight: '100vh',
       }}
     >
-      <button onClick={() => navigate('/lecture-xml')} style={backButtonStyle}>
+      <button
+        onClick={() => navigate('/lecture-xml')}
+        style={backButtonStyle}
+      >
         <ArrowLeft size={15} />
         Retour aux factures XML
       </button>
 
+      {/* HEADER */}
       <div
         style={{
           display: 'flex',
@@ -180,138 +220,209 @@ export default function InvoiceView() {
             </span>
           </div>
         </div>
+
+        {/* BOUTON XML / VUE LISIBLE */}
+        <button
+          onClick={handleToggleXml}
+          style={{
+            padding: '8px 16px',
+            borderRadius: '7px',
+            border: '1px solid #1a2744',
+            background: showXml ? '#fff' : '#1a2744',
+            color: showXml ? '#1a2744' : '#fff',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontWeight: 500,
+          }}
+        >
+          {showXml ? 'Vue lisible' : 'Voir XML'}
+        </button>
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: '16px',
-          marginBottom: '20px',
-        }}
-      >
-        <PartyCard
-          title="Vendeur"
-          icon={Building2}
-          party={invoice.seller}
-        />
+      {showXml ? (
+        /* =========================
+           VUE XML
+           ========================= */
+        <div style={cardStyle}>
+          <div style={cardHeaderStyle}>
+            <h2 style={sectionTitleStyle}>XML brut</h2>
+          </div>
 
-        <PartyCard
-          title="Acheteur"
-          icon={UserRound}
-          party={invoice.buyer}
-        />
-      </div>
-
-      <div style={cardStyle}>
-        <div style={cardHeaderStyle}>
-          <h2 style={sectionTitleStyle}>Lignes de facture</h2>
-        </div>
-
-        <div style={{ overflowX: 'auto' }}>
-          <table
+          <pre
             style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-              fontSize: '13.5px',
+              margin: 0,
+              padding: '20px',
+              overflowX: 'auto',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              fontSize: '12.5px',
+              lineHeight: 1.6,
+              color: '#1f2937',
+              background: '#fff',
+              maxHeight: '650px',
+              overflowY: 'auto',
             }}
           >
-            <thead>
-              <tr style={{ background: '#f9fafb' }}>
-                <th style={tableHeaderStyle}>Description</th>
-                <th style={tableHeaderStyle}>Quantité</th>
-                <th style={tableHeaderStyle}>Prix unitaire</th>
-                <th style={tableHeaderStyle}>Total</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {invoice.lines?.length > 0 ? (
-                invoice.lines.map((line, index) => (
-                  <tr
-                    key={index}
-                    style={{ borderTop: '1px solid #f3f4f6' }}
-                  >
-                    <td style={tableCellStyle}>
-                      {displayValue(line.description)}
-                    </td>
-
-                    <td style={tableCellStyle}>
-                      {displayValue(line.quantity)}
-                    </td>
-
-                    <td style={tableCellStyle}>
-                      {displayAmount(line.unitPrice, invoice.currency)}
-                    </td>
-
-                    <td
-                      style={{
-                        ...tableCellStyle,
-                        fontWeight: 600,
-                        color: '#111827',
-                      }}
-                    >
-                      {displayAmount(line.lineTotal, invoice.currency)}
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td
-                    colSpan="4"
-                    style={{
-                      padding: '28px',
-                      textAlign: 'center',
-                      color: '#9ca3af',
-                    }}
-                  >
-                    Aucune ligne de facture disponible.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+            {xmlLoading
+              ? 'Chargement du XML...'
+              : xmlError || xmlContent}
+          </pre>
         </div>
-      </div>
-
-      <div
-        style={{
-          ...cardStyle,
-          maxWidth: '430px',
-          marginLeft: 'auto',
-          marginTop: '20px',
-        }}
-      >
-        <div style={cardHeaderStyle}>
-          <h2 style={sectionTitleStyle}>Totaux</h2>
-        </div>
-
-        <div style={{ padding: '18px 20px' }}>
-          <TotalRow
-            label="Sous-total"
-            value={displayAmount(invoice.subtotal, invoice.currency)}
-          />
-
-          <TotalRow
-            label="TVA"
-            value={displayAmount(invoice.vat, invoice.currency)}
-          />
-
+      ) : (
+        /* =========================
+           VUE LISIBLE
+           ========================= */
+        <>
+          {/* VENDEUR / ACHETEUR */}
           <div
             style={{
-              borderTop: '1px solid #e5e7eb',
-              marginTop: '12px',
-              paddingTop: '14px',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: '16px',
+              marginBottom: '20px',
             }}
           >
-            <TotalRow
-              label="Total"
-              value={displayAmount(invoice.total, invoice.currency)}
-              strong
+            <PartyCard
+              title="Vendeur"
+              icon={Building2}
+              party={invoice.seller}
+            />
+
+            <PartyCard
+              title="Acheteur"
+              icon={UserRound}
+              party={invoice.buyer}
             />
           </div>
-        </div>
-      </div>
+
+          {/* LIGNES DE FACTURE */}
+          <div style={cardStyle}>
+            <div style={cardHeaderStyle}>
+              <h2 style={sectionTitleStyle}>Lignes de facture</h2>
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table
+                style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  fontSize: '13.5px',
+                }}
+              >
+                <thead>
+                  <tr style={{ background: '#f9fafb' }}>
+                    <th style={tableHeaderStyle}>Description</th>
+                    <th style={tableHeaderStyle}>Quantité</th>
+                    <th style={tableHeaderStyle}>Prix unitaire</th>
+                    <th style={tableHeaderStyle}>Total</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {invoice.lines?.length > 0 ? (
+                    invoice.lines.map((line, index) => (
+                      <tr
+                        key={index}
+                        style={{ borderTop: '1px solid #f3f4f6' }}
+                      >
+                        <td style={tableCellStyle}>
+                          {displayValue(line.description)}
+                        </td>
+
+                        <td style={tableCellStyle}>
+                          {displayValue(line.quantity)}
+                        </td>
+
+                        <td style={tableCellStyle}>
+                          {displayAmount(
+                            line.unitPrice,
+                            invoice.currency
+                          )}
+                        </td>
+
+                        <td
+                          style={{
+                            ...tableCellStyle,
+                            fontWeight: 600,
+                            color: '#111827',
+                          }}
+                        >
+                          {displayAmount(
+                            line.lineTotal,
+                            invoice.currency
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan="4"
+                        style={{
+                          padding: '28px',
+                          textAlign: 'center',
+                          color: '#9ca3af',
+                        }}
+                      >
+                        Aucune ligne de facture disponible.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* TOTAUX */}
+          <div
+            style={{
+              ...cardStyle,
+              maxWidth: '430px',
+              marginLeft: 'auto',
+              marginTop: '20px',
+            }}
+          >
+            <div style={cardHeaderStyle}>
+              <h2 style={sectionTitleStyle}>Totaux</h2>
+            </div>
+
+            <div style={{ padding: '18px 20px' }}>
+              <TotalRow
+                label="Sous-total"
+                value={displayAmount(
+                  invoice.subtotal,
+                  invoice.currency
+                )}
+              />
+
+              <TotalRow
+                label="TVA"
+                value={displayAmount(
+                  invoice.vat,
+                  invoice.currency
+                )}
+              />
+
+              <div
+                style={{
+                  borderTop: '1px solid #e5e7eb',
+                  marginTop: '12px',
+                  paddingTop: '14px',
+                }}
+              >
+                <TotalRow
+                  label="Total"
+                  value={displayAmount(
+                    invoice.total,
+                    invoice.currency
+                  )}
+                  strong
+                />
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -353,6 +464,7 @@ function PartyCard({ title, icon: Icon, party }) {
           }}
         >
           <div>{displayValue(party?.address)}</div>
+
           <div>
             TVA : {displayValue(party?.vatId)}
           </div>

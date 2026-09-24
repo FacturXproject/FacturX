@@ -238,9 +238,16 @@ const totalPages = Math.ceil(documents.length / documentsPerPage);
       await api.delete(`/organizations/${id}`);
       navigate('/organisations');
     } catch (err) {
-      setDeleteError(
-        err.response?.data?.message ?? err.message
-      );
+      if (err.response?.status === 409) {
+        setDeleteError(
+          "Impossible de supprimer cette organisation tant qu'elle contient des documents."
+        );
+      } else {
+        setDeleteError(
+          "Une erreur est survenue lors de la suppression de l'organisation."
+        );
+      }
+
       setDeleting(false);
     }
   };

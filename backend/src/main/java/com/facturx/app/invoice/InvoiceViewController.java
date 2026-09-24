@@ -34,4 +34,15 @@ public class InvoiceViewController {
 				currentUserId(authentication)
 		);
 	}
+
+	@GetMapping(value = "/{id}/xml",produces = "application/xml")
+	public String getRawXml(
+			@PathVariable Long id,
+			Authentication authentication
+	) {
+		return invoiceViewService.getRawXml(
+				id,
+				currentUserId(authentication)
+		);
+	}
 }

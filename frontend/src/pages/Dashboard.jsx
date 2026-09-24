@@ -121,14 +121,7 @@ export default function Dashboard({ onFileSelect }) {
     }
   };
 
-<<<<<<< HEAD
- /* const handleAction = (type) => {
-    navigate(`/traitement?action=${type}`);
-  };*/
-
-=======
   // Ouvrir le détail du document
->>>>>>> origin/feature/documents-status_avalent2
   const handleRowClick = (doc) => {
     if (onFileSelect) {
       onFileSelect(doc.filename);
@@ -200,64 +193,6 @@ export default function Dashboard({ onFileSelect }) {
           Consultez vos documents récents.
         </p>
       </div>
-<<<<<<< HEAD
-      <br />
-      {/* UPLOAD */}
-      <div
-        onDragOver={(event) => {
-          event.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(event) => {
-          event.preventDefault();
-          setDragging(false);
-        }}
-        onClick={() => fileRef.current?.click()}
-        style={{
-          border: `2px dashed ${dragging ? '#4a9eff' : '#d1d5db'}`,
-          borderRadius: '10px',
-          padding: '36px 24px',
-          textAlign: 'center',
-          background: dragging ? '#f0f7ff' : '#fafafa',
-          cursor: 'pointer',
-          marginBottom: '32px',
-        }}
-      >
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".pdf,.xml"
-          style={{ display: 'none' }}
-          onChange={handleFileUpload}
-        />
-
-        <p
-          style={{
-            margin: '0 0 4px',
-            fontWeight: 600,
-            fontSize: '14px',
-            color: '#1a1a2e',
-            
-          }}
-        >
-          Déposez une facture ici
-        </p>
-
-        <p
-          style={{
-            margin: 0,
-            fontSize: '12.5px',
-            color: '#9ca3af',
-          }}
-        >
-          PDF ou XML — jusqu'à 10 Mo
-        </p>
-      </div>
-
-     
-=======
->>>>>>> origin/feature/documents-status_avalent2
 
       {/* DOCUMENTS */}
       <div style={{ marginTop: '32px' }}>
@@ -289,9 +224,6 @@ export default function Dashboard({ onFileSelect }) {
           >
             <thead>
               <tr style={{ background: '#f9fafb' }}>
-<<<<<<< HEAD
-                {['Fichier', 'Date', 'Type', 'Utilisateur', 'Statut', 'Action'].map((title) => (
-=======
                 {[
                   'Fichier',
                   'Date',
@@ -300,7 +232,6 @@ export default function Dashboard({ onFileSelect }) {
                   'Statut',
                   'Action',
                 ].map((title) => (
->>>>>>> origin/feature/documents-status_avalent2
                   <th
                     key={title}
                     style={{
@@ -345,10 +276,6 @@ export default function Dashboard({ onFileSelect }) {
 
                   <td style={{ padding: '10px 14px' }}>
                     {formatType(doc.type)}
-                  </td>
-
-                   <td style={{ padding: '10px 14px' }}>
-                    {doc.ownerName}
                   </td>
 
                   <td style={{ padding: '10px 14px' }}>
