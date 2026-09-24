@@ -1,6 +1,16 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { ShieldCheck, Building2, FileCheck2, RefreshCw, ScanLine, LogOut, Users } from 'lucide-react';
+import {
+  ShieldCheck,
+  Building2,
+  FileCheck2,
+  RefreshCw,
+  FileCode2,
+  LogOut,
+  Users,
+  User
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import Footer from './Footer';
 
 const navItems = [
   { to: '/dashboard', icon: ShieldCheck, label: 'Tableau de bord' },
@@ -8,18 +18,19 @@ const navItems = [
   { to: '/invitations', icon: Users, label: 'Invitations' },
   { to: '/verifier', icon: FileCheck2, label: 'Vérifier' },
   { to: '/convertir', icon: RefreshCw, label: 'Convertir' },
-  { to: '/lecture-xml', icon: ScanLine, label: 'Lecture XML' },
+  { to: '/lecture-xml', icon: FileCode2, label: 'Lecture XML' },
+  { to: '/profile', icon: User, label: 'Profil' },
 ];
 
 export default function Layout({ children }) {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
 
   const handleLogout = async () => {
     try {
       await logout();
     } finally {
-      navigate('/login');
+      navigate('/');
     }
   };
 
@@ -44,7 +55,60 @@ export default function Layout({ children }) {
             </div>
           </div>
         </div>
+	  	{/* User profile */}
+		<div
+		onClick={() => navigate('/profile')}
+		style={{
+			display: 'flex',
+			alignItems: 'center',
+			gap: '10px',
+			padding: '14px 16px',
+			borderBottom: '1px solid #f3f4f6',
+			cursor: 'pointer',
+		}}
+		>
+		<div
+			style={{
+			width: '36px',
+			height: '36px',
+			borderRadius: '50%',
+			background: '#eff6ff',
+			display: 'flex',
+			alignItems: 'center',
+			justifyContent: 'center',
+			flexShrink: 0,
+			}}
+		>
+			<User size={19} color="#1a2744" />
+		</div>
 
+		<div style={{ minWidth: 0 }}>
+			<div
+			style={{
+				color: '#1a1a2e',
+				fontSize: '14px',
+				fontWeight: 600,
+				whiteSpace: 'nowrap',
+				overflow: 'hidden',
+				textOverflow: 'ellipsis',
+			}}
+			>
+			{user?.firstName} {user?.lastName}
+			</div>
+
+			<div
+			style={{
+				color: '#6b7280',
+				fontSize: '11.5px',
+				whiteSpace: 'nowrap',
+				overflow: 'hidden',
+				textOverflow: 'ellipsis',
+			}}
+			>
+			{user?.email}
+			</div>
+		</div>
+</div>
         {/* Nav */}
         <nav style={{ flex: 1, padding: '10px 0' }}>
           {navItems.map(({ to, icon: Icon, label }) => (
@@ -96,9 +160,20 @@ export default function Layout({ children }) {
       </aside>
 
       {/* Main content */}
-      <main style={{ flex: 1, overflow: 'auto' }}>
-        {children}
-      </main>
+      <main
+		style={{
+			flex: 1,
+			overflow: 'auto',
+			display: 'flex',
+			flexDirection: 'column',
+		}}
+		>
+		<div style={{ flex: 1 }}>
+			{children}
+		</div>
+
+		<Footer />
+	  </main>
     </div>
   );
 }

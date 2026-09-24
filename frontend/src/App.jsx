@@ -1,3 +1,4 @@
+import Profile from './pages/Profile';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -18,10 +19,18 @@ import Invitations from './pages/Invitations';
 import OrganizationMembersPage from './pages/OrganizationMembersPage';
 import NewInvitation from './pages/NewInvitation';
 import InvitationCheck from './pages/InvitationCheck';
+<<<<<<< HEAD
 
 import DocumentDetail from './pages/DocumentDetail'
 import XmlReader from './pages/XmlReader';
 import InvoiceView from './pages/InvoiceView';
+=======
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import Terms from './pages/Terms';
+import LandingPage from './pages/LandingPage';
+import DocumentDetail from './pages/DocumentDetail';
+
+>>>>>>> origin/feature/documents-status_avalent2
 
 function Protected({ children }) {
   return (
@@ -41,8 +50,11 @@ export default function App() {
 
           <Route path="/healthcheck" element={<HealthCheck />} />
           <Route path="/users" element={<Users />} />
+         <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<Terms />} />
+
           <Route path="/organisations/:id" element={<Protected><OrganizationMembersPage /></Protected>} />
-          <Route path="/" element={<Protected><Dashboard /></Protected>} />
+          <Route path="/" element={<LandingPage />} />
           <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
           <Route path="/documents/:id" element={<Protected><DocumentDetail /></Protected>} />
           <Route path="/invitations/new" element={<Protected><NewInvitation /></Protected>} />
@@ -53,6 +65,7 @@ export default function App() {
           <Route path="/traitement" element={<Protected><Processing /></Protected>} />
           <Route path="/rapport" element={<Protected><ComplianceReport /></Protected>} />
           <Route path="/conversion" element={<Protected><Conversion /></Protected>} />
+		  <Route path="/profile" element={<Protected><Profile /></Protected>} />
           <Route path="/succes" element={<Protected><Success /></Protected>} />
           <Route path="/verifier" element={<Protected><UploadPage mode="verifier" /></Protected>} />
           <Route path="/convertir" element={<Protected><UploadPage mode="convertir" /></Protected>} />
