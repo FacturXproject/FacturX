@@ -73,6 +73,14 @@
 			<scope>runtime</scope>
 		</dependency>
 
+		<!-- F08: Factur-X/ZUGFeRD validation engine (PDF/A-3 + CII XSD + EN16931 Schematron + profile). Apache-2.0. -->
+		<dependency>
+			<groupId>org.mustangproject</groupId>
+			<artifactId>validator</artifactId>
+			<version>2.25.0</version>
+			<classifier>shaded</classifier>
+		</dependency>
+
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-testcontainers</artifactId>
