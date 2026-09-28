@@ -1,4 +1,4 @@
-Anna already knew F08,   she built her F07 work on top of it (her
+Anna already used F08,   she built her F07 work on top of it (her
 FacturXValidationService update to set the document status PROCESSING/VALID/INVALID/
 FAILED during validation *is* my F08 service, extended). 
 
@@ -21,7 +21,7 @@ I added the missing "VERIFY" endpoint and a report endpoint on DocumentControlle
 that link works end to end, and wired a button + report panel into the document detail
 page. then I ported F09 (described above) over from my branch and hooked it up to the
 same document id, since it had never been merged anywhere before. 
-checked everything compiles and the tests I could run pass.
+confirmed with the full backend test suite: 65/65 green.
 --------------------------------------------------------------------------------------------
 
 In DETAILS:
@@ -46,5 +46,9 @@ F08/F09 — finished the "Vérifier" part Anna asked for + ported F09
 - Didn't touch the existing "Vérifier la conformité" button — goes to a separate mockup flow (UploadPage), not related to this.
 
 4) сhecked
-- mvn compile / test-compile: green.
+- full backend suite: mvn test — 65/65 green, BUILD SUCCESS (all modules, not just F08/F09).
+- found  and fixed one real bug along the way: DocumentValidationFlowTest was uploading
+  samples under the same filename FacturXValidationServiceTest uses directly, which
+  broke that other test's assertion since both share the same test DB/context. Fixed
+  by giving my test's uploads a unique filename.
 - vite build: green
