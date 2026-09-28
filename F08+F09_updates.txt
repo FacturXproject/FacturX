@@ -58,7 +58,7 @@ F08/F09 — finished the "Vérifier" part Anna asked for + ported F09
 
 
 
-After the first code review from Anna and Salma, the following problems were found:
+After the first code review from Ana and Salma, the following problems were found:
 
 1. No permission check on /validate — anyone could run a validation.
 2. rule_catalog was nowhere near complete — up to 88% of shown errors had no French explanation.
