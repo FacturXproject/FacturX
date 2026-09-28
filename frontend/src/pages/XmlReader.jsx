@@ -89,6 +89,16 @@ export default function XmlReader() {
 		loadDocuments(selectedOrganizationId);
 	};
 
+	const handleDeleteDocument = async (documentId) => {
+	try {
+		await api.delete(`/documents/${documentId}`);
+		loadDocuments(selectedOrganizationId);
+	} catch {
+		setError('Impossible de supprimer le document.');
+	}
+	};
+
+
 	if (loadingOrganizations) {
 		return (
 			<div style={{ padding: '32px 40px' }}>
@@ -392,27 +402,51 @@ export default function XmlReader() {
 										</td>
 
 										<td style={cellStyle}>
+										<div
+											style={{
+											display: 'flex',
+											alignItems: 'center',
+											gap: '8px',
+											}}
+										>
 											<button
-												onClick={() =>
-													navigate(`/documents/${document.id}/invoice`)
-												}
-												style={{
-													display: 'flex',
-													alignItems: 'center',
-													gap: '6px',
-													padding: '7px 13px',
-													borderRadius: '7px',
-													border: 'none',
-													background: '#1a2744',
-													color: '#fff',
-													cursor: 'pointer',
-													fontSize: '12.5px',
-													fontWeight: 500,
-												}}
+											onClick={() =>
+												navigate(`/documents/${document.id}/invoice`)
+											}
+											style={{
+												display: 'flex',
+												alignItems: 'center',
+												gap: '6px',
+												padding: '7px 13px',
+												borderRadius: '7px',
+												border: 'none',
+												background: '#1a2744',
+												color: '#fff',
+												cursor: 'pointer',
+												fontSize: '12.5px',
+												fontWeight: 500,
+											}}
 											>
-												<Eye size={14} />
-												Lire la facture
+											<Eye size={14} />
+											Lire la facture
 											</button>
+
+											<button
+											onClick={() => handleDeleteDocument(document.id)}
+											style={{
+												padding: '7px 13px',
+												borderRadius: '7px',
+												border: '1px solid #dc2626',
+												background: '#fff',
+												color: '#dc2626',
+												cursor: 'pointer',
+												fontSize: '12.5px',
+												fontWeight: 500,
+											}}
+											>
+											Supprimer
+											</button>
+										</div>
 										</td>
 									</tr>
 								))}

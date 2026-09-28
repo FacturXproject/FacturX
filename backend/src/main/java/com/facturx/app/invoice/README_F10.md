@@ -4,16 +4,26 @@
 
 F10 permet de transformer un document XML CII déjà stocké dans l'application en une représentation de facture lisible.
 
-La feature ne valide pas la conformité Factur-X.  
+La feature ne valide pas la conformité Factur-X.
 Elle lit uniquement les données métier présentes dans le XML.
+
+F10 permet également de consulter le XML brut afin de comparer le document original avec la vue lisible.
 
 ---
 
-## Endpoint
+## Endpoints
 
-```http
+### Vue lisible
+
 GET /api/documents/{id}/invoice-view
-```
+
+Retourne les données de la facture sous forme structurée.
+
+### XML brut
+
+GET /api/documents/{id}/xml
+
+Retourne le fichier XML original.
 
 L'utilisateur doit être authentifié et avoir accès au document.
 
@@ -21,21 +31,21 @@ L'utilisateur doit être authentifié et avoir accès au document.
 
 ## Fonctionnement
 
-```text
 documentId
    ↓
 récupération du Document
    ↓
 vérification des permissions
    ↓
-lecture du fichier depuis le stockage F06
+lecture du fichier depuis le stockage
    ↓
 vérification du format XML
    ↓
 parsing CII
    ↓
 InvoiceViewResponse
-```
+   ↓
+affichage frontend
 
 F10 réutilise les documents déjà gérés par F06/F07 et ne crée pas de nouvelle table en base.
 
@@ -60,7 +70,6 @@ Le parser retourne notamment :
 
 Exemple de réponse :
 
-```json
 {
   "invoiceNumber": "INV-001",
   "invoiceDate": "2026-09-14",
@@ -87,13 +96,11 @@ Exemple de réponse :
   "vat": 40.00,
   "total": 240.00
 }
-```
 
 ---
 
-## Architecture
+## Backend
 
-```text
 invoice/
 ├── CiiInvoiceParser.java
 ├── InvoiceViewController.java
@@ -101,39 +108,81 @@ invoice/
 ├── InvoiceViewResponse.java
 ├── InvalidInvoiceXmlException.java
 └── InvoiceViewExceptionHandler.java
-```
 
-### `InvoiceViewController`
-Expose l'endpoint HTTP.
+### InvoiceViewController
 
-### `InvoiceViewService`
-Récupère le document, vérifie les permissions et lit le fichier.
+Expose les endpoints :
 
-### `CiiInvoiceParser`
-Parse le XML CII avec DOM/XPath et extrait les données de facture.
+GET /api/documents/{id}/invoice-view
+GET /api/documents/{id}/xml
 
-### `InvoiceViewResponse`
+### InvoiceViewService
+
+- récupère le document
+- vérifie les permissions
+- lit le fichier stocké
+- vérifie qu'il s'agit d'un XML
+- appelle le parser pour la vue lisible
+- retourne le XML original pour la vue XML
+
+### CiiInvoiceParser
+
+Parse le XML CII avec DOM/XPath et extrait les données métier de la facture.
+
+### InvoiceViewResponse
+
 Définit la structure retournée au frontend.
+
+---
+
+## Frontend
+
+La page :
+
+/documents/:id/invoice
+
+affiche la facture sous une forme lisible.
+
+Elle présente notamment :
+
+- vendeur
+- acheteur
+- informations générales
+- lignes de facture
+- TVA
+- totaux
+
+Un bouton permet de basculer entre :
+
+Voir XML
+
+et :
+
+Vue lisible
+
+La vue XML affiche directement le contenu original retourné par :
+
+GET /api/documents/{id}/xml
 
 ---
 
 ## Permissions
 
-F10 respecte les permissions existantes :
+F10 utilise les permissions existantes :
 
-```text
 VIEW_ALL_DOCUMENTS
-```
 
 ou :
 
-```text
 VIEW_OWN_DOCUMENTS
-```
 
 si l'utilisateur est propriétaire du document.
 
-Un utilisateur sans accès reçoit un `403 Forbidden`.
+Un utilisateur sans accès reçoit :
+
+403 Forbidden
+
+Les permissions sont vérifiées côté backend.
 
 ---
 
@@ -141,9 +190,9 @@ Un utilisateur sans accès reçoit un `403 Forbidden`.
 
 | Cas | Réponse |
 |---|---|
-| Document inexistant | `404 DOCUMENT_NOT_FOUND` |
-| Utilisateur sans permission | `403 Forbidden` |
-| XML invalide ou document non XML | `422 INVALID_INVOICE_XML` |
+| Document inexistant | 404 DOCUMENT_NOT_FOUND |
+| Utilisateur sans permission | 403 Forbidden |
+| XML invalide ou document non XML | 422 INVALID_INVOICE_XML |
 
 ---
 
@@ -151,10 +200,8 @@ Un utilisateur sans accès reçoit un `403 Forbidden`.
 
 Deux types de tests sont présents :
 
-```text
 CiiInvoiceParserTest
 InvoiceViewIntegrationTest
-```
 
 Ils couvrent notamment :
 
@@ -168,30 +215,24 @@ Ils couvrent notamment :
 
 Lancer les tests F10 :
 
-```bash
 cd backend
 ./mvnw -Dtest=CiiInvoiceParserTest,InvoiceViewIntegrationTest test
-```
 
 ---
 
 ## Résumé
 
-F10 ajoute la lecture métier d'un XML CII :
-
-```text
 XML stocké
    ↓
 permissions
    ↓
-parser
+parser CII
    ↓
 facture lisible
-```
+   ↓
+vue lisible / XML brut
 
-F10 est indépendant de F08/F09 :
+F10 reste indépendant de la validation de conformité :
 
-```text
-F08/F09 → validation de conformité
-F10     → lecture des données de la facture
-```
+F08/F09 → validation de conformité Factur-X
+F10     → lecture et affichage des données de la facture

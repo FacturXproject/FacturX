@@ -9,7 +9,7 @@ export default function Profile() {
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [organization, setOrganization] = useState(null);
+  const [organizations, setOrganizations] = useState([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -21,17 +21,23 @@ export default function Profile() {
 		try {
 			const response = await api.get('/organizations');
 
-			if (response.data && response.data.length > 0) {
-			const firstOrganization = response.data[0];
-			const organizationId =
-				firstOrganization.organizationId ?? firstOrganization.id;
+			const organizationsWithNames = await Promise.all(
+			response.data.map(async (organization) => {
+				const organizationId =
+				organization.organizationId ?? organization.id;
 
-			const organizationResponse = await api.get(
+				const organizationResponse = await api.get(
 				`/organizations/${organizationId}`
+				);
+
+				return {
+				id: organizationId,
+				name: organizationResponse.data.name,
+				};
+			})
 			);
 
-			setOrganization(organizationResponse.data);
-			}
+			setOrganizations(organizationsWithNames);
 		} catch (error) {
 			console.error('Erreur lors du chargement de l’organisation :', error);
 		}
@@ -50,7 +56,7 @@ export default function Profile() {
 		lastName: lastName,
 		});
 		setUser(response.data);
-		
+
 		console.log('Profil mis à jour :', response.data);
 		alert('Profil sauvegardé !');
 
@@ -109,12 +115,20 @@ export default function Profile() {
 				</div>
 
 				<div className="profile-field">
-					<label>Organisation active</label>
-					<div className="profile-input disabled">
-					<p>{organization?.name ?? '—'}</p>
-					</div>
-				</div>
+				<label>Organisations</label>
 
+				<div className="profile-input disabled organizations-list">
+					{organizations.length > 0 ? (
+					organizations.map((organization) => (
+						<p key={organization.id}>
+						{organization.name}
+						</p>
+					))
+					) : (
+					<p>—</p>
+					)}
+				</div>
+				</div>
 			</div>
 			<div className="profile-actions">
 				<button
