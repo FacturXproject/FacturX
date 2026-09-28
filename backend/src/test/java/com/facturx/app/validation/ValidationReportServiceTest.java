@@ -17,8 +17,23 @@ class ValidationReportServiceTest extends AbstractIntegrationTest {
     @Autowired
     private ValidationReportService validationReportService;
 
+    @Autowired
+    private ValidationErrorRepository validationErrorRepository;
+
     @Test
-    void validSampleReportHasNoErrorsAndAReadableNoticeForKnownRule() throws IOException {
+    void peppolNoticeIsHiddenFromTheReportButKeptInTheDatabase() throws IOException {
+        ValidationResult result = validationService.validate(
+                readSample("EN16931_Einfach.pdf"), "EN16931_Einfach.pdf", null);
+
+        ValidationReport report = validationReportService.getReport(result.runId());
+        assertThat(report.errors()).noneMatch(e -> e.ruleCode().startsWith("PEPPOL"));
+
+        assertThat(validationErrorRepository.findByRunId(result.runId()))
+                .anyMatch(e -> e.getRuleCode().equals("PEPPOL-EN16931-R001"));
+    }
+
+    @Test
+    void validSampleReportHasNoErrorsAndHidesThePeppolNotice() throws IOException {
         ValidationResult result = validationService.validate(
                 readSample("EN16931_Einfach.pdf"), "EN16931_Einfach.pdf", null);
 
@@ -26,16 +41,12 @@ class ValidationReportServiceTest extends AbstractIntegrationTest {
 
         assertThat(report.valid()).isTrue();
         assertThat(report.errorCount()).isZero();
-        // Still has non-blocking PEPPOL notices (see FacturXValidationServiceTest) -
-        // "empty report" means no blocking error, not an empty error list.
-        assertThat(report.infoCount()).isPositive();
-
-        ReadableValidationError peppolNotice = report.errors().stream()
-                .filter(e -> e.ruleCode().equals("PEPPOL-EN16931-R001"))
-                .findFirst()
-                .orElseThrow();
-        assertThat(peppolNotice.titleFr()).isEqualTo("Identifiant de processus métier manquant");
-        assertThat(peppolNotice.correctionHintFr()).isNotBlank();
+        // The sample's only info-level message is a PEPPOL-EN16931-R001 notice (see
+        // FacturXValidationServiceTest) - PEPPOL/BR-DE noise is filtered out of the F09
+        // report entirely (kept in validation_errors, just not surfaced here).
+        assertThat(report.infoCount()).isZero();
+        assertThat(report.errors()).noneMatch(e -> e.ruleCode().startsWith("PEPPOL"));
+        assertThat(report.errors()).noneMatch(e -> e.ruleCode().startsWith("BR-DE"));
     }
 
     @Test
@@ -61,6 +72,13 @@ class ValidationReportServiceTest extends AbstractIntegrationTest {
                 .orElseThrow();
         assertThat(pdfA3Failure.ruleCode()).isEqualTo("MUSTANG-ERROR-23");
         assertThat(pdfA3Failure.titleFr()).isEqualTo("Le fichier n'est pas un PDF/A-3 valide");
+
+        ReadableValidationError noXmlFailure = report.errors().stream()
+                .filter(e -> e.ruleCode().equals("MUSTANG-EXCEPTION-17"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(noXmlFailure.titleFr()).isEqualTo("Ce PDF ne contient pas de facture Factur-X");
+        assertThat(noXmlFailure.correctionHintFr()).contains("Convertir");
     }
 
     @Test

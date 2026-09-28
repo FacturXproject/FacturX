@@ -331,23 +331,6 @@ export default function DocumentDetail() {
           >
             <button
               onClick={() =>
-                navigate(`/verifier?documentId=${document.id}`)
-              }
-              style={{
-                padding: '9px 18px',
-                background: '#1a2744',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '13.5px',
-                cursor: 'pointer',
-              }}
-            >
-              Vérifier la conformité
-            </button>
-
-            <button
-              onClick={() =>
                 navigate(`/convertir?documentId=${document.id}`)
               }
               style={{
@@ -457,8 +440,30 @@ export default function DocumentDetail() {
                           padding: '12px 0',
                         }}
                       >
-                        <div style={{ fontWeight: 600, color: '#111827', fontSize: '13.5px' }}>
-                          {err.titleFr}
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'baseline',
+                            gap: '8px',
+                          }}
+                        >
+                          <span style={{ fontWeight: 600, color: '#111827', fontSize: '13.5px' }}>
+                            {err.titleFr}
+                          </span>
+                          {err.ruleCode && (
+                            <span
+                              style={{
+                                fontFamily: 'monospace',
+                                fontSize: '11.5px',
+                                color: '#6b7280',
+                                background: '#f3f4f6',
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                              }}
+                            >
+                              {err.ruleCode}
+                            </span>
+                          )}
                         </div>
                         <div style={{ color: '#6b7280', fontSize: '13px', marginTop: '2px' }}>
                           {err.descriptionFr}

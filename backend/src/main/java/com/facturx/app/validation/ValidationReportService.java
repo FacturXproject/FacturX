@@ -55,7 +55,14 @@ public class ValidationReportService {
     }
 
     private ValidationReport buildReport(ValidationRun run) {
-        List<ValidationErrorEntity> errorEntities = validationErrorRepository.findByRunId(run.getId());
+        // BR-DE-* (Chorus Pro / German CIUS extension rules) and PEPPOL-* notices are
+        // stored like any other validation error (validation_errors keeps every row
+        // Mustang raised) but are noise for the F09 report's audience, so they're
+        // filtered out here rather than at persistence time.
+        List<ValidationErrorEntity> errorEntities = validationErrorRepository.findByRunId(run.getId())
+                .stream()
+                .filter(entity -> !isHiddenFromReport(entity.getRuleCode()))
+                .toList();
 
         Map<String, RuleCatalog> catalogByCode = ruleCatalogRepository
                 .findAllById(errorEntities.stream().map(ValidationErrorEntity::getRuleCode).distinct().toList())
@@ -98,5 +105,9 @@ public class ValidationReportService {
 
     private long countBySeverity(List<ReadableValidationError> errors, ValidationSeverity severity) {
         return errors.stream().filter(e -> e.severity() == severity).count();
+    }
+
+    private static boolean isHiddenFromReport(String ruleCode) {
+        return ruleCode != null && (ruleCode.startsWith("BR-DE") || ruleCode.startsWith("PEPPOL"));
     }
 }

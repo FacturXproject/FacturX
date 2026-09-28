@@ -61,7 +61,9 @@ class ValidationReportControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.valid").value(true))
                 .andExpect(jsonPath("$.errorCount").value(0))
-                .andExpect(jsonPath("$.errors[0].titleFr").isNotEmpty());
+                // The only notice on this sample is PEPPOL-EN16931-R001, hidden from the
+                // report on purpose (see ValidationReportService).
+                .andExpect(jsonPath("$.errors").isEmpty());
     }
 
     private Cookie loginSession() throws Exception {

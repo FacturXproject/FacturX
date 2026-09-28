@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.facturx.app.AbstractIntegrationTest;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -34,11 +33,11 @@ class FacturXValidationServiceTest extends AbstractIntegrationTest {
         assertThat(result.errors()).allMatch(e -> e.severity() == ValidationSeverity.INFO);
         assertThat(result.errors()).anyMatch(e -> e.ruleCode().equals("PEPPOL-EN16931-R001"));
 
-        List<ValidationRun> runs = validationRunRepository.findAll();
-        ValidationRun persistedRun = runs.stream()
-                .filter(r -> "EN16931_Einfach.pdf".equals(r.getFilename()))
-                .findFirst()
-                .orElseThrow();
+        // Looked up by the run's own id, not by filename: the test database is shared
+        // across the whole suite (see AbstractIntegrationTest), and other tests upload
+        // samples under this same filename, so filtering findAll() by filename is a
+        // collision waiting to happen depending on execution order.
+        ValidationRun persistedRun = validationRunRepository.findById(result.runId()).orElseThrow();
         assertThat(persistedRun.isValid()).isTrue();
         assertThat(persistedRun.getDocumentId()).isNull();
         assertThat(validationErrorRepository.findByRunId(persistedRun.getId()))
@@ -57,11 +56,7 @@ class FacturXValidationServiceTest extends AbstractIntegrationTest {
         assertThat(result.errors()).allMatch(e -> e.layer() == ValidationLayer.PDF_A3);
         assertThat(result.errors()).anyMatch(e -> e.message().equals("Not a PDF/A-3"));
 
-        List<ValidationRun> runs = validationRunRepository.findAll();
-        ValidationRun persistedRun = runs.stream()
-                .filter(r -> "veraPDFtestsuite6-7-11-t01-fail-a.pdf".equals(r.getFilename()))
-                .findFirst()
-                .orElseThrow();
+        ValidationRun persistedRun = validationRunRepository.findById(result.runId()).orElseThrow();
         assertThat(persistedRun.isValid()).isFalse();
         assertThat(persistedRun.getLayerReached()).isEqualTo(ValidationLayer.PDF_A3);
     }

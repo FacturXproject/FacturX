@@ -1,6 +1,8 @@
 package com.facturx.app.document;
 
 import com.facturx.app.auth.AppUserPrincipal;
+import com.facturx.app.permission.Permission;
+import com.facturx.app.permission.PermissionService;
 import com.facturx.app.validation.FacturXValidationService;
 import com.facturx.app.validation.ValidationReport;
 import com.facturx.app.validation.ValidationReportService;
@@ -22,13 +24,16 @@ public class DocumentController {
     private final DocumentService documentService;
     private final FacturXValidationService validationService;
     private final ValidationReportService validationReportService;
+    private final PermissionService permissionService;
 
     public DocumentController(DocumentService documentService,
                                FacturXValidationService validationService,
-                               ValidationReportService validationReportService) {
+                               ValidationReportService validationReportService,
+                               PermissionService permissionService) {
         this.documentService = documentService;
         this.validationService = validationService;
         this.validationReportService = validationReportService;
+        this.permissionService = permissionService;
     }
 
     private Long currentUserId(Authentication authentication) {
@@ -79,8 +84,12 @@ public class DocumentController {
     // Factur-X (F08) sur un document deja depose, en utilisant son documentId existant.
     // Met a jour son statut (PROCESSING -> VALID/INVALID, ou FAILED en cas d'erreur).
     @PostMapping("/{id}/validate")
-    public ValidationResult validateDocument(@PathVariable Long id) {
+    public ValidationResult validateDocument(@PathVariable Long id, Authentication authentication) {
         Document document = documentService.getDocument(id);
+        permissionService.requirePermission(
+                currentUserId(authentication),
+                document.getOrganization().getId(),
+                Permission.VALIDATE_DOCUMENT);
         byte[] bytes = documentService.readFileBytes(document);
         return validationService.validate(bytes, document.getFilename(), document.getId());
     }

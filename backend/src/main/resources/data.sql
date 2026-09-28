@@ -7,12 +7,29 @@
 -- splitter (ScriptUtils) only tracks '...' string state, not PostgreSQL's $$...$$
 -- dollar-quoting, so a dollar-quoted multi-row INSERT gets mis-split mid-statement.
 --
--- Coverage: 19 codes catalogued so far (16 core EN16931 cardinality/presence rules
+-- Coverage: 37 codes catalogued so far (16 core EN16931 cardinality/presence rules
 -- BR-01..BR-16, 6 EN16931 calculation rules BR-CO-09/10/13/15/16/25, the PEPPOL
--- business-process rule seen in our own valid sample, and MUSTANG-ERROR-23 - the
--- PDF/A-3 failure documented in backend/README.md). Any other rule code Mustang
--- reports falls back to its raw message in the report (see ValidationReportService)
--- instead of a bare, unexplained code.
+-- business-process rule seen in our own valid sample, MUSTANG-ERROR-23 - the
+-- PDF/A-3 failure documented in backend/README.md - and MUSTANG-EXCEPTION-17, raised
+-- when Mustang can't extract any embedded invoice XML at all, i.e. the PDF simply
+-- isn't a Factur-X file). Any other rule code Mustang reports falls back to its raw
+-- message in the report (see ValidationReportService) instead of a bare, unexplained
+-- code. BR-DE-* (Chorus Pro / German CIUS extension rules) and PEPPOL-* notices are
+-- deliberately left uncatalogued here beyond what's already above - ValidationReportService
+-- hides that whole family from the F09 report regardless (kept in validation_errors,
+-- just not surfaced to the end user).
+--
+-- Also covers (empirically triggered against synthetic PDFs built for this purpose -
+-- see backend/src/test/resources/facturx-samples/{missing-invoice-number,
+-- missing-type-code,wrong-total-amount,plain-pdf-no-xml}.pdf and
+-- RuleCatalogCoverageTest): the MUSTANG-ERROR-11..21 family (XMP/PDF-A3 metadata
+-- checks - note MUSTANG-ERROR-17 "Invalid XMP Metadata not found" is a distinct code
+-- from MUSTANG-EXCEPTION-17 above, same numeric type but a different XML tag name),
+-- MUSTANG-ERROR-18 (XSD schema validation), and FX-SCH-A-000019/000020 (the
+-- Factur-X-specific schematron's cardinality checks for the invoice number and type
+-- code elements, fired alongside BR-02/BR-04 when those are missing). The full
+-- FX-SCH-A-* schematron has ~180 other codes not covered here - only the ones our
+-- fixtures actually raise.
 
 INSERT INTO rule_catalog (code, layer, raw_text, title_fr, description_fr, correction_hint_fr)
 VALUES ('BR-01', 'SCHEMATRON',
@@ -227,5 +244,132 @@ VALUES ('MUSTANG-ERROR-23', 'PDF_A3',
  'Le fichier n''est pas un PDF/A-3 valide',
  'Une facture Factur-X doit être un PDF conforme au format d''archivage PDF/A-3, qui permet d''embarquer les données structurées de la facture (XML) dans le document. Ce fichier n''y est pas conforme.',
  'Régénérez le PDF avec un outil qui produit du PDF/A-3 (la plupart des logiciels de facturation Factur-X le font automatiquement), plutôt qu''un PDF classique.')
+ON CONFLICT (code) DO UPDATE SET layer = EXCLUDED.layer, raw_text = EXCLUDED.raw_text,
+ title_fr = EXCLUDED.title_fr, description_fr = EXCLUDED.description_fr, correction_hint_fr = EXCLUDED.correction_hint_fr;
+
+INSERT INTO rule_catalog (code, layer, raw_text, title_fr, description_fr, correction_hint_fr)
+VALUES ('MUSTANG-EXCEPTION-17', 'PDF_A3',
+ 'XML could not be extracted',
+ 'Ce PDF ne contient pas de facture Factur-X',
+ 'Mustang n''a trouvé aucune donnée de facture structurée (XML) intégrée dans ce fichier. C''est un PDF ordinaire, pas une facture Factur-X : il n''y a rien à valider selon la norme EN 16931.',
+ 'Utilisez la fonction « Convertir » pour générer une véritable facture Factur-X à partir de ce PDF, puis validez le fichier obtenu.')
+ON CONFLICT (code) DO UPDATE SET layer = EXCLUDED.layer, raw_text = EXCLUDED.raw_text,
+ title_fr = EXCLUDED.title_fr, description_fr = EXCLUDED.description_fr, correction_hint_fr = EXCLUDED.correction_hint_fr;
+
+-- XMP/PDF-A3 metadata checks (MUSTANG-ERROR-11..21). Note MUSTANG-ERROR-17 below is a
+-- distinct code from MUSTANG-EXCEPTION-17 above: same Mustang numeric type (17), but a
+-- different XML tag (<error> vs <exception>) for a different failure - metadata
+-- entirely absent, vs. XML entirely unextractable.
+
+INSERT INTO rule_catalog (code, layer, raw_text, title_fr, description_fr, correction_hint_fr)
+VALUES ('MUSTANG-ERROR-11', 'PDF_A3',
+ 'XMP Metadata: ConformanceLevel not found',
+ 'Métadonnées XMP : niveau de conformité PDF/A manquant',
+ 'Les métadonnées XMP intégrées au PDF doivent préciser le niveau de conformité PDF/A (schéma PDF/A Identification, champ ConformanceLevel). Ce champ est absent.',
+ 'Régénérez le PDF avec un outil Factur-X qui écrit correctement le schéma PDF/A Identification dans les métadonnées XMP, plutôt qu''un PDF classique.')
+ON CONFLICT (code) DO UPDATE SET layer = EXCLUDED.layer, raw_text = EXCLUDED.raw_text,
+ title_fr = EXCLUDED.title_fr, description_fr = EXCLUDED.description_fr, correction_hint_fr = EXCLUDED.correction_hint_fr;
+
+INSERT INTO rule_catalog (code, layer, raw_text, title_fr, description_fr, correction_hint_fr)
+VALUES ('MUSTANG-ERROR-12', 'PDF_A3',
+ 'XMP Metadata: ConformanceLevel contains invalid value',
+ 'Métadonnées XMP : niveau de conformité PDF/A invalide',
+ 'Le niveau de conformité PDF/A indiqué dans les métadonnées XMP (ConformanceLevel) a une valeur non reconnue - elle doit être A, B ou U.',
+ 'Régénérez le PDF avec un outil Factur-X conforme, qui renseigne correctement ce champ.')
+ON CONFLICT (code) DO UPDATE SET layer = EXCLUDED.layer, raw_text = EXCLUDED.raw_text,
+ title_fr = EXCLUDED.title_fr, description_fr = EXCLUDED.description_fr, correction_hint_fr = EXCLUDED.correction_hint_fr;
+
+INSERT INTO rule_catalog (code, layer, raw_text, title_fr, description_fr, correction_hint_fr)
+VALUES ('MUSTANG-ERROR-13', 'PDF_A3',
+ 'XMP Metadata: DocumentType not found',
+ 'Métadonnées XMP : type de document manquant',
+ 'Les métadonnées XMP doivent préciser le type de document (DocumentType), qui vaut « INVOICE » pour une facture Factur-X. Ce champ est absent.',
+ 'Régénérez le PDF avec un outil qui renseigne le champ DocumentType dans les métadonnées XMP.')
+ON CONFLICT (code) DO UPDATE SET layer = EXCLUDED.layer, raw_text = EXCLUDED.raw_text,
+ title_fr = EXCLUDED.title_fr, description_fr = EXCLUDED.description_fr, correction_hint_fr = EXCLUDED.correction_hint_fr;
+
+INSERT INTO rule_catalog (code, layer, raw_text, title_fr, description_fr, correction_hint_fr)
+VALUES ('MUSTANG-ERROR-14', 'PDF_A3',
+ 'XMP Metadata: DocumentType invalid',
+ 'Métadonnées XMP : type de document invalide',
+ 'Le type de document indiqué dans les métadonnées XMP (DocumentType) ne correspond pas à la valeur attendue pour une facture Factur-X (« INVOICE »).',
+ 'Régénérez le PDF avec un outil Factur-X conforme, qui renseigne correctement ce champ.')
+ON CONFLICT (code) DO UPDATE SET layer = EXCLUDED.layer, raw_text = EXCLUDED.raw_text,
+ title_fr = EXCLUDED.title_fr, description_fr = EXCLUDED.description_fr, correction_hint_fr = EXCLUDED.correction_hint_fr;
+
+INSERT INTO rule_catalog (code, layer, raw_text, title_fr, description_fr, correction_hint_fr)
+VALUES ('MUSTANG-ERROR-15', 'PDF_A3',
+ 'XMP Metadata: Version not found',
+ 'Métadonnées XMP : version du format manquante',
+ 'Les métadonnées XMP doivent préciser la version du format Factur-X/ZUGFeRD utilisée (champ Version). Ce champ est absent.',
+ 'Régénérez le PDF avec un outil qui renseigne le champ Version dans les métadonnées XMP.')
+ON CONFLICT (code) DO UPDATE SET layer = EXCLUDED.layer, raw_text = EXCLUDED.raw_text,
+ title_fr = EXCLUDED.title_fr, description_fr = EXCLUDED.description_fr, correction_hint_fr = EXCLUDED.correction_hint_fr;
+
+INSERT INTO rule_catalog (code, layer, raw_text, title_fr, description_fr, correction_hint_fr)
+VALUES ('MUSTANG-ERROR-16', 'PDF_A3',
+ 'XMP Metadata: Version contains invalid value',
+ 'Métadonnées XMP : version du format invalide',
+ 'La version du format indiquée dans les métadonnées XMP (champ Version) n''est pas une valeur reconnue.',
+ 'Régénérez le PDF avec un outil Factur-X conforme, qui renseigne correctement ce champ.')
+ON CONFLICT (code) DO UPDATE SET layer = EXCLUDED.layer, raw_text = EXCLUDED.raw_text,
+ title_fr = EXCLUDED.title_fr, description_fr = EXCLUDED.description_fr, correction_hint_fr = EXCLUDED.correction_hint_fr;
+
+INSERT INTO rule_catalog (code, layer, raw_text, title_fr, description_fr, correction_hint_fr)
+VALUES ('MUSTANG-ERROR-17', 'PDF_A3',
+ 'Invalid XMP Metadata not found',
+ 'Métadonnées XMP absentes',
+ 'Le PDF ne contient aucune métadonnée XMP décrivant le document Factur-X/ZUGFeRD embarqué (schéma PDF/A Identification et Extension absents). C''est le signe d''un PDF classique, sans aucune préparation Factur-X.',
+ 'Régénérez le fichier avec un outil qui produit un PDF/A-3 avec des métadonnées XMP complètes, plutôt qu''un PDF classique - voir aussi MUSTANG-EXCEPTION-17.')
+ON CONFLICT (code) DO UPDATE SET layer = EXCLUDED.layer, raw_text = EXCLUDED.raw_text,
+ title_fr = EXCLUDED.title_fr, description_fr = EXCLUDED.description_fr, correction_hint_fr = EXCLUDED.correction_hint_fr;
+
+INSERT INTO rule_catalog (code, layer, raw_text, title_fr, description_fr, correction_hint_fr)
+VALUES ('MUSTANG-ERROR-18', 'XSD',
+ 'schema validation fails',
+ 'Le XML de la facture ne respecte pas son schéma technique',
+ 'La structure du fichier XML intégré ne correspond pas au schéma XML (XSD) attendu pour ce type de document : un élément obligatoire est absent, mal placé, ou apparaît dans le mauvais ordre.',
+ 'Vérifiez la structure de l''XML généré (éléments obligatoires, ordre des balises) avec l''outil qui a produit ce fichier ; le message technique associé précise l''élément en cause.')
+ON CONFLICT (code) DO UPDATE SET layer = EXCLUDED.layer, raw_text = EXCLUDED.raw_text,
+ title_fr = EXCLUDED.title_fr, description_fr = EXCLUDED.description_fr, correction_hint_fr = EXCLUDED.correction_hint_fr;
+
+INSERT INTO rule_catalog (code, layer, raw_text, title_fr, description_fr, correction_hint_fr)
+VALUES ('MUSTANG-ERROR-19', 'PDF_A3',
+ 'XMP Metadata: DocumentFileName contains invalid value',
+ 'Métadonnées XMP : nom de fichier incorrect',
+ 'Le nom de fichier indiqué dans les métadonnées XMP (DocumentFileName) ne correspond pas au nom réel du fichier XML embarqué dans le PDF.',
+ 'Vérifiez que le nom de fichier déclaré dans les métadonnées XMP correspond exactement au nom du fichier XML embarqué (généralement factur-x.xml).')
+ON CONFLICT (code) DO UPDATE SET layer = EXCLUDED.layer, raw_text = EXCLUDED.raw_text,
+ title_fr = EXCLUDED.title_fr, description_fr = EXCLUDED.description_fr, correction_hint_fr = EXCLUDED.correction_hint_fr;
+
+INSERT INTO rule_catalog (code, layer, raw_text, title_fr, description_fr, correction_hint_fr)
+VALUES ('MUSTANG-ERROR-21', 'PDF_A3',
+ 'XMP Metadata: DocumentFileName not found',
+ 'Métadonnées XMP : nom de fichier manquant',
+ 'Les métadonnées XMP doivent préciser le nom du fichier XML embarqué (champ DocumentFileName). Ce champ est absent.',
+ 'Régénérez le PDF avec un outil qui renseigne le champ DocumentFileName dans les métadonnées XMP (généralement factur-x.xml).')
+ON CONFLICT (code) DO UPDATE SET layer = EXCLUDED.layer, raw_text = EXCLUDED.raw_text,
+ title_fr = EXCLUDED.title_fr, description_fr = EXCLUDED.description_fr, correction_hint_fr = EXCLUDED.correction_hint_fr;
+
+-- Factur-X-specific schematron (FX-SCH-A-*, distinct from the generic EN16931 BR-*
+-- rules): cardinality checks that fire alongside BR-02/BR-04 when the invoice number
+-- or type code is missing from the header. Only the two codes our fixtures actually
+-- raise are catalogued here - the full FX-SCH-A-* schematron has ~180 other checks.
+
+INSERT INTO rule_catalog (code, layer, raw_text, title_fr, description_fr, correction_hint_fr)
+VALUES ('FX-SCH-A-000019', 'SCHEMATRON',
+ 'Element ''ram:ID'' must occur exactly 1 times.',
+ 'Numéro de facture manquant (contrainte technique Factur-X)',
+ 'Le schéma Factur-X impose exactement un élément Numéro de facture dans l''en-tête du document XML ; il est absent.',
+ 'Renseignez un numéro de facture (BT-1) dans l''en-tête du document XML.')
+ON CONFLICT (code) DO UPDATE SET layer = EXCLUDED.layer, raw_text = EXCLUDED.raw_text,
+ title_fr = EXCLUDED.title_fr, description_fr = EXCLUDED.description_fr, correction_hint_fr = EXCLUDED.correction_hint_fr;
+
+INSERT INTO rule_catalog (code, layer, raw_text, title_fr, description_fr, correction_hint_fr)
+VALUES ('FX-SCH-A-000020', 'SCHEMATRON',
+ 'Element ''ram:TypeCode'' must occur exactly 1 times.',
+ 'Type de document manquant (contrainte technique Factur-X)',
+ 'Le schéma Factur-X impose exactement un élément Type de document dans l''en-tête du document XML ; il est absent.',
+ 'Renseignez un code de type de document (BT-3, par exemple 380 pour une facture commerciale) dans l''en-tête du document XML.')
 ON CONFLICT (code) DO UPDATE SET layer = EXCLUDED.layer, raw_text = EXCLUDED.raw_text,
  title_fr = EXCLUDED.title_fr, description_fr = EXCLUDED.description_fr, correction_hint_fr = EXCLUDED.correction_hint_fr;
