@@ -140,7 +140,7 @@ export default function DocumentDetail() {
         >
           {/* RETOUR */}
           <button
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate(`/organisations/${document.organizationId}`)}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -155,7 +155,7 @@ export default function DocumentDetail() {
             }}
           >
             <ArrowLeft size={16} />
-            Retour au tableau de bord
+            Retour à l'organisation
           </button>
 
           {/* HEADER */}
