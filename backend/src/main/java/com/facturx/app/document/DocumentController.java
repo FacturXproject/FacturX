@@ -1,6 +1,12 @@
 package com.facturx.app.document;
 
 import com.facturx.app.auth.AppUserPrincipal;
+import com.facturx.app.permission.Permission;
+import com.facturx.app.permission.PermissionService;
+import com.facturx.app.validation.FacturXValidationService;
+import com.facturx.app.validation.ValidationReport;
+import com.facturx.app.validation.ValidationReportService;
+import com.facturx.app.validation.ValidationResult;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -16,9 +22,18 @@ import java.util.List;
 public class DocumentController {
 
     private final DocumentService documentService;
+    private final FacturXValidationService validationService;
+    private final ValidationReportService validationReportService;
+    private final PermissionService permissionService;
 
-    public DocumentController(DocumentService documentService) {
+    public DocumentController(DocumentService documentService,
+                               FacturXValidationService validationService,
+                               ValidationReportService validationReportService,
+                               PermissionService permissionService) {
         this.documentService = documentService;
+        this.validationService = validationService;
+        this.validationReportService = validationReportService;
+        this.permissionService = permissionService;
     }
 
     private Long currentUserId(Authentication authentication) {
@@ -63,5 +78,26 @@ public class DocumentController {
     @DeleteMapping("/{id}")
     public void delete(@PathVariable Long id) {
         documentService.deleteDocument(id);
+    }
+
+    // POST /api/documents/{id}/validate - "Verifier": lance le controle de conformite
+    // Factur-X (F08) sur un document deja depose, en utilisant son documentId existant.
+    // Met a jour son statut (PROCESSING -> VALID/INVALID, ou FAILED en cas d'erreur).
+    @PostMapping("/{id}/validate")
+    public ValidationResult validateDocument(@PathVariable Long id, Authentication authentication) {
+        Document document = documentService.getDocument(id);
+        permissionService.requirePermission(
+                currentUserId(authentication),
+                document.getOrganization().getId(),
+                Permission.VALIDATE_DOCUMENT);
+        byte[] bytes = documentService.readFileBytes(document);
+        return validationService.validate(bytes, document.getFilename(), document.getId());
+    }
+
+    // GET /api/documents/{id}/report - rapport de validation lisible (F09) pour le
+    // controle le plus recent de ce document.
+    @GetMapping("/{id}/report")
+    public ValidationReport getValidationReport(@PathVariable Long id) {
+        return validationReportService.getReportForDocument(id);
     }
 }

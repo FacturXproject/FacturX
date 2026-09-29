@@ -1,0 +1,79 @@
+ Anna already used F08,   she built her F07 work on top of it (her
+FacturXValidationService update to set the document status PROCESSING/VALID/INVALID/
+FAILED during validation *is* my F08 service, extended). 
+
+F09 is new 
+
+
+what F09 actually is: F08 validates a file and gives back a raw list of errors (rule
+code, layer, severity, a Mustang-generated technical message). That's fine for a
+developer, useless for the person who uploaded the invoice. F09 sits on top of F08 and
+turns that raw list into something a non-expert can read: each rule code is looked up
+in a rule_catalog table (title_fr / description_fr / correction_hint_fr — data, not
+code) and the errors come back with a French explanation and a fix hint instead of a
+bare code. Never shows a bare code with no explanation — falls back to Mustang's own
+message if a code isn't catalogued yet.
+
+Short summary:
+Anna's F08 integration only worked if something called validate() with a real document
+id — nothing did, so a document's status could never actually change from UPLOADED.
+I added the missing "VERIFY" endpoint and a report endpoint on DocumentController so
+that link works end to end, and wired a button + report panel into the document detail
+page. then I ported F09 (described above) over from my branch and hooked it up to the
+same document id, since it had never been merged anywhere before. 
+confirmed with the full backend test suite: 65/65 green.
+--------------------------------------------------------------------------------------------
+
+In DETAILS:
+
+F08/F09 — finished the "Vérifier" part Anna asked for + ported F09
+
+1) F_08 — wired the missing link (documentId was never used)
+- DocumentController: added POST /api/documents/{id}/validate (loads the doc, runs FacturXValidationService with its real id, so status actually updates now) and GET /api/documents/{id}/report.
+- ValidationRunRepository: added findTopByDocumentIdOrderByFinishedAtDesc
+- Added DocumentValidationFlowTest (upload -> validate -> status -> report, valid + invalid + 404 cases)
+
+2) F09 — was missing entirely from this branch, ported it over from my F_09 branch
+- Added ReadableValidationError, ValidationReport, ValidationReportService (+ getReportForDocument), ValidationReportController.
+- RuleCatalog: added title_fr/description_fr/correction_hint_fr
+- Added data.sql (24 rule codes, French text).
+- application.properties: added defer-datasource-initialization + sql.init.mode=always so data.sql loads
+- ValidationResult now carries runId; updated MustangReportParser and FacturXValidationService to match
+- Ported ValidationReportServiceTest + ValidationReportControllerTest
+
+3) frontend
+- DocumentDetail.jsx: added a "Lancer la validation Factur-X" button + report panel (status, error/warning/info counts, French explanations + correction hints).
+- Didn't touch the existing "Vérifier la conformité" button — goes to a separate mockup flow (UploadPage), not related to this.
+
+4) сhecked
+- full backend suite: mvn test — 65/65 green, BUILD SUCCESS (all modules, not just F08/F09).
+- found  and fixed one real bug along the way: DocumentValidationFlowTest was uploading
+  samples under the same filename FacturXValidationServiceTest uses directly, which
+  broke that other test's assertion since both share the same test DB/context. Fixed
+  by giving my test's uploads a unique filename.
+- vite build: green
+--------------------------------------------------------------------------------------------
+
+
+
+
+
+After the first code review from Ana and Salma, the following problems were found:
+
+1. No permission check on /validate — anyone could run a validation.
+2. rule_catalog was nowhere near complete — up to 88% of shown errors had no French explanation.
+3. BR-DE and PEPPOL notices cluttered the report.
+4. No rule code shown next to each error in the UI.
+5. The old dead "Vérifier la conformité" button was still on the document page.
+6. FacturXValidationServiceTest was flaky.
+
+How each was fixed:
+
+1. DocumentController now calls requirePermission(VALIDATE_DOCUMENT) before running validation → 403 for CLIENT and for users outside the document's organization. Added tests for both cases.
+2. Added 13 codes to rule_catalog (MUSTANG-EXCEPTION-17, MUSTANG-ERROR-11/12/13/14/15/16/17/18/19/21, FX-SCH-A-000019/000020) — all confirmed by actually running Mustang against new synthetic fixtures. Added RuleCatalogCoverageTest to keep unexplained errors at 0%.
+3. ValidationReportService now filters BR-DE*/PEPPOL* out of the report (still kept in the database).
+4. DocumentDetail.jsx now shows a rule code badge next to each error.
+5. Removed the button from DocumentDetail.jsx; left /verifier and the Layout.jsx menu entry untouched.
+6. The test now looks up its own run by runId instead of by filename — collision with other tests is gone.
+
+Result: full backend suite — 78/78 green (ran twice in a row), vite build — green.
