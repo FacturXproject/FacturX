@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { FileCode2, Eye, Building2 } from 'lucide-react';
 
 import api from '../services/api';
-import DocumentUploadForm from '../components/DocumentUploadForm';
 
 export default function XmlReader() {
 	const navigate = useNavigate();
@@ -85,8 +84,48 @@ export default function XmlReader() {
 		loadDocuments(selectedOrganizationId);
 	}, [selectedOrganizationId]);
 
-	const handleUploaded = () => {
-		loadDocuments(selectedOrganizationId);
+
+	const handleXmlUpload = async (event) => {
+		const file = event.target.files?.[0];
+
+		if (!file) {
+			return;
+		}
+
+		if (
+			file.type !== 'application/xml' &&
+			file.type !== 'text/xml' &&
+			!file.name.toLowerCase().endsWith('.xml')
+		) {
+			setError('Seuls les fichiers XML sont autorisés.');
+			event.target.value = '';
+			return;
+		}
+
+		try {
+			setError(null);
+
+			const formData = new FormData();
+			formData.append('file', file);
+
+			await api.post(
+				`/documents?organizationId=${selectedOrganizationId}`,
+				formData,
+				{
+					headers: {
+						'Content-Type': 'multipart/form-data',
+					},
+				}
+			);
+
+			loadDocuments(selectedOrganizationId);
+			event.target.value = '';
+		} catch (err) {
+			setError(
+				err.response?.data?.message ??
+				"Impossible d'envoyer le fichier XML."
+			);
+		}
 	};
 
 	const handleDeleteDocument = async (documentId) => {
@@ -258,11 +297,26 @@ export default function XmlReader() {
 						pointerEvents: selectedOrganizationId ? 'auto' : 'none',
 					}}
 				>
-					<DocumentUploadForm
-						organizationId={selectedOrganizationId}
-						onUploaded={handleUploaded}
-						xmlOnly
-					/>
+					<label
+						style={{
+							display: 'block',
+							border: '2px dashed #d1d5db',
+							borderRadius: '10px',
+							padding: '36px',
+							textAlign: 'center',
+							cursor: 'pointer',
+							color: '#374151',
+						}}
+					>
+						Cliquez pour choisir un fichier XML
+
+						<input
+							type="file"
+							accept=".xml,application/xml,text/xml"
+							onChange={handleXmlUpload}
+							style={{ display: 'none' }}
+						/>
+					</label>
 				</div>
 			</div>
 
