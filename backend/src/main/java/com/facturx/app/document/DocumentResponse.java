@@ -1,6 +1,6 @@
 package com.facturx.app.document;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record DocumentResponse(
         Long id,
@@ -10,7 +10,7 @@ public record DocumentResponse(
         String type,
         long size,
         DocumentStatus status,
-        LocalDateTime uploadedAt
+        Instant uploadedAt
 ) {
     public static DocumentResponse from(Document document) {
         return new DocumentResponse(

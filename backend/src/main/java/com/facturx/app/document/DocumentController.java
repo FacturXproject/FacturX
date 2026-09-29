@@ -76,8 +76,14 @@ public class DocumentController {
 
     // DELETE /api/documents/{id}
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable Long id) {
-        documentService.deleteDocument(id);
+    public void delete(
+            @PathVariable Long id,
+            Authentication authentication) {
+
+        documentService.deleteDocument(
+            id,
+            currentUserId(authentication)
+        );
     }
 
     // POST /api/documents/{id}/validate - "Verifier": lance le controle de conformite

@@ -13,6 +13,8 @@ export default function DocumentDetail() {
   const [report, setReport] = useState(null);
   const [validating, setValidating] = useState(false);
   const [validationError, setValidationError] = useState(null);
+  const [extracting, setExtracting] = useState(false);
+  const [extractionError, setExtractionError] = useState(null);
 
   const formatDate = (date) => {
     if (!date) return '';
@@ -110,6 +112,24 @@ export default function DocumentDetail() {
     loadReport();
   }, [id]);
 
+  // F11: lance l'extraction PDF (POST /api/documents/{id}/extract) sur ce document
+  // deja depose, en reutilisant le documentId existant, puis ouvre la page de
+  // verification des champs extraits (F12) une fois le brouillon persiste.
+  const handleExtract = async () => {
+    setExtracting(true);
+    setExtractionError(null);
+    try {
+      await api.post(`/documents/${id}/extract`);
+      navigate(`/conversion?documentId=${id}`);
+    } catch (error) {
+      console.error('Extraction error:', error);
+      setExtractionError(
+        error.response?.data?.message || "Échec de l'extraction des données."
+      );
+      setExtracting(false);
+    }
+  };
+
   // F08: lance la validation Factur-X sur ce document (POST /api/documents/{id}/validate),
   // en reutilisant le documentId existant plutot qu'un nouvel upload independant.
   const handleValidate = async () => {
@@ -140,7 +160,7 @@ export default function DocumentDetail() {
         >
           {/* RETOUR */}
           <button
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate(`/organisations/${document.organizationId}`)}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -155,7 +175,7 @@ export default function DocumentDetail() {
             }}
           >
             <ArrowLeft size={16} />
-            Retour au tableau de bord
+            Retour à l'organisation
           </button>
 
           {/* HEADER */}
@@ -330,22 +350,26 @@ export default function DocumentDetail() {
               paddingLeft: '24px',
             }}
           >
-            <button
-              onClick={() =>
-                navigate(`/convertir?documentId=${document.id}`)
-              }
-              style={{
-                padding: '9px 18px',
-                background: '#fff',
-                color: '#1a2744',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '13.5px',
-                cursor: 'pointer',
-              }}
-            >
-              Convertir en Factur-X
-            </button>
+            {/* F11: seul un PDF brut peut être converti (le service d'extraction
+                interne rejette tout autre type - voir ExtractionService). */}
+            {document.type === 'application/pdf' && (
+              <button
+                onClick={handleExtract}
+                disabled={extracting}
+                style={{
+                  padding: '9px 18px',
+                  background: '#fff',
+                  color: '#1a2744',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '13.5px',
+                  cursor: extracting ? 'default' : 'pointer',
+                  opacity: extracting ? 0.6 : 1,
+                }}
+              >
+                {extracting ? 'Extraction en cours…' : 'Convertir en Factur-X'}
+              </button>
+            )}
 
             <button
               onClick={handleValidate}
@@ -377,6 +401,21 @@ export default function DocumentDetail() {
               }}
             >
               {validationError}
+            </p>
+          )}
+
+          {/* EXTRACTION (F11) */}
+          {extractionError && (
+            <p
+              style={{
+                color: '#991b1b',
+                fontSize: '13.5px',
+                marginTop: '-16px',
+                marginBottom: '24px',
+                paddingLeft: '24px',
+              }}
+            >
+              {extractionError}
             </p>
           )}
 

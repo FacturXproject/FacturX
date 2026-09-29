@@ -52,46 +52,80 @@ function StatusBadge({ status }) {
       {status}
     </span>
   );
-}
+  }
 
-export default function Dashboard({ onFileSelect }) {
+  export default function Dashboard({ onFileSelect }) {
   const navigate = useNavigate();
 
   const [documents, setDocuments] = useState([]);
-  const [organizationId, setOrganizationId] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Récupérer l'organisation de l'utilisateur
   useEffect(() => {
-    api
-      .get('/organizations')
-      .then((response) => {
-        if (response.data.length > 0) {
-          const org = response.data[0];
-          setOrganizationId(org.organizationId ?? org.id);
-        }
-      })
-      .catch((error) => {
-        console.error('Organizations error:', error);
-      });
+    loadRecentDocuments();
   }, []);
 
-  // Charger les documents quand on connaît l'organisation
-  useEffect(() => {
-    if (!organizationId) return;
-
-    loadDocuments();
-  }, [organizationId]);
-
-  const loadDocuments = async () => {
+  const loadRecentDocuments = async () => {
     try {
-      const response = await api.get(
-        `/documents?organizationId=${organizationId}`
+      setLoading(true);
+
+      // 1. Récupérer toutes les organisations de l'utilisateur
+      const organizationsResponse = await api.get('/organizations');
+
+      const organizations = organizationsResponse.data || [];
+
+      // 2. Pour chaque organisation :
+      //    - récupérer son nom
+      //    - récupérer ses documents
+      const results = await Promise.all(
+        organizations.map(async (organization) => {
+          const organizationId =
+            organization.organizationId ?? organization.id;
+
+          let organizationName = `Organisation #${organizationId}`;
+
+          try {
+            const organizationDetails = await api.get(
+              `/organizations/${organizationId}`
+            );
+
+            organizationName =
+              organizationDetails.data.name ?? organizationName;
+          } catch (error) {
+            console.error(
+              `Organization ${organizationId} details error:`,
+              error
+            );
+          }
+
+          try {
+            const documentsResponse = await api.get(
+              `/documents?organizationId=${organizationId}`
+            );
+
+            const organizationDocuments =
+              documentsResponse.data.content || [];
+
+            return organizationDocuments.map((document) => ({
+              ...document,
+              organizationName,
+            }));
+          } catch (error) {
+            console.error(
+              `Documents for organization ${organizationId} error:`,
+              error
+            );
+
+            return [];
+          }
+        })
       );
 
-      const allDocuments = response.data.content || [];
+      // 3. Fusionner les documents de toutes les organisations
+      const allDocuments = results.flat();
 
-      // Garder seulement les 5 documents les plus récents
-      const recentDocuments = [...allDocuments]
+      // 4. Trier du plus récent au plus ancien
+      //    puis garder uniquement les 5 derniers
+      const recentDocuments = allDocuments
         .sort(
           (a, b) =>
             new Date(b.uploadedAt) - new Date(a.uploadedAt)
@@ -100,29 +134,15 @@ export default function Dashboard({ onFileSelect }) {
 
       setDocuments(recentDocuments);
     } catch (error) {
-      console.error('Documents error:', error);
-    }
-  };
-
-  // Supprimer un document
-  const handleDelete = async (event, documentId) => {
-    event.stopPropagation();
-
-    try {
-      await api.delete(`/documents/${documentId}`);
-
-      setDocuments((previousDocuments) =>
-        previousDocuments.filter(
-          (doc) => doc.id !== documentId
-        )
-      );
-    } catch (error) {
-      console.error('Delete error:', error);
+      console.error('Dashboard error:', error);
+      setDocuments([]);
+    } finally {
+      setLoading(false);
     }
   };
 
   // Ouvrir le détail du document
-  const handleRowClick = (doc) => {
+  const handleDocumentClick = (doc) => {
     if (onFileSelect) {
       onFileSelect(doc.filename);
     }
@@ -130,24 +150,12 @@ export default function Dashboard({ onFileSelect }) {
     navigate(`/documents/${doc.id}`);
   };
 
-  // Date uniquement
   const formatDate = (date) => {
     if (!date) return '';
 
     return new Date(date).toLocaleDateString('fr-FR');
   };
 
-  // Heure uniquement
-  const formatTime = (date) => {
-    if (!date) return '';
-
-    return new Date(date).toLocaleTimeString('fr-FR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  // Affichage simple du type
   const formatType = (type) => {
     if (type === 'application/pdf') {
       return 'PDF';
@@ -226,11 +234,10 @@ export default function Dashboard({ onFileSelect }) {
               <tr style={{ background: '#f9fafb' }}>
                 {[
                   'Fichier',
+                  'Organisation',
                   'Date',
-                  'Heure',
                   'Type',
                   'Statut',
-                  'Action',
                 ].map((title) => (
                   <th
                     key={title}
@@ -247,64 +254,60 @@ export default function Dashboard({ onFileSelect }) {
             </thead>
 
             <tbody>
-              {documents.map((doc) => (
-                <tr
-                  key={doc.id}
-                  style={{
-                    borderTop: '1px solid #f3f4f6',
-                  }}
-                >
-                  {/* Seul le nom du fichier ouvre le détail */}
-                  <td
-                    onClick={() => handleRowClick(doc)}
-                    style={{
-                      padding: '10px 14px',
-                      cursor: 'pointer',
-                      fontWeight: 500,
-                    }}
-                  >
-                    {doc.filename}
-                  </td>
-
-                  <td style={{ padding: '10px 14px' }}>
-                    {formatDate(doc.uploadedAt)}
-                  </td>
-
-                  <td style={{ padding: '10px 14px' }}>
-                    {formatTime(doc.uploadedAt)}
-                  </td>
-
-                  <td style={{ padding: '10px 14px' }}>
-                    {formatType(doc.type)}
-                  </td>
-
-                  <td style={{ padding: '10px 14px' }}>
-                    <StatusBadge status={doc.status} />
-                  </td>
-
-                  <td style={{ padding: '10px 14px' }}>
-                    <button
-                      onClick={(event) =>
-                        handleDelete(event, doc.id)
-                      }
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: '#b91c1c',
-                        fontSize: '12px',
-                      }}
-                    >
-                      Supprimer
-                    </button>
-                  </td>
-                </tr>
-              ))}
-
-              {documents.length === 0 && (
+              {loading ? (
                 <tr>
                   <td
-                    colSpan="6"
+                    colSpan="5"
+                    style={{
+                      padding: '20px',
+                      textAlign: 'center',
+                      color: '#9ca3af',
+                    }}
+                  >
+                    Chargement...
+                  </td>
+                </tr>
+              ) : documents.length > 0 ? (
+                documents.map((doc) => (
+                  <tr
+                    key={doc.id}
+                    style={{
+                      borderTop: '1px solid #f3f4f6',
+                    }}
+                  >
+                    <td
+                      onClick={() => handleDocumentClick(doc)}
+                      style={{
+                        padding: '10px 14px',
+                        cursor: 'pointer',
+                        fontWeight: 500,
+                        color: '#1a2744',
+                      }}
+                    >
+                      {doc.filename}
+                    </td>
+
+                    <td style={{ padding: '10px 14px' }}>
+                      {doc.organizationName}
+                    </td>
+
+                    <td style={{ padding: '10px 14px' }}>
+                      {formatDate(doc.uploadedAt)}
+                    </td>
+
+                    <td style={{ padding: '10px 14px' }}>
+                      {formatType(doc.type)}
+                    </td>
+
+                    <td style={{ padding: '10px 14px' }}>
+                      <StatusBadge status={doc.status} />
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td
+                    colSpan="5"
                     style={{
                       padding: '20px',
                       textAlign: 'center',

@@ -313,8 +313,20 @@ export default function OrganizationsPage() {
   };
 
   const handleDelete = async (realId) => {
-    await api.delete(`/organizations/${realId}`);
-    fetchOrganizations();
+    try {
+      await api.delete(`/organizations/${realId}`);
+      fetchOrganizations();
+    } catch (err) {
+      if (err.response?.status === 409) {
+        throw new Error(
+          "Impossible de supprimer cette organisation tant qu'elle contient des documents."
+        );
+      }
+
+      throw new Error(
+        "Une erreur est survenue lors de la suppression de l'organisation."
+      );
+    }
   };
 
   const total = organizations.length;

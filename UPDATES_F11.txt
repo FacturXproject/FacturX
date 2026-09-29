@@ -1,0 +1,111 @@
+F11 — Extraction PDF (Python)
+---------------------------------------------------------------------------
+
+
+Goal:
+Automatically extract the key fields from a plain PDF invoice (seller,
+buyer, dates, number, lines, VAT, totals), with a confidence score per
+field, so a human can review and correct them (F12) before Factur-X
+generation (F13). No field is trusted until a human has checked it.
+
+
+Architecture:
+React -> Nginx -> Spring Boot (checks user/org/permissions/document) ->
+FastAPI extractor (internal, no DB, no auth, receives bytes returns JSON)
+-> Spring Boot (validates the JSON shape, persists the draft) -> React.
+
+
+New service - extractor/ (Python, FastAPI):
+- POST /extract: multipart PDF in, JSON out. Reads the PDF's text layer
+  with pdfplumber and matches known French invoice patterns (SIREN,
+  intra-EU VAT, totals, dates...) with regex. Deterministic, not OCR/ML.
+- Every field carries confidence in [0, 1]; a field not found comes back
+  as value: null, confidence: 0.0 instead of failing the request - a
+  hard-to-read PDF still produces a (mostly empty) draft.
+- GET /health for the aggregate health response.
+- No database access, no authentication - Spring Boot is the only caller
+  and is responsible for every permission check beforehand.
+- Dockerfile, requirements.txt; internal-only in docker-compose (no host
+  port published).
+
+
+Backend changes (new package: extraction):
+- DraftInvoice / ExtractedField / DraftLine (JPA entities) + repositories:
+  extracted_fields keeps field_name, value, confidence, source per the
+  roadmap; draft_lines the same per invoice line.
+- ExtractionClient: HTTP client (java.net.http, pinned to HTTP/1.1 - see
+  "Bug found" below) calling the extractor's POST /extract.
+- ExtractionService: rejects non-PDF documents, calls the extractor,
+  validates the response shape, persists the draft, clamps confidence to
+  [0, 1].
+- ExtractionController: POST /documents/{id}/extract, GET
+  /documents/{id}/draft. Same pattern as F08's validate endpoint - loads
+  the document, checks the caller's permission, then delegates.
+- Permission.EXTRACT_DOCUMENT (new), granted to ADMIN and ACCOUNTANT (same
+  policy as VALIDATE_DOCUMENT) - see PermissionService.
+- app.extractor.url / EXTRACTOR_URL env var, defaults to
+  http://extractor:8000.
+
+
+Frontend changes:
+- DocumentDetail.jsx: "Convertir en Factur-X" button (shown only for
+  application/pdf documents) now calls POST /documents/{id}/extract
+  directly on the already-uploaded document, then opens /conversion - same
+  pattern as the existing "Lancer la validation" button.
+- UploadPage.jsx (mode="convertir"): now actually uploads the PDF then
+  calls extract, mirroring the "verifier" mode's upload+validate flow
+  (org selection restricted to ADMIN/ACCOUNTANT, PDF-only client check).
+  Previously this mode did nothing but navigate to a fake progress page.
+- Conversion.jsx: now fetches GET /documents/{id}/draft and renders the
+  real extracted fields/lines instead of mockData.js. Confidence >= 0.6
+  shown as "high" (green), otherwise "low" (amber, matches F12's planned
+  correction-form design). Dropped the fake PDF preview panel that had no
+  real data to back it.
+
+
+docker-compose.yml: new extractor service (internal network only);
+backend gets EXTRACTOR_URL and depends_on: extractor.
+
+
+CI (.github/workflows/ci.yml): added a step running the extractor's own
+pytest suite, next to the existing backend test step.
+
+
+Tests added:
+- extractor/tests (10, pytest): field extraction on a synthetic invoice
+  PDF, confidence bounds, a PDF with no matches (nulls, not a crash), the
+  /extract endpoint (200/415/400/422), /health needs no auth.
+- ExtractionFlowTest (backend, 4): extract persists and GET /draft returns
+  it; no draft yet -> 404; non-PDF document -> 415; a user outside the
+  document's organisation -> 403. ExtractionClient is mocked here - the
+  real HTTP call is covered by the manual test below.
+
+
+Bug found and fixed during manual end-to-end testing:
+The JDK's default java.net.http.HttpClient attempts a cleartext HTTP/2
+(h2c) upgrade. uvicorn/python-multipart accepts the connection but fails
+to parse the resulting chunked multipart body - the extractor reported
+"file" as missing even though Spring Boot had sent it. Fixed by pinning
+ExtractionClient's HttpClient to HTTP_1_1 explicitly. Found by capturing
+the raw bytes on the wire (netcat) and comparing against a hand-built
+multipart request that worked - not visible from unit/integration tests
+alone, since those mock ExtractionClient.
+
+
+Manually tested against the real stack (docker compose, all 6 containers,
+through Nginx/TLS with real cookie+CSRF auth):
+1. register -> create organisation -> upload a real invoice PDF from the
+   F08 test corpus -> POST /extract -> 200, fields returned with mixed
+   confidence, GET /draft returns the same draft.
+2. Uploading an XML document and calling /extract -> 415
+   EXTRACTION_UNSUPPORTED_TYPE, no draft created.
+3. docker compose build (all 5 images) and docker compose up -> HTTPS
+   healthcheck green.
+
+
+Result:
+- backend: mvn test - 82/82 passing (78 pre-existing + 4 new).
+- extractor: pytest - 10/10 passing.
+- frontend: npm run lint (0 errors) and npm run build both pass.
+- A PDF can be uploaded and converted into a structured draft invoice with
+  per-field confidence, end to end, through the real Docker stack.
