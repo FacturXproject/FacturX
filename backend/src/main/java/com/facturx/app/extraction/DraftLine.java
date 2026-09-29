@@ -27,13 +27,13 @@ public class DraftLine {
     @Column(name = "description", length = 500)
     private String description;
 
-    @Column(name = "quantity", length = 50)
+    @Column(name = "quantity", length = 500)
     private String quantity;
 
-    @Column(name = "unit_price", length = 50)
+    @Column(name = "unit_price", length = 500)
     private String unitPrice;
 
-    @Column(name = "total", length = 50)
+    @Column(name = "total", length = 500)
     private String total;
 
     @Column(name = "confidence")

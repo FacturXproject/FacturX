@@ -4,6 +4,7 @@ import com.facturx.app.document.Document;
 import com.facturx.app.document.DocumentService;
 import java.util.Map;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ExtractionService {
@@ -28,6 +29,10 @@ public class ExtractionService {
         this.draftLineRepository = draftLineRepository;
     }
 
+    // @Transactional : evite qu'un brouillon reste persiste avec des champs/lignes
+    // partiels si une sauvegarde echoue en cours de route (ex: valeur extraite plus
+    // longue que prevu) - soit tout est sauvegarde, soit rien ne l'est.
+    @Transactional
     public DraftInvoiceResponse extract(Long documentId) {
         Document document = documentService.getDocument(documentId);
 
