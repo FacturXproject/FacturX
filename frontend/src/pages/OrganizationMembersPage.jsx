@@ -136,6 +136,18 @@ const totalPages = Math.ceil(documents.length / documentsPerPage);
     }
   };
 
+  const handleDeleteDocument = async (documentId) => {
+    try {
+      await api.delete(`/documents/${documentId}`);
+      fetchDocuments();
+    } catch (err) {
+      setDocumentsError(
+        err.response?.data?.message ??
+        'Impossible de supprimer le document.'
+      );
+    }
+  };
+
   useEffect(() => {
     fetchOrganization();
     fetchMembers();
@@ -1043,8 +1055,16 @@ const totalPages = Math.ceil(documents.length / documentsPerPage);
                 </thead>
 
                 <tbody>
-                  {visibleDocuments.map((doc) => (
-                    <tr
+                  {visibleDocuments.map((doc) => {
+                    const canDelete =
+                      currentRole === 'ADMIN' ||
+                      (
+                        String(doc.ownerId) === String(currentUserId) &&
+                        doc.status === 'UPLOADED'
+                      );
+
+                    return (
+                      <tr
                       key={doc.id}
                       style={{
                         borderBottom: '1px solid #f3f4f6',
@@ -1087,29 +1107,59 @@ const totalPages = Math.ceil(documents.length / documentsPerPage);
                           padding: '12px 16px',
                         }}
                       >
-                        <button
-                          onClick={() =>
-                            navigate(`/documents/${doc.id}`)
-                          }
+                        <div
                           style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '5px',
-                            padding: '6px 11px',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '7px',
-                            background: '#fff',
-                            color: '#374151',
-                            cursor: 'pointer',
-                            fontSize: '12.5px',
+                            gap: '8px',
                           }}
                         >
-                          <Eye size={14} />
-                          Voir
-                        </button>
+                          <button
+                            onClick={() =>
+                              navigate(`/documents/${doc.id}`)
+                            }
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              padding: '6px 11px',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '7px',
+                              background: '#fff',
+                              color: '#374151',
+                              cursor: 'pointer',
+                              fontSize: '12.5px',
+                            }}
+                          >
+                            <Eye size={14} />
+                            Voir
+                          </button>
+
+                        {canDelete && (
+                          <button
+                            onClick={() => handleDeleteDocument(doc.id)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              padding: '6px 11px',
+                              border: '1px solid #fecaca',
+                              borderRadius: '7px',
+                              background: '#fff',
+                              color: '#dc2626',
+                              cursor: 'pointer',
+                              fontSize: '12.5px',
+                            }}
+                          >
+                            <Trash2 size={14} />
+                            Supprimer
+                          </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
 

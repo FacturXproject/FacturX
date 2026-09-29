@@ -61,7 +61,13 @@ public class DocumentController {
 
     // DELETE /api/documents/{id}
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable Long id) {
-        documentService.deleteDocument(id);
+    public void delete(
+            @PathVariable Long id,
+            Authentication authentication) {
+
+        documentService.deleteDocument(
+            id,
+            currentUserId(authentication)
+        );
     }
 }
