@@ -1,10 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Processing from '../Processing';
-import api from '../../services/api';
-
-vi.mock('../../services/api');
 
 const mockNavigate = vi.fn();
 
@@ -13,62 +10,33 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => mockNavigate };
 });
 
-function renderAt(path) {
-  return render(
-    <MemoryRouter initialEntries={[path]}>
-      <Processing />
-    </MemoryRouter>
-  );
-}
-
-describe('Processing - flux Verifier (F08/F09 reel)', () => {
+// F09+: le flux "Verifier" (F08/F09) ne passe plus par cette page - il est
+// gere directement par UploadPage (upload + validate + navigation vers
+// /rapport dans un seul gestionnaire). Processing.jsx ne sert plus que la
+// simulation de conversion (F13, pas encore branchee sur un service reel).
+describe('Processing - simulation de conversion (F13, mockee)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
   });
 
-  it('lance la validation reelle du document puis redirige vers le rapport', async () => {
-    api.post.mockResolvedValue({ data: { valid: true } });
-
-    renderAt('/traitement?action=verifier&documentId=7');
-
-    await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith('/documents/7/validate');
-    });
-
-    await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/rapport?documentId=7');
-    });
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
-  it('affiche un message clair si aucun documentId n\'est fourni', async () => {
-    renderAt('/traitement?action=verifier');
+  it('affiche la progression puis redirige vers /conversion apres le delai simule', () => {
+    render(
+      <MemoryRouter>
+        <Processing />
+      </MemoryRouter>
+    );
 
-    await waitFor(() => {
-      expect(screen.getByText(/Aucun document à valider/i)).toBeInTheDocument();
+    expect(screen.getByText(/Traitement en cours/i)).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(2200);
     });
-    expect(api.post).not.toHaveBeenCalled();
-  });
 
-  it('affiche le message de refus quand un role CLIENT ne peut pas valider (403)', async () => {
-    api.post.mockRejectedValue({
-      response: { data: { message: 'You do not have permission to perform this action.' } },
-    });
-
-    renderAt('/traitement?action=verifier&documentId=9');
-
-    await waitFor(() => {
-      expect(screen.getByText(/You do not have permission to perform this action/i)).toBeInTheDocument();
-    });
-    expect(mockNavigate).not.toHaveBeenCalled();
-  });
-
-  it('affiche un message d\'echec generique si le serveur ne renvoie pas de message', async () => {
-    api.post.mockRejectedValue(new Error('Network Error'));
-
-    renderAt('/traitement?action=verifier&documentId=3');
-
-    await waitFor(() => {
-      expect(screen.getByText(/Échec de la validation du document/i)).toBeInTheDocument();
-    });
+    expect(mockNavigate).toHaveBeenCalledWith('/conversion');
   });
 });
