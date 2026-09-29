@@ -13,6 +13,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.UUID;
+import com.facturx.app.permission.Permission;
+import com.facturx.app.permission.PermissionService;
 
 @Service
 public class DocumentService {
@@ -20,16 +22,21 @@ public class DocumentService {
     private final DocumentRepository documentRepository;
     private final UserRepository userRepository;
     private final OrganizationRepository organizationRepository;
+    private final PermissionService permissionService;
 
     @Value("${app.storage.path:/app/uploads}")
     private String storageBasePath;
 
-    public DocumentService(DocumentRepository documentRepository,
-                            UserRepository userRepository,
-                            OrganizationRepository organizationRepository) {
+    public DocumentService(
+            DocumentRepository documentRepository,
+            UserRepository userRepository,
+            OrganizationRepository organizationRepository,
+            PermissionService permissionService) {
+
         this.documentRepository = documentRepository;
         this.userRepository = userRepository;
         this.organizationRepository = organizationRepository;
+        this.permissionService = permissionService;
     }
 
     public Document upload(MultipartFile file, Long organizationId, Long ownerId) {
@@ -90,13 +97,47 @@ public class DocumentService {
         }
     }
 
-    public void deleteDocument(Long documentId) {
+    public void deleteDocument(Long documentId,Long currentUserId)
+    {
         Document document = getDocument(documentId);
-        try {
-            Files.deleteIfExists(Paths.get(document.getStoragePath()));
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to delete stored file", e);
+
+        Long organizationId = document.getOrganization().getId();
+
+        boolean canDeleteAny = permissionService.hasPermission(
+            currentUserId,
+            organizationId,
+            Permission.DELETE_ANY_DOCUMENT
+        );
+
+        boolean canDeleteOwnPending = permissionService.hasPermission(
+            currentUserId,
+            organizationId,
+            Permission.DELETE_OWN_PENDING_DOCUMENT
+        );
+
+        boolean isOwner =
+            document.getOwner() != null
+            && document.getOwner().getId().equals(currentUserId);
+
+        boolean isPending =
+            document.getStatus() == DocumentStatus.UPLOADED;
+
+        if (!canDeleteAny
+                && !(canDeleteOwnPending && isOwner && isPending)) {
+            throw new com.facturx.app.permission.AccessDeniedException();
         }
+
+        try {
+            Files.deleteIfExists(
+                Paths.get(document.getStoragePath())
+            );
+        } catch (IOException e) {
+            throw new RuntimeException(
+                "Failed to delete stored file",
+                e
+            );
+        }
+
         documentRepository.delete(document);
     }
 }

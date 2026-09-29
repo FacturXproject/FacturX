@@ -82,26 +82,61 @@ export default function InvitationCheck() {
   }
 
 
-  if (!invitation && error) {
-    return (
-      <div style={{ padding: '40px' }}>
+if (!invitation && error) {
+  return (
+    <div
+      style={{
+        maxWidth: '700px',
+        margin: '40px auto',
+        padding: '0 24px',
+      }}
+    >
+      <button
+        onClick={() => navigate('/')}
+        style={{
+          background: 'transparent',
+          border: 'none',
+          padding: 0,
+          marginBottom: '18px',
+          color: '#6b7280',
+          cursor: 'pointer',
+          fontSize: '13px',
+        }}
+      >
+        ← Retour
+      </button>
 
-        <h2>Invitation</h2>
+      <div
+        style={{
+          background: '#fff',
+          border: '1px solid #e5e7eb',
+          borderRadius: '8px',
+          padding: '24px',
+        }}
+      >
+        <h2
+          style={{
+            margin: '0 0 8px',
+            fontSize: '20px',
+            color: '#1a1a2e',
+          }}
+        >
+          Invitation
+        </h2>
 
-        <p style={{ color: '#b42318' }}>
+        <p
+          style={{
+            margin: 0,
+            fontSize: '13px',
+            color: '#b42318',
+          }}
+        >
           {error}
         </p>
-
-        <button
-          onClick={() => navigate('/')}
-        >
-          Retour
-        </button>
-
       </div>
-    );
-  }
-
+    </div>
+  );
+}
 
   return (
     <div

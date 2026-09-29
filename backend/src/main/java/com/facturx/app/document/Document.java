@@ -3,7 +3,7 @@ package com.facturx.app.document;
 import com.facturx.app.organization.Organization;
 import com.facturx.app.user.User;
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Entity
 @Table(name = "documents")
@@ -32,8 +32,7 @@ public class Document {
 
     private String storagePath;
 
-    private LocalDateTime uploadedAt = LocalDateTime.now();
-
+    private Instant uploadedAt = Instant.now();
     public Document() {}
 
     // getters
@@ -45,8 +44,7 @@ public class Document {
     public long getSize() { return size; }
     public DocumentStatus getStatus() { return status; }
     public String getStoragePath() { return storagePath; }
-    public LocalDateTime getUploadedAt() { return uploadedAt; }
-
+    public Instant getUploadedAt() { return uploadedAt; }
     // setters
     public void setOrganization(Organization organization) { this.organization = organization; }
     public void setOwner(User owner) { this.owner = owner; }

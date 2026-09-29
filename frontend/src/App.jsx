@@ -23,7 +23,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import Terms from './pages/Terms';
 import LandingPage from './pages/LandingPage';
 import DocumentDetail from './pages/DocumentDetail';
-
+import InvoiceView from './pages/InvoiceView';
 
 function Protected({ children }) {
   return (
@@ -43,7 +43,7 @@ export default function App() {
 
           <Route path="/healthcheck" element={<HealthCheck />} />
           <Route path="/users" element={<Users />} />
-         <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<Terms />} />
 
           <Route path="/organisations/:id" element={<Protected><OrganizationMembersPage /></Protected>} />
@@ -53,10 +53,11 @@ export default function App() {
           <Route path="/invitations/new" element={<Protected><NewInvitation /></Protected>} />
           <Route path="/invitations" element={<Protected><Invitations /></Protected>} />
           <Route path="/invitations/:token" element={<InvitationCheck />} />
+          <Route path="/documents/:id/invoice" element={<Protected><InvoiceView /></Protected>} />
           <Route path="/traitement" element={<Protected><Processing /></Protected>} />
           <Route path="/rapport" element={<Protected><ComplianceReport /></Protected>} />
           <Route path="/conversion" element={<Protected><Conversion /></Protected>} />
-		  <Route path="/profile" element={<Protected><Profile /></Protected>} />
+          <Route path="/profile" element={<Protected><Profile /></Protected>} />
           <Route path="/succes" element={<Protected><Success /></Protected>} />
           <Route path="/lecture-xml" element={<Protected><XmlReader /></Protected>} />
           <Route path="/verifier" element={<Protected><UploadPage mode="verifier" /></Protected>} />

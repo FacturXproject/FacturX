@@ -1,167 +1,526 @@
-import { useState } from 'react';
-import { xmlContent, conversionData } from '../mockData';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { FileCode2, Eye, Building2 } from 'lucide-react';
 
-function XmlHighlight({ xml }) {
-  // Tokenize XML into segments and colorize each
-  const tokens = [];
-  const re = /(<\/?)([\w:]+)([^>]*)(\/?>)|(<!--[\s\S]*?-->)|("([^"]*)")|([^<>"]+)/g;
-  let m;
-  while ((m = re.exec(xml)) !== null) {
-    if (m[1] != null) {
-      // Opening/closing tag
-      tokens.push({ type: 'punct', text: m[1] });
-      tokens.push({ type: 'tag', text: m[2] });
-      // Attributes inside the tag
-      const attrs = m[3];
-      const attrRe = /\s+([\w:]+)(="([^"]*)")?/g;
-      let am;
-      while ((am = attrRe.exec(attrs)) !== null) {
-        tokens.push({ type: 'text', text: ' ' });
-        tokens.push({ type: 'attr', text: am[1] });
-        if (am[2]) {
-          tokens.push({ type: 'punct', text: '=' });
-          tokens.push({ type: 'string', text: `"${am[3]}"` });
-        }
-      }
-      tokens.push({ type: 'punct', text: m[4] });
-    } else if (m[5] != null) {
-      tokens.push({ type: 'comment', text: m[5] });
-    } else if (m[6] != null) {
-      tokens.push({ type: 'string', text: m[6] });
-    } else if (m[8] != null) {
-      tokens.push({ type: 'text', text: m[8] });
-    }
-  }
-
-  const colors = { tag: '#4a9eff', attr: '#f59e0b', string: '#86efac', punct: '#94a3b8', comment: '#64748b', text: '#e2e8f0' };
-
-  return (
-    <pre style={{ margin: 0, fontSize: '12px', lineHeight: '1.6', color: '#e2e8f0', overflow: 'auto', padding: '16px' }}>
-      {tokens.map((t, i) => (
-        <span key={i} style={{ color: colors[t.type] || '#e2e8f0' }}>{t.text}</span>
-      ))}
-    </pre>
-  );
-}
+import api from '../services/api';
 
 export default function XmlReader() {
-  const [view, setView] = useState('lisible');
-  const d = conversionData;
+	const navigate = useNavigate();
 
-  return (
-    <div style={{ padding: '24px 28px', maxWidth: '900px' }}>
-      <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: '19px', fontWeight: 700, color: '#1a1a2e' }}>Lecture XML</h1>
-          <p style={{ margin: '3px 0 0', fontSize: '12.5px', color: '#6b7280' }}>
-            <span className="mono">FACT-2026-00139.xml</span>
-          </p>
-        </div>
+	const [organizations, setOrganizations] = useState([]);
+	const [selectedOrganizationId, setSelectedOrganizationId] = useState('');
+	const [documents, setDocuments] = useState([]);
 
-        {/* Toggle */}
-        <div style={{ display: 'flex', border: '1px solid #d1d5db', borderRadius: '7px', overflow: 'hidden', background: '#fff', flexShrink: 0 }}>
-          {['lisible', 'brut'].map(v => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              style={{
-                padding: '7px 16px', border: 'none', cursor: 'pointer',
-                fontSize: '13px', fontWeight: view === v ? 600 : 400,
-                background: view === v ? '#1a2744' : '#fff',
-                color: view === v ? '#fff' : '#4b5563',
-              }}
-            >
-              {v === 'lisible' ? 'Vue lisible' : 'XML brut'}
-            </button>
-          ))}
-        </div>
-      </div>
+	const [loadingOrganizations, setLoadingOrganizations] = useState(true);
+	const [loadingDocuments, setLoadingDocuments] = useState(false);
+	const [error, setError] = useState(null);
 
-      {view === 'lisible' ? (
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', overflow: 'hidden' }}>
-          {/* Invoice header */}
-          <div style={{ background: '#1a2744', color: '#fff', padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-              <div style={{ fontSize: '20px', fontWeight: 700, letterSpacing: '-0.4px' }}>SARL Dupont Informatique</div>
-              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', lineHeight: '1.7', marginTop: '6px' }}>
-                14 rue des Lilas, 75011 Paris<br />
-                SIREN : 452 891 237 · TVA : FR45452891237
-              </div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '1px' }}>Facture</div>
-              <div style={{ fontSize: '18px', fontWeight: 700, fontFamily: 'monospace' }}>FACT-2026-00139</div>
-              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginTop: '4px' }}>25 juillet 2026</div>
-            </div>
-          </div>
+	useEffect(() => {
+		async function loadOrganizations() {
+			try {
+				const response = await api.get('/organizations');
 
-          <div style={{ padding: '20px 24px' }}>
-            {/* Parties */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-              {[
-                { title: 'Vendeur', nom: 'SARL Dupont Informatique', addr: '14 rue des Lilas, 75011 Paris', siren: '452 891 237' },
-                { title: 'Acheteur', nom: 'SAS Martin & Associés', addr: '8 avenue Foch, 69002 Lyon', siren: '789 012 345' },
-              ].map(p => (
-                <div key={p.title} style={{ background: '#f9fafb', borderRadius: '7px', padding: '14px 16px' }}>
-                  <div style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>{p.title}</div>
-                  <div style={{ fontSize: '13.5px', fontWeight: 600, color: '#1a1a2e' }}>{p.nom}</div>
-                  <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '3px', lineHeight: '1.5' }}>
-                    {p.addr}<br />
-                    SIREN : {p.siren}
-                  </div>
-                </div>
-              ))}
-            </div>
+				const organizationsWithNames = await Promise.all(
+					response.data.map(async (organization) => {
+						const id = organization.organizationId ?? organization.id;
 
-            {/* Lines */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px', fontSize: '13px' }}>
-              <thead>
-                <tr style={{ background: '#f3f4f6', borderBottom: '2px solid #e5e7eb' }}>
-                  {['Réf.', 'Description', 'Qté', 'P.U. HT', 'TVA', 'Total HT'].map(h => (
-                    <th key={h} style={{ padding: '8px 12px', textAlign: h === 'Description' ? 'left' : 'right', fontWeight: 500, color: '#6b7280', fontSize: '12px' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {d.lignes.map((l, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                    <td style={{ padding: '9px 12px', fontFamily: 'monospace', fontSize: '11.5px', color: '#6b7280' }}>{l.ref}</td>
-                    <td style={{ padding: '9px 12px', color: '#1a1a2e' }}>{l.description}</td>
-                    <td style={{ padding: '9px 12px', textAlign: 'right', color: '#4b5563' }}>{l.qty} {l.unit}</td>
-                    <td style={{ padding: '9px 12px', textAlign: 'right', fontFamily: 'monospace' }}>{l.pu.toFixed(2)} €</td>
-                    <td style={{ padding: '9px 12px', textAlign: 'right', color: '#6b7280' }}>{l.tva}%</td>
-                    <td style={{ padding: '9px 12px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600 }}>{l.total.toFixed(2)} €</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+						try {
+							const details = await api.get(`/organizations/${id}`);
 
-            {/* Totals */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <div style={{ width: '240px', borderTop: '2px solid #e5e7eb', paddingTop: '10px' }}>
-                {[
-                  ['Total HT', `${d.totalHT.toFixed(2)} €`, false],
-                  [`TVA ${d.tauxTva}%`, `${d.montantTva.toFixed(2)} €`, false],
-                  ['Total TTC', `${d.totalTTC.toFixed(2)} €`, true],
-                ].map(([l, v, bold]) => (
-                  <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: bold ? '15px' : '13px', fontWeight: bold ? 700 : 400, color: bold ? '#1a1a2e' : '#6b7280', borderTop: bold ? '1px solid #e5e7eb' : 'none', marginTop: bold ? '6px' : 0, paddingTop: bold ? '8px' : '5px' }}>
-                    <span>{l}</span>
-                    <span className="mono">{v}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div style={{ background: '#0f172a', borderRadius: '10px', overflow: 'hidden', border: '1px solid #1e293b' }}>
-          <div style={{ background: '#1e293b', padding: '8px 16px', fontSize: '12px', color: '#94a3b8', display: 'flex', justifyContent: 'space-between' }}>
-            <span>FACT-2026-00139.xml — Factur-X EN 16931</span>
-            <span>{xmlContent.split('\n').length} lignes</span>
-          </div>
-          <XmlHighlight xml={xmlContent} />
-        </div>
-      )}
-    </div>
-  );
+							return {
+								id,
+								name: details.data.name ?? `Organisation #${id}`,
+							};
+						} catch {
+							return {
+								id,
+								name: `Organisation #${id}`,
+							};
+						}
+					})
+				);
+
+				setOrganizations(organizationsWithNames);
+			} catch {
+				setError('Impossible de charger les organisations.');
+			} finally {
+				setLoadingOrganizations(false);
+			}
+		}
+
+		loadOrganizations();
+	}, []);
+
+	async function loadDocuments(organizationId) {
+		if (!organizationId) {
+			setDocuments([]);
+			return;
+		}
+
+		setLoadingDocuments(true);
+		setError(null);
+
+		try {
+			const response = await api.get(
+				`/documents?organizationId=${organizationId}`
+			);
+
+			const xmlDocuments =
+				response.data.content?.filter(
+					(document) =>
+						document.type === 'text/xml' ||
+						document.type === 'application/xml'
+				) ?? [];
+
+			setDocuments(xmlDocuments);
+		} catch {
+			setError('Impossible de charger les fichiers XML.');
+		} finally {
+			setLoadingDocuments(false);
+		}
+	}
+
+	useEffect(() => {
+		loadDocuments(selectedOrganizationId);
+	}, [selectedOrganizationId]);
+
+
+	const handleXmlUpload = async (event) => {
+		const file = event.target.files?.[0];
+
+		if (!file) {
+			return;
+		}
+
+		if (
+			file.type !== 'application/xml' &&
+			file.type !== 'text/xml' &&
+			!file.name.toLowerCase().endsWith('.xml')
+		) {
+			setError('Seuls les fichiers XML sont autorisés.');
+			event.target.value = '';
+			return;
+		}
+
+		try {
+			setError(null);
+
+			const formData = new FormData();
+			formData.append('file', file);
+
+			await api.post(
+				`/documents?organizationId=${selectedOrganizationId}`,
+				formData,
+				{
+					headers: {
+						'Content-Type': 'multipart/form-data',
+					},
+				}
+			);
+
+			loadDocuments(selectedOrganizationId);
+			event.target.value = '';
+		} catch (err) {
+			setError(
+				err.response?.data?.message ??
+				"Impossible d'envoyer le fichier XML."
+			);
+		}
+	};
+
+	const handleDeleteDocument = async (documentId) => {
+	try {
+		await api.delete(`/documents/${documentId}`);
+		loadDocuments(selectedOrganizationId);
+	} catch {
+		setError('Impossible de supprimer le document.');
+	}
+	};
+
+
+	if (loadingOrganizations) {
+		return (
+			<div style={{ padding: '32px 40px' }}>
+				Chargement...
+			</div>
+		);
+	}
+
+	return (
+		<div
+			style={{
+				padding: '32px 40px',
+				maxWidth: '1200px',
+				margin: '0 auto',
+				background: '#f8f9fa',
+				minHeight: '100vh',
+			}}
+		>
+			<div style={{ marginBottom: '24px' }}>
+				<h1
+					style={{
+						fontSize: '26px',
+						fontWeight: 700,
+						color: '#111827',
+						margin: '0 0 4px',
+					}}
+				>
+					Lecture XML
+				</h1>
+
+				<p
+					style={{
+						color: '#6b7280',
+						fontSize: '14px',
+						margin: 0,
+					}}
+				>
+					Déposez une facture XML et consultez-la sous une forme lisible.
+				</p>
+			</div>
+
+			{error && (
+				<div
+					style={{
+						background: '#fee2e2',
+						color: '#991b1b',
+						borderRadius: '8px',
+						padding: '12px 16px',
+						marginBottom: '18px',
+						fontSize: '13.5px',
+					}}
+				>
+					{error}
+				</div>
+			)}
+
+			<div
+				style={{
+					background: '#fff',
+					border: '1px solid #e5e7eb',
+					borderRadius: '10px',
+					padding: '22px',
+					marginBottom: '20px',
+				}}
+			>
+				<div
+					style={{
+						display: 'flex',
+						alignItems: 'center',
+						gap: '10px',
+						marginBottom: '16px',
+					}}
+				>
+					<Building2 size={18} color="#2563eb" />
+
+					<h2
+						style={{
+							fontSize: '16px',
+							color: '#111827',
+							margin: 0,
+						}}
+					>
+						Organisation
+					</h2>
+				</div>
+
+				<select
+					value={selectedOrganizationId}
+					onChange={(e) => setSelectedOrganizationId(e.target.value)}
+					style={{
+						width: '100%',
+						maxWidth: '420px',
+						padding: '9px 12px',
+						border: '1px solid #d1d5db',
+						borderRadius: '8px',
+						fontSize: '14px',
+						background: '#fff',
+						color: '#374151',
+					}}
+				>
+					<option value="">Sélectionnez une organisation</option>
+
+					{organizations.map((organization) => (
+						<option key={organization.id} value={organization.id}>
+							{organization.name}
+						</option>
+					))}
+				</select>
+			</div>
+
+			<div
+				style={{
+					background: '#fff',
+					border: '1px solid #e5e7eb',
+					borderRadius: '10px',
+					padding: '22px',
+					marginBottom: '20px',
+				}}
+			>
+				<div style={{ marginBottom: '16px' }}>
+					<h2
+						style={{
+							fontSize: '16px',
+							color: '#111827',
+							margin: '0 0 4px',
+						}}
+					>
+						Déposer une facture XML
+					</h2>
+
+					<p
+						style={{
+							fontSize: '13px',
+							color: '#6b7280',
+							margin: 0,
+						}}
+					>
+						Formats XML uniquement, jusqu’à 10 Mo.
+					</p>
+				</div>
+
+				{!selectedOrganizationId && (
+					<p
+						style={{
+							fontSize: '12.5px',
+							color: '#9ca3af',
+							margin: '0 0 12px',
+						}}
+					>
+						Sélectionnez une organisation pour pouvoir déposer une facture XML.
+					</p>
+				)}
+
+				<div
+					style={{
+						opacity: selectedOrganizationId ? 1 : 0.5,
+						pointerEvents: selectedOrganizationId ? 'auto' : 'none',
+					}}
+				>
+					<label
+						style={{
+							display: 'block',
+							border: '2px dashed #d1d5db',
+							borderRadius: '10px',
+							padding: '36px',
+							textAlign: 'center',
+							cursor: 'pointer',
+							color: '#374151',
+						}}
+					>
+						Cliquez pour choisir un fichier XML
+
+						<input
+							type="file"
+							accept=".xml,application/xml,text/xml"
+							onChange={handleXmlUpload}
+							style={{ display: 'none' }}
+						/>
+					</label>
+				</div>
+			</div>
+
+			<div
+				style={{
+					background: '#fff',
+					border: '1px solid #e5e7eb',
+					borderRadius: '10px',
+					overflow: 'hidden',
+				}}
+			>
+				<div
+					style={{
+						padding: '16px 20px',
+						borderBottom: '1px solid #e5e7eb',
+						display: 'flex',
+						alignItems: 'center',
+						gap: '8px',
+					}}
+				>
+					<FileCode2 size={18} color="#2563eb" />
+
+					<h2
+						style={{
+							fontSize: '16px',
+							color: '#111827',
+							margin: 0,
+						}}
+					>
+						Factures XML
+					</h2>
+				</div>
+
+				{!selectedOrganizationId ? (
+					<p
+						style={{
+							padding: '30px',
+							color: '#9ca3af',
+							textAlign: 'center',
+							fontSize: '14px',
+						}}
+					>
+						Sélectionnez une organisation pour afficher ses factures XML.
+					</p>
+				) : loadingDocuments ? (
+					<p
+						style={{
+							padding: '24px 20px',
+							color: '#6b7280',
+							fontSize: '14px',
+						}}
+					>
+						Chargement des fichiers XML...
+					</p>
+				) : documents.length === 0 ? (
+					<p
+						style={{
+							padding: '30px',
+							color: '#9ca3af',
+							textAlign: 'center',
+							fontSize: '14px',
+						}}
+					>
+						Aucun fichier XML disponible pour cette organisation.
+					</p>
+				) : (
+					<div style={{ overflowX: 'auto' }}>
+						<table
+							style={{
+								width: '100%',
+								borderCollapse: 'collapse',
+								fontSize: '13.5px',
+							}}
+						>
+							<thead>
+								<tr
+									style={{
+										background: '#f9fafb',
+										borderBottom: '1px solid #e5e7eb',
+									}}
+								>
+									<th style={headerStyle}>Fichier</th>
+									<th style={headerStyle}>Date de dépôt</th>
+									<th style={headerStyle}>Statut</th>
+									<th style={headerStyle}>Action</th>
+								</tr>
+							</thead>
+
+							<tbody>
+								{documents.map((document) => (
+									<tr
+										key={document.id}
+										style={{
+											borderBottom: '1px solid #f3f4f6',
+										}}
+									>
+										<td style={cellStyle}>
+											<div
+												style={{
+													display: 'flex',
+													alignItems: 'center',
+													gap: '8px',
+												}}
+											>
+												<FileCode2 size={16} color="#2563eb" />
+
+												<span
+													style={{
+														fontWeight: 500,
+														color: '#111827',
+													}}
+												>
+													{document.filename}
+												</span>
+											</div>
+										</td>
+
+										<td style={cellStyle}>
+											{document.uploadedAt
+												? new Date(document.uploadedAt).toLocaleString('fr-FR')
+												: 'Non renseignée'}
+										</td>
+
+										<td style={cellStyle}>
+											<span
+												style={{
+													background: '#dcfce7',
+													color: '#15803d',
+													padding: '3px 10px',
+													borderRadius: '999px',
+													fontSize: '12px',
+													fontWeight: 500,
+												}}
+											>
+												{document.status ?? 'Non renseigné'}
+											</span>
+										</td>
+
+										<td style={cellStyle}>
+										<div
+											style={{
+											display: 'flex',
+											alignItems: 'center',
+											gap: '8px',
+											}}
+										>
+											<button
+											onClick={() =>
+												navigate(`/documents/${document.id}/invoice`)
+											}
+											style={{
+												display: 'flex',
+												alignItems: 'center',
+												gap: '6px',
+												padding: '7px 13px',
+												borderRadius: '7px',
+												border: 'none',
+												background: '#1a2744',
+												color: '#fff',
+												cursor: 'pointer',
+												fontSize: '12.5px',
+												fontWeight: 500,
+											}}
+											>
+											<Eye size={14} />
+											Lire la facture
+											</button>
+
+											<button
+											onClick={() => handleDeleteDocument(document.id)}
+											style={{
+												padding: '7px 13px',
+												borderRadius: '7px',
+												border: '1px solid #dc2626',
+												background: '#fff',
+												color: '#dc2626',
+												cursor: 'pointer',
+												fontSize: '12.5px',
+												fontWeight: 500,
+											}}
+											>
+											Supprimer
+											</button>
+										</div>
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				)}
+			</div>
+		</div>
+	);
 }
+
+const headerStyle = {
+	textAlign: 'left',
+	padding: '12px 20px',
+	color: '#6b7280',
+	fontWeight: 500,
+};
+
+const cellStyle = {
+	padding: '14px 20px',
+	color: '#374151',
+};
