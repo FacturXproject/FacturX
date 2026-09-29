@@ -8,9 +8,12 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 /**
- * Schema shell only for now: {@code code} + {@code layer} + the raw (English/German)
- * text Mustangproject reports. F09 owns populating title_fr / description_fr /
- * correction_hint_fr for the rules that need a human-readable French explanation.
+ * {@code code} + {@code layer} + the raw (English/German) text Mustangproject
+ * reports, plus the F09 columns: {@code title_fr} / {@code description_fr} /
+ * {@code correction_hint_fr}. This is data, not logic - the French explanation for a
+ * rule lives here, seeded from {@code data.sql}, not hardcoded in Java. A code with no
+ * row here simply has no curated explanation yet; {@link ValidationReportService}
+ * falls back to Mustang's raw message rather than showing a bare rule code.
  */
 @Entity
 @Table(name = "rule_catalog")
@@ -26,6 +29,15 @@ public class RuleCatalog {
 
     @Column(name = "raw_text", length = 2000)
     private String rawText;
+
+    @Column(name = "title_fr", length = 500)
+    private String titleFr;
+
+    @Column(name = "description_fr", columnDefinition = "TEXT")
+    private String descriptionFr;
+
+    @Column(name = "correction_hint_fr", columnDefinition = "TEXT")
+    private String correctionHintFr;
 
     public String getCode() {
         return code;
@@ -49,5 +61,29 @@ public class RuleCatalog {
 
     public void setRawText(String rawText) {
         this.rawText = rawText;
+    }
+
+    public String getTitleFr() {
+        return titleFr;
+    }
+
+    public void setTitleFr(String titleFr) {
+        this.titleFr = titleFr;
+    }
+
+    public String getDescriptionFr() {
+        return descriptionFr;
+    }
+
+    public void setDescriptionFr(String descriptionFr) {
+        this.descriptionFr = descriptionFr;
+    }
+
+    public String getCorrectionHintFr() {
+        return correctionHintFr;
+    }
+
+    public void setCorrectionHintFr(String correctionHintFr) {
+        this.correctionHintFr = correctionHintFr;
     }
 }

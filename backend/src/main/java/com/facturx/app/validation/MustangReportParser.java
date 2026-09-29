@@ -66,7 +66,7 @@ final class MustangReportParser {
         // actually reached.
         errors.addAll(readMessages(firstChildElement(root, "messages"), layerReached));
 
-        return new ValidationResult(completelyValid, layerReached, errors);
+        return new ValidationResult(completelyValid, layerReached, errors, null);
     }
 
     private static ValidationLayer determineLayerReached(Element pdfBlock, Element xmlBlock) {

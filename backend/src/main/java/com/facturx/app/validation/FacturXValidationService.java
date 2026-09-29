@@ -118,6 +118,6 @@ public class FacturXValidationService {
             validationErrorRepository.save(entity);
         }
 
-        return result;
+        return new ValidationResult(result.valid(), result.layerReached(), result.errors(), run.getId());
     }
 }
