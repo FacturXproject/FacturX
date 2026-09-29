@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 
 const steps = [
@@ -9,10 +9,13 @@ const steps = [
   'Génération du rapport',
 ];
 
+// F13 (conversion) n'est pas encore branchee sur un service reel : la barre
+// de progression reste une simulation en attendant la generation Factur-X
+// cote Python. Le flux "Verifier" (F08/F09) ne passe plus par cette page :
+// UploadPage depose le fichier et lance la validation directement, puis
+// navigue vers /rapport.
 export default function Processing() {
   const navigate = useNavigate();
-  const [params] = useSearchParams();
-  const action = params.get('action') || 'verifier';
 
   const [currentStep, setCurrentStep] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -31,15 +34,11 @@ export default function Processing() {
 
     const timeout = setTimeout(() => {
       clearInterval(interval);
-      if (action === 'convertir') {
-        navigate('/conversion');
-      } else {
-        navigate('/rapport?type=with-errors');
-      }
+      navigate('/conversion');
     }, total);
 
     return () => { clearInterval(interval); clearTimeout(timeout); };
-  }, [action, navigate]);
+  }, [navigate]);
 
   const step = steps[Math.min(currentStep, steps.length - 1)];
 

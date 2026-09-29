@@ -1,0 +1,114 @@
+F09+ — Connect the "VERIFIER" page to the real validation service
+---------------------------------------------------------------------------
+
+
+Goal:
+The "Vérifier" page showed a fake report from mockData.js. It now runs the
+real F06 upload + F08/F09 validation flow end to end.
+
+
+
+
+Frontend changes:
+-UploadPage.jsx (mode="verifier"): actually uploads the dropped/selected
+  file via POST /documents?organizationId=... (org id fetched the same way
+  Dashboard does), then navigates to /traitement with the real documentId.
+  Client-side file validation and error display reuse the DocumentUploadForm
+  pattern. "convertir" mode is untouched (F13 not built yet).
+
+-Processing.jsx: for action=verifier, calls
+  POST /documents/{id}/validate and navigates to /rapport?documentId=...
+  on success. On failure (e.g. CLIENT role refused, same 403 as F08) it
+  shows a clear error instead of navigating. The old fake timer/steps flow
+  is kept only for action=convertir (still mocked, out of scope here).
+
+-ComplianceReport.jsx: now fetches GET /documents/{id}/report instead of
+  reading mockData.js, and renders the summary + report with the shared
+  component below.
+
+-ValidationReportCard.jsx (new): the validation report block was extracted
+  from DocumentDetail.jsx into a shared component, so DocumentDetail and
+  ComplianceReport render the exact same report UI — no new/duplicated
+  design.
+
+-mockData.js: removed the now-dead reportWithErrors / reportNoErrors mocks
+  (conversionData / xmlContent are kept, still used by the not-yet-built
+  F13/F10 mock pages).
+
+-Layout.jsx: sidebar link "Vérifier" already pointed at /verifier, no
+  change needed — it now leads to the real flow automatically.
+
+
+
+
+Backend changes:
+None. Reuses the existing F06 upload endpoint and F08/F09 validation endpoints as-is.
+
+
+
+
+Tests added:
+- Processing.test.jsx, ComplianceReport.test.jsx, UploadPage.test.jsx:
+  - valid file -> conforming report
+  - plain PDF without embedded XML -> "Ce PDF ne contient pas de facture
+    Factur-X"
+  - CLIENT role -> access refused (403), same as F08
+
+
+Also tested manually(Verifier Page):
+1. sidebar --> « VVERIFIER » → upload "EN16931_Einfach.pdf" (it's our valid facturx invoice) ---> CONFORME
+2. Upload a PDF-only invoice ---> « Ce PDF ne contient pas de facture Factur-X »
+3. refresh the report page ---> report is still there
+4. The uploaded file appears in the documents list
+5. no any console errors
+
+
+
+Result:
+- No fake data left on the "Vérifier" page.
+- Uploading a file from this page shows the same report as DocumentDetail.
+- Full frontend test suite (39 tests), lint, and `vite build` pass.
+------------------------------------------_---------------------_---------------------_---------------------_---------------------_---------------------
+
+
+CHANGES after the first review made by Ana and Salma:
+
+1. Organization selection (Salma's review):
+   - UploadPage (verifier mode) no longer silently uploads to the first
+     organization returned by the API.
+   - Only organizations where the user has VALIDATE_DOCUMENT (role ADMIN
+     or ACCOUNTANT) are shown.
+   - One eligible organization -> shown as a read-only label, no dropdown.
+   - Several eligible organizations -> a dropdown to pick one before
+     uploading.
+   - No eligible organization (e.g. only CLIENT) -> upload zone hidden,
+     message: "Vous n'avez pas le droit de vérifier des factures dans vos
+     organisations."
+   - Added text near the dropzone: "Le document sera enregistré dans
+     l'organisation sélectionnée."
+
+2. Duplicate validation_run on a single click (Ana's review):
+   - Root cause: the POST /documents/{id}/validate call lived in a
+     useEffect in Processing.jsx; React 18 StrictMode double-invokes
+     effects in dev, so one click sent two POST requests and created two
+     validation_runs rows for the same document.
+   - Fix: moved upload + validate + redirect into a single click/drop
+     event handler in UploadPage.jsx (no useEffect involved). Event
+     handlers are never double-invoked by StrictMode.
+   - Processing.jsx no longer has a "verifier" mode at all; it now only
+     serves the existing (untouched) "convertir" mock flow.
+
+
+Tests added:
+-UploadPage.test.jsx: multiple organizations -> selected org used in the
+  upload request; single organization -> label only, no dropdown;
+  CLIENT-only -> no upload zone shown; single click under
+  <React.StrictMode> -> exactly one call to /validate.
+
+
+manually verified against the real stack (docker compose + Postgres):
+one upload + one validate call produced exactly one row in
+validation_runs for that document.
+
+backend: not touched.
+
