@@ -109,3 +109,27 @@ Result:
 - frontend: npm run lint (0 errors) and npm run build both pass.
 - A PDF can be uploaded and converted into a structured draft invoice with
   per-field confidence, end to end, through the real Docker stack.
+
+----------------------------------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+FIXES After the review of ANA:
+
+Real BUGS:
+- Buyer SIREN wasn't being extracted at all (we only searched for seller's) —> ADDED.
+- VAT % was being picked up as unit price when the table has a Qty/P.U./TVA/Total layout —>   fixed, now excludes % cells from price detection.
+
+
+Known limitation, not fixing now (flagged, not blocking):
+- Seller/buyer sometimes mixed up —> heuristic limitation; confidence is already LOW on these fields so UI flags them "à vérifier."
+- Multiple VAT rates per invoice — our data model only supports one global rate; needs a schema change, bigger than this PR.
+- Lines not detected on "linear" (borderless) PDFs — extractor only reads actual table grids via pdfplumber; text-only layouts need a different detection strategy.
+- Complex multi-rate invoice → junk lines / totals at 0 — same root causes as above (rigid "total ht" phrase matching + no per-line VAT).
+
+
+Not F11 — different feature (F13, not built yet):
+- "Télécharger" / "Vérifier ce fichier" after generation — confirmed this page is a pre-existing static mockup untouched by F10 or F11, it's just waiting on actual Factur-X generation (F13).

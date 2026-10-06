@@ -1,0 +1,25 @@
+Ana commented last week
+---
+
+
+J’ai testé avec +++ PDF différents. Le flow fonctionne globalement, mais j’ai remarqué quelques limites :
+vendeur/acheteur parfois mélangés selon le layout ;
+certains champs non extraits (n° facture, SIREN acheteur, adresse complète) ;
+avec Qté | P.U. | TVA | Total, la TVA peut être prise comme prix unitaire ;
+plusieurs taux de TVA ne semblent pas gérés.
+Le sample_invoice_pdf fonctionne bien.
+--
+Après génération, chez moi “Télécharger” ne fait rien et “Vérifier ce fichier” mène à “Aucun document à afficher”.
+Je ne sais pas si ce sont des bugs ou des limites acceptées pour cette version, donc à voir selon le scope prévu.
+J’ai aussi testé une facture plus complexe avec plusieurs lignes et différents taux de TVA (7% / 19%) : l’extracteur interprète plusieurs lignes du document comme des lignes de facture et les totaux restent à 0.
+
+J’ai aussi testé un PDF linéaire, très proche du sample_invoice_pdf, avec 3 lignes de prestation : les champs et totaux sont bien extraits, mais aucune ligne n’est détectée automatiquement.
+
+
+
+
+Files:
+facture_lineaire_multi_lignes.pdf
+sample_invoice_fedor_test.pdf
+facture_test_layout_2.pdf
+facture_test.pdf

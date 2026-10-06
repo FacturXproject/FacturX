@@ -131,6 +131,19 @@ def _find_address_near(text: str, anchor: str | None) -> tuple[str | None, float
     return None, 0.0
 
 
+def _find_siren_near(text: str, anchor: str | None) -> tuple[str | None, float]:
+    # Reuses SIREN_PATTERNS (otherwise only applied once, for the seller) in a
+    # window right after the buyer block, so a second "SIREN: ..." near the
+    # buyer's details isn't missed just because it comes after the seller's.
+    if not anchor:
+        return None, 0.0
+    idx = text.find(anchor)
+    if idx == -1:
+        return None, 0.0
+    window = text[idx:idx + 300]
+    return _find_first(SIREN_PATTERNS, window)
+
+
 def _extract_lines(pdf: "pdfplumber.PDF") -> list[dict]:
     rows: list[dict] = []
     for page in pdf.pages:
@@ -147,9 +160,16 @@ def _extract_lines(pdf: "pdfplumber.PDF") -> list[dict]:
                     continue
                 description = max(cells, key=len) if cells else ""
                 numeric_cells = [c for c in cells if re.search(r"\d", c)]
-                quantity = numeric_cells[0] if len(numeric_cells) >= 1 else None
-                unit_price = numeric_cells[-2] if len(numeric_cells) >= 2 else None
-                total = numeric_cells[-1] if len(numeric_cells) >= 1 else None
+                # A TVA/VAT-rate cell (e.g. "20 %") is not a price - excluded here
+                # so it can't be mistaken for unit_price/total when a table has a
+                # separate VAT column (Qte | P.U. | TVA | Total).
+                amount_cells = [c for c in numeric_cells if not re.fullmatch(r"\s*\d{1,2}(?:[.,]\d+)?\s*%\s*", c)]
+                quantity = numeric_cells[0] if numeric_cells else None
+                total = amount_cells[-1] if amount_cells else None
+                # Need at least 3 distinct amount cells to tell quantity and unit
+                # price apart unambiguously - otherwise leave unit_price unset
+                # rather than guessing (e.g. duplicating quantity or total).
+                unit_price = amount_cells[-2] if len(amount_cells) >= 3 else None
                 rows.append({
                     "description": description or None,
                     "quantity": quantity,
@@ -188,6 +208,9 @@ def extract_fields(pdf_bytes: bytes) -> Extracted:
 
     buyer_name, buyer_conf = _find_buyer(text)
     result.set("buyerName", buyer_name, buyer_conf)
+
+    buyer_siren, buyer_siren_conf = _find_siren_near(text, buyer_name)
+    result.set("buyerSiren", buyer_siren, buyer_siren_conf)
 
     buyer_address, buyer_address_conf = _find_address_near(text, buyer_name)
     result.set("buyerAddress", buyer_address, buyer_address_conf)
