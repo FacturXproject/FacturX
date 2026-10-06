@@ -124,11 +124,11 @@ Real BUGS:
 - VAT % was being picked up as unit price when the table has a Qty/P.U./TVA/Total layout —>   fixed, now excludes % cells from price detection.
 
 
-Known limitation, not fixing now (flagged, not blocking):
-- Seller/buyer sometimes mixed up —> heuristic limitation; confidence is already LOW on these fields so UI flags them "à vérifier."
-- Multiple VAT rates per invoice — our data model only supports one global rate; needs a schema change, bigger than this PR.
-- Lines not detected on "linear" (borderless) PDFs — extractor only reads actual table grids via pdfplumber; text-only layouts need a different detection strategy.
-- Complex multi-rate invoice → junk lines / totals at 0 — same root causes as above (rigid "total ht" phrase matching + no per-line VAT).
+Known limitation, NOT fixing now (flagged, not blocking):
+- Seller/buyer sometimes mixed up — this needs real document understanding (positional/layout analysis) to fix properly, not a regex patch. The whole design of F11 assumes imperfect extraction: that's exactly why confidence scores exist and why these fields already show LOW confidence / "à vérifier" in the UI. F12 (human correction) is the actual fix for this, by design.
+- Multiple VAT rates per invoice — our data model only has one global vatRate field, not one per line. Supporting this means a schema change on DraftLine + extractor logic to detect per-line rates + UI updates — a real feature, not a quick fix. Makes more sense to build this as part of F12, since that's where we'll be handling line-level corrections anyway.
+- Lines not detected on "linear" (borderless) PDFs — the extractor only reads actual table grids via pdfplumber.extract_tables(). A borderless/text-only layout needs a completely different detection strategy (clustering text by position), which is a real engineering task, not a patch. Most real accounting-software invoices do use actual tables, so this is a secondary case.
+- Complex multi-rate invoice → junk lines / totals at 0 — same two root causes as above: no per-line VAT, and extract_tables() grabbing any table-shaped row as a "line." Not something to chase without first deciding whether per-line VAT is in scope.
 
 
 Not F11 — different feature (F13, not built yet):
