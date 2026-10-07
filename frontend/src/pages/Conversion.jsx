@@ -38,7 +38,9 @@ function toViewModel(draft) {
 
   const lignes = (draft.lines || []).map((l) => ({
     ref: '',
-    description: l.description ?? '',
+    // Un <input> supprime les sauts de ligne : sans cela les mots d'une description
+    // sur deux lignes (brouillons extraits avant la correction côté extracteur) se collent.
+    description: (l.description ?? '').replace(/\s+/g, ' ').trim(),
     qty: toNumber(l.quantity) || l.quantity || '',
     unit: '',
     pu: toNumber(l.unitPrice),

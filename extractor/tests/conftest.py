@@ -55,7 +55,7 @@ def corrupt_pdf() -> bytes:
     return b"not a real pdf file at all"
 
 
-def _build_table_invoice_pdf(head: list[str], rows: list[list[str]], tail: list[str]) -> bytes:
+def _build_table_invoice_pdf(head: list[str], rows: list[list], tail: list[str], col_widths=None) -> bytes:
     # A real ruled table (unlike _build_invoice_pdf's plain text), so that
     # pdfplumber's extract_tables() - and therefore line extraction - is exercised.
     from reportlab.lib import colors
@@ -64,7 +64,7 @@ def _build_table_invoice_pdf(head: list[str], rows: list[list[str]], tail: list[
 
     buffer = io.BytesIO()
     style = getSampleStyleSheet()["Normal"]
-    table = Table(rows)
+    table = Table(rows, colWidths=col_widths)
     table.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, colors.black)]))
 
     elements = [Paragraph(line, style) for line in head]
@@ -98,3 +98,13 @@ def table_invoice_pdf() -> bytes:
         ],
         ["Total HT : 2 400,00", "TVA 20 % : 480,00", "Total TTC : 2 880,00"],
     )
+
+
+@pytest.fixture
+def make_invoice_pdf():
+    return _build_invoice_pdf
+
+
+@pytest.fixture
+def make_table_invoice_pdf():
+    return _build_table_invoice_pdf

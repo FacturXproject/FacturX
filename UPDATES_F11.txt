@@ -169,3 +169,21 @@ Tests:
 - frontend: vitest 39/39, lint 0 errors, build OK.
 - End to end through the real Docker stack (Nginx/TLS, cookie+CSRF) with Salma's PDF facture_F11_test_02_multilignes.pdf: extract 200, the 4 lines and both addresses correct, French 403 for a user outside the organisation.
 -  RETOUR button is tested - OK
+
+--------------------------------------------------------------------
+
+
+
+FIXES After second review of ANA:
+
+Real BUGS (F11):
+- Buyer name empty with "Facture a :" but found with "Facturé à :" —> fixed. The buyer-block pattern required the exact accents; they are now optional ("Facture à", "Facturé a", "Facture a", "FACTURE A", "Adresse a") and "Destinataire" is accepted too. The whole buyer block was affected, not only the name: buyer SIREN and address are searched from the buyer name, so they were empty as well.
+- A description on two lines was shown with its words glued together in the UI —> fixed. The extractor returned the line break of the wrapped table cell, and an HTML <input> drops line breaks. The extractor now collapses line breaks inside a cell into a space; Conversion.jsx does the same on display, so drafts already stored with a line break are shown correctly too.
+
+Tests:
+- extractor: pytest 25/25 (11 new: 10 buyer-label variants, 1 two-line description).
+- backend: mvn test 91/91.
+- frontend: vitest 39/39, lint 0 errors, build OK.
+- End to end through the real Docker stack (Nginx/TLS, cookie+CSRF) with a PDF combining "Facture a :" and a two-line description: extract 200, buyer name / SIREN / address filled, description on one line.
+- Checked in a browser on the Conversion page: words no longer glued, including an older draft stored with a line break.
+

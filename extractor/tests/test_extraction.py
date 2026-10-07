@@ -1,3 +1,5 @@
+import pytest
+
 from app.extraction import extract_fields
 
 
@@ -74,3 +76,61 @@ def test_address_includes_the_street_line_above_the_postal_code(table_invoice_pd
 
     assert fields["sellerAddress"][0] == "10 rue de la Republique, 06000 Nice"
     assert fields["buyerAddress"][0] == "25 avenue Victor Hugo, 75016 Paris"
+
+
+@pytest.mark.parametrize("label", [
+    "Facturé à :",
+    "Facturée à :",
+    "Facture à :",
+    "Facturé a :",
+    "Facture a :",
+    "FACTURE A :",
+    "Adressé à :",
+    "Adresse a :",
+    "Destinataire :",
+    "Client :",
+])
+def test_buyer_block_is_found_with_or_without_accents(make_invoice_pdf, label):
+    pdf = make_invoice_pdf([
+        "SARL Dupont Informatique",
+        "14 rue des Lilas, 75011 Paris",
+        "SIREN : 452 891 237",
+        "",
+        "Facture N° FACT-2026-00142",
+        "",
+        label,
+        "SAS Martin Associés",
+        "8 avenue Foch",
+        "69002 Lyon",
+        "SIREN : 987 654 321",
+    ])
+    fields = extract_fields(pdf).fields
+
+    assert fields["buyerName"][0] == "SAS Martin Associés"
+    assert fields["buyerSiren"][0] == "987 654 321"
+    assert fields["buyerAddress"][0] == "8 avenue Foch, 69002 Lyon"
+    # The buyer label must not disturb what was already found.
+    assert fields["invoiceNumber"][0] == "FACT-2026-00142"
+    assert fields["sellerSiren"][0] == "452 891 237"
+
+
+def test_a_description_wrapped_on_two_lines_is_returned_on_one_line(make_table_invoice_pdf):
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import Paragraph
+
+    wrapped = Paragraph("Prestation de conseil en organisation", getSampleStyleSheet()["Normal"])
+    pdf = make_table_invoice_pdf(
+        ["Facture n° FAC-1"],
+        [
+            ["Description", "Qte", "P.U.", "TVA", "Total"],
+            [wrapped, "2", "100,00", "20 %", "200,00"],
+        ],
+        ["Total HT : 200,00"],
+        col_widths=[120, 40, 60, 50, 60],
+    )
+    lines = extract_fields(pdf).lines
+
+    assert len(lines) == 1
+    assert lines[0]["description"] == "Prestation de conseil en organisation"
+    assert lines[0]["quantity"] == "2"
+    assert lines[0]["total"] == "200,00"

@@ -56,8 +56,10 @@ TOTAL_VAT_PATTERNS = [
 LEGAL_FORM = r"(?:SARL|SAS(?:U)?|SA|EURL|EI|SCI)"
 SELLER_NAME_PATTERN = re.compile(r"^.*\b" + LEGAL_FORM + r"\b.*$", re.IGNORECASE | re.MULTILINE)
 
+# Accents are optional: invoices in capitals ("FACTURE A :") or produced by
+# software that drops them ("Facture a :") are common.
 BUYER_BLOCK_PATTERN = re.compile(
-    r"(?:facturé[e]?\s*à|adressé\s*à|client\s*)\s*[:\n]\s*\n?(.+)",
+    r"(?:factur[ée]e?\s*[àa]|adress[ée]e?\s*[àa]|destinataire|client)\s*[:\n]\s*\n?(.+)",
     re.IGNORECASE,
 )
 
@@ -175,7 +177,9 @@ def _extract_lines(pdf: "pdfplumber.PDF") -> list[dict]:
             for raw_row in table:
                 if raw_row is None:
                     continue
-                cells = [c.strip() if c else "" for c in raw_row]
+                # A cell wrapped over several lines in the PDF comes back with
+                # line breaks: collapse them, a description is a single line.
+                cells = [re.sub(r"\s+", " ", c).strip() if c else "" for c in raw_row]
                 if not any(cells):
                     continue
                 # Skip header-looking rows (no digits at all - a real invoice
