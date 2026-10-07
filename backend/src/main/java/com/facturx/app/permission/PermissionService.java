@@ -21,6 +21,7 @@ public class PermissionService {
 			Permission.VIEW_ALL_DOCUMENTS,
 			Permission.VIEW_OWN_DOCUMENTS,
 			Permission.VALIDATE_DOCUMENT,
+			Permission.EXTRACT_DOCUMENT,
 			Permission.INVITE_MEMBER,
 			Permission.MANAGE_MEMBERS,
 			Permission.MANAGE_ORGANIZATION,
@@ -33,6 +34,7 @@ public class PermissionService {
 			Permission.VIEW_ALL_DOCUMENTS,
 			Permission.VIEW_OWN_DOCUMENTS,
 			Permission.VALIDATE_DOCUMENT,
+			Permission.EXTRACT_DOCUMENT,
 			Permission.DELETE_OWN_PENDING_DOCUMENT
 		),
 

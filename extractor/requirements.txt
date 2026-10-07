@@ -1,0 +1,5 @@
+fastapi==0.141.1
+uvicorn[standard]==0.54.0
+pdfplumber==0.11.10
+python-multipart==0.0.32
+pydantic==2.13.5
