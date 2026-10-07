@@ -133,3 +133,39 @@ Known limitation, NOT fixing now (flagged, not blocking):
 
 Not F11 — different feature (F13, not built yet):
 - "Télécharger" / "Vérifier ce fichier" after generation — confirmed this page is a pre-existing static mockup untouched by F10 or F11, it's just waiting on actual Factur-X generation (F13).
+
+
+--------------------------------------------
+
+
+
+FIXES After the review of Salma:
+
+
+Real BUGS :
+
+- Line description replaced by an amount ("Audit" extracted as "240,00") —> fixed. The description was the longest cell of the row, so any description shorter than an amount lost. It is now the longest *text* cell only.
+- Same heuristic, found while testing: quantity could be a text cell containing a digit ("Licence Office 365", a reference like "A12"), and a totals row inside the table ("Total HT") became an invoice line —> fixed. Quantity/price/total are now taken from pure numeric cells only, totals rows are skipped.
+- Address was incomplete ("06000 Nice" without the street) —> fixed, the street line above the postal code is now included ("10 rue de la Republique, 06000 Nice").
+- Amounts with a thousands separator were truncated on the Conversion page ("3 590,00" shown as 3) —> fixed in Conversion.jsx (toNumber).
+- "Retour" on the Conversion page always went to the dashboard —> now goes back to the previous page (Convertir or the document page), or to /convertir if the page was opened directly by URL.
+
+Not a bug, by design:
+- Address / buyer name stay orange ("à vérifier") even when the value looks right: their confidence is fixed at 0.5 / 0.55, below the 0.6 threshold, because these fields are the least reliable ones. Left unchanged on purpose.
+
+
+
+Not F11 (permissions, shared code):
+- Access-denied message was in English —> desormais EN FRANCAIS ("Vous n'avez pas la permission d'effectuer cette action"),         frontend test updated.
+
+
+Minor:
+- Labelled VAT number pattern ("TVA intracommunautaire : FR...") was unreachable behind the generic one    ————>    order swapped (confidence 0.9 instead of 0.85).
+
+
+Tests:
+- extractor: pytest 14/14 (4 new, on a PDF with a real ruled table - the previous fixture had no table, so line extraction was not covered).
+- backend: mvn test 91/91.
+- frontend: vitest 39/39, lint 0 errors, build OK.
+- End to end through the real Docker stack (Nginx/TLS, cookie+CSRF) with Salma's PDF facture_F11_test_02_multilignes.pdf: extract 200, the 4 lines and both addresses correct, French 403 for a user outside the organisation.
+-  RETOUR button is tested - OK

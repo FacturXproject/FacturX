@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import api from '../services/api';
 
@@ -11,9 +11,17 @@ function confidenceLevel(score) {
   return score != null && score >= CONFIDENCE_THRESHOLD ? 'high' : 'low';
 }
 
+// Montants au format français : "1 080,00" (espace, y compris insécable, comme
+// séparateur de milliers) ou "1.080,00". Le dernier séparateur est la décimale.
 function toNumber(value) {
   if (value == null) return 0;
-  const n = Number.parseFloat(String(value).replace(',', '.'));
+  let s = String(value).replace(/\s/g, '');
+  if (s.lastIndexOf(',') > s.lastIndexOf('.')) {
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else {
+    s = s.replace(/,/g, '');
+  }
+  const n = Number.parseFloat(s);
   return Number.isFinite(n) ? n : 0;
 }
 
@@ -99,8 +107,13 @@ function Field({ label, fieldKey, data, onChange }) {
 
 export default function Conversion() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [params] = useSearchParams();
   const documentId = params.get('documentId');
+
+  // Retour : page précédente (Convertir ou fiche du document). Si la page a été
+  // ouverte directement par son URL, il n'y a pas d'historique : on va sur Convertir.
+  const goBack = () => (location.key !== 'default' ? navigate(-1) : navigate('/convertir'));
 
   const [data, setData] = useState(null);
   const [lignes, setLignes] = useState([]);
@@ -152,7 +165,7 @@ export default function Conversion() {
     return (
       <div style={{ padding: '24px 28px', maxWidth: '600px' }}>
         <button
-          onClick={() => navigate('/dashboard')}
+          onClick={goBack}
           style={{ background: 'none', border: 'none', color: '#4a9eff', fontSize: '13px', cursor: 'pointer', padding: 0, marginBottom: '16px', textDecoration: 'underline' }}
         >
           ← Retour
@@ -171,7 +184,7 @@ export default function Conversion() {
     <div style={{ padding: '24px 28px' }}>
       <div style={{ marginBottom: '20px' }}>
         <button
-          onClick={() => navigate('/dashboard')}
+          onClick={goBack}
           style={{ background: 'none', border: 'none', color: '#4a9eff', fontSize: '13px', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
         >
           ← Retour

@@ -53,3 +53,48 @@ def blank_pdf() -> bytes:
 @pytest.fixture
 def corrupt_pdf() -> bytes:
     return b"not a real pdf file at all"
+
+
+def _build_table_invoice_pdf(head: list[str], rows: list[list[str]], tail: list[str]) -> bytes:
+    # A real ruled table (unlike _build_invoice_pdf's plain text), so that
+    # pdfplumber's extract_tables() - and therefore line extraction - is exercised.
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+    buffer = io.BytesIO()
+    style = getSampleStyleSheet()["Normal"]
+    table = Table(rows)
+    table.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, colors.black)]))
+
+    elements = [Paragraph(line, style) for line in head]
+    elements += [Spacer(1, 10), table, Spacer(1, 10)]
+    elements += [Paragraph(line, style) for line in tail]
+    SimpleDocTemplate(buffer, pagesize=A4).build(elements)
+    return buffer.getvalue()
+
+
+@pytest.fixture
+def table_invoice_pdf() -> bytes:
+    return _build_table_invoice_pdf(
+        [
+            "Facture n° FAC-2026-002",
+            "Date facture : 07/10/2026",
+            "SARL Demo Conseil",
+            "10 rue de la Republique",
+            "06000 Nice",
+            "SIREN : 123 456 789",
+            "Client:",
+            "SAS Client Exemple",
+            "25 avenue Victor Hugo",
+            "75016 Paris",
+            "SIREN : 987 654 321",
+        ],
+        [
+            ["Ref", "Description", "Qte", "P.U.", "TVA", "Total"],
+            ["A12", "Audit", "3", "80,00", "20 %", "240,00"],
+            ["B07", "Licence Office 365", "2", "1 080,00", "20 %", "2 160,00"],
+            ["", "", "", "", "Total HT", "2 400,00"],
+        ],
+        ["Total HT : 2 400,00", "TVA 20 % : 480,00", "Total TTC : 2 880,00"],
+    )

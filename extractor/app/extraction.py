@@ -31,8 +31,10 @@ SIREN_PATTERNS = [
 ]
 
 VAT_PATTERNS = [
-    (r"\b(FR\s?\d{2}\s?\d{9})\b", 0.85),
+    # Labelled match first: the bare pattern below matches everything this one
+    # does, so listed second it could never be reached.
     (r"tva\s*intra\w*\s*[:\-]?\s*(FR\s?\d{2}\s?\d{9})", 0.9),
+    (r"\b(FR\s?\d{2}\s?\d{9})\b", 0.85),
 ]
 
 VAT_RATE_PATTERNS = [
@@ -60,6 +62,19 @@ BUYER_BLOCK_PATTERN = re.compile(
 )
 
 POSTAL_ADDRESS_LINE = re.compile(r".{0,60}\b\d{5}\b.{0,60}")
+
+# Table cells: a pure number/amount ("3", "1 080,00", "50,00 €") and a VAT-rate
+# cell ("20 %"). Anything else is text, even if it contains a digit
+# ("Licence Office 365", a reference like "A12").
+_NUMBER_CELL = re.compile(r"-?\d[\d\s]*(?:[.,]\d+)?\s*(?:€|EUR)?", re.IGNORECASE)
+_PERCENT_CELL = re.compile(r"\d{1,2}(?:[.,]\d+)?\s*%")
+
+# A totals row sitting inside the lines table is not an invoice line.
+_TOTALS_LABEL = re.compile(
+    r"(?:sous[-\s]?total|total(?:\s+(?:h\.?t\.?|t\.?t\.?c\.?|tva))?|(?:montant\s+)?tva(?:\s+\d{1,2}(?:[.,]\d+)?\s*%)?"
+    r"|net\s+[àa]\s+payer)\s*:?",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -127,7 +142,16 @@ def _find_address_near(text: str, anchor: str | None) -> tuple[str | None, float
     window = text[idx:idx + 200]
     match = POSTAL_ADDRESS_LINE.search(window)
     if match:
-        return match.group(0).strip(), 0.5
+        address = match.group(0).strip()
+        # "06000 Nice" alone: the street is on the line above (but that line
+        # must not be the anchor itself, nor a labelled line such as SIREN).
+        if re.match(r"\d{5}\b", address):
+            before = window[:match.start()].strip().splitlines()
+            if len(before) >= 2:
+                street = before[-1].strip()
+                if street and ":" not in street:
+                    address = f"{street}, {address}"
+        return address, 0.5
     return None, 0.0
 
 
@@ -158,14 +182,26 @@ def _extract_lines(pdf: "pdfplumber.PDF") -> list[dict]:
                 # line always has a quantity or an amount somewhere).
                 if not any(re.search(r"\d", c) for c in cells):
                     continue
-                description = max(cells, key=len) if cells else ""
-                numeric_cells = [c for c in cells if re.search(r"\d", c)]
                 # A TVA/VAT-rate cell (e.g. "20 %") is not a price - excluded here
                 # so it can't be mistaken for unit_price/total when a table has a
                 # separate VAT column (Qte | P.U. | TVA | Total).
-                amount_cells = [c for c in numeric_cells if not re.fullmatch(r"\s*\d{1,2}(?:[.,]\d+)?\s*%\s*", c)]
-                quantity = numeric_cells[0] if numeric_cells else None
-                total = amount_cells[-1] if amount_cells else None
+                amount_cells = [c for c in cells if _NUMBER_CELL.fullmatch(c)]
+                text_cells = [
+                    c for c in cells
+                    if c and not _NUMBER_CELL.fullmatch(c) and not _PERCENT_CELL.fullmatch(c)
+                ]
+                # No pure number at all (e.g. a header like "Prix 2026"), or a
+                # totals row inside the table: not an invoice line.
+                if not amount_cells:
+                    continue
+                if any(_TOTALS_LABEL.fullmatch(c) for c in text_cells):
+                    continue
+                # The description is the longest *text* cell - taking the longest
+                # cell overall picked an amount whenever the description was
+                # shorter than it ("Audit" vs "240,00").
+                description = max(text_cells, key=len) if text_cells else ""
+                quantity = amount_cells[0]
+                total = amount_cells[-1]
                 # Need at least 3 distinct amount cells to tell quantity and unit
                 # price apart unambiguously - otherwise leave unit_price unset
                 # rather than guessing (e.g. duplicating quantity or total).
