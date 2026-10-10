@@ -61,6 +61,8 @@ services:
       - MAIL_FROM=${MAIL_FROM}
       - APP_BASE_URL=${APP_BASE_URL}
       - EXTRACTOR_URL=http://extractor:8000
+      # F17: public API requests allowed per key and per minute (optional, 60 by default)
+      - PUBLIC_API_RATE_LIMIT=${PUBLIC_API_RATE_LIMIT:-60}
 
     volumes:
       - documents-storage:/app/uploads

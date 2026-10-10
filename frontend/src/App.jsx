@@ -24,6 +24,7 @@ import Terms from './pages/Terms';
 import LandingPage from './pages/LandingPage';
 import DocumentDetail from './pages/DocumentDetail';
 import InvoiceView from './pages/InvoiceView';
+import ApiKeys from './pages/ApiKeys';
 
 function Protected({ children }) {
   return (
@@ -58,6 +59,7 @@ export default function App() {
           <Route path="/rapport" element={<Protected><ComplianceReport /></Protected>} />
           <Route path="/conversion" element={<Protected><Conversion /></Protected>} />
           <Route path="/profile" element={<Protected><Profile /></Protected>} />
+          <Route path="/cles-api" element={<Protected><ApiKeys /></Protected>} />
           <Route path="/succes" element={<Protected><Success /></Protected>} />
           <Route path="/lecture-xml" element={<Protected><XmlReader /></Protected>} />
           <Route path="/verifier" element={<Protected><UploadPage mode="verifier" /></Protected>} />

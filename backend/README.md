@@ -460,6 +460,39 @@ README) - it is a separate deployable, not part of this Maven module.
 
 ---
 
+## Public API (F17)
+
+A second entrance to the document features (F06-F09) for technical clients, with no
+browser session: each request carries an API key in the `X-API-Key` header.
+
+```text
+GET /api/public/v1/documents      (X-API-Key: fxk_...)
+        ↓
+PublicApiSecurityConfig      → separate, stateless security chain for /api/public/**
+        ↓
+ApiKeyAuthenticationFilter   → key hash lookup (401), per-key rate limit (429)
+        ↓
+scope check                  → GET: documents:read, others: documents:write (403)
+        ↓
+PublicApiService             → document in the key's organization (404),
+                               owner's role via PermissionService (403)
+        ↓
+DocumentService / FacturXValidationService / ValidationReportService
+```
+
+Keys are created and revoked by a logged-in user through `/api/api-keys` (page
+"Clés API" in the frontend). Only the SHA-256 hash of a key is stored; the key itself
+is shown once, at creation. A key is bound to one user and one organization and never
+exceeds that user's role there.
+
+The session security chain in `config/SecurityConfig.java` is not modified: an API key
+does not open the session API, and a session cookie does not open the public API.
+
+Everything related to the public API lives under the `publicapi` feature package -
+see its README for the design decisions, the endpoint list and curl examples.
+
+---
+
 # Authentication
 
 Authentication is session-based.
@@ -999,6 +1032,45 @@ Response (`DraftInvoiceResponse`):
   ]
 }
 ```
+
+---
+
+## Public API (F17)
+
+```http
+GET    /api/public/v1/documents
+POST   /api/public/v1/documents
+GET    /api/public/v1/documents/{id}
+PUT    /api/public/v1/documents/{id}
+DELETE /api/public/v1/documents/{id}
+POST   /api/public/v1/documents/{id}/validate
+GET    /api/public/v1/documents/{id}/report
+GET    /api/public/v1/documents/{id}/download
+```
+
+Authenticated by an API key, not by a session - no cookie and no CSRF token:
+
+```bash
+curl -k -H "X-API-Key: fxk_..." https://localhost:8443/api/public/v1/documents
+```
+
+Rate limited to 60 requests per minute and per key (`429` beyond).
+
+Interactive documentation (Swagger UI), readable without a key:
+
+```text
+https://localhost:8443/api/public/docs
+```
+
+Key management, for a logged-in user (session + CSRF):
+
+```http
+GET    /api/api-keys
+POST   /api/api-keys
+DELETE /api/api-keys/{id}
+```
+
+Full reference: `src/main/java/com/facturx/app/publicapi/README.md`.
 
 ---
 

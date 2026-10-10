@@ -1,0 +1,308 @@
+F17 — API publique sécurisée (Public API)
+---------------------------------------------------------------------------
+
+
+Goal:
+Let a technical client (typically an accounting software vendor) deposit
+invoices, run the Factur-X conformity check and read the result without a
+browser session. Subject module "Public API" (2 points): a secured API key,
+rate limiting, documentation, and at least 5 endpoints.
+
+
+Architecture:
+Client (curl / software) -> Nginx (/api/) -> Spring Boot:
+  PublicApiSecurityConfig     separate security chain, /api/public/** only
+  ApiKeyAuthenticationFilter  X-API-Key -> SHA-256 -> lookup      (401)
+                              per-key rate limit                  (429)
+  scope check                 GET: documents:read, else :write    (403)
+  PublicApiService            document in the key's organization  (404)
+                              owner's role via PermissionService  (403)
+  -> the existing services of F06-F09 (DocumentService,
+     FacturXValidationService, ValidationReportService), unchanged.
+
+The public API adds no business logic. It is a second entrance to what
+already exists, with its own authentication and access rules in front.
+
+
+Design decisions (useful for the defence):
+- The key is never stored. Only its SHA-256 hash is (api_keys.key_hash).
+  The full key is returned once, when it is created. A database leak does
+  not leak usable keys. SHA-256 rather than BCrypt on purpose: a key is 256
+  random bits, there is nothing to brute-force; slow hashes are for weak
+  secrets such as passwords.
+- A key = one user + one organization. It acts with its owner's role in
+  that organization and can never do more. That is why no public route
+  takes an organizationId.
+- The role is re-checked on every request. A member who is downgraded or
+  removed loses API access at once, even if nobody revoked the key.
+- Scopes only narrow: documents:read (GET) and documents:write (POST, PUT,
+  DELETE). They never grant what the role does not.
+- A document of another organization answers 404, not 403: a key must not
+  even learn that it exists.
+- Separate security chain (@Order(1)), stateless, no CSRF. CSRF abuses a
+  cookie the browser sends by itself, and there is no cookie here. The
+  session chain in config/SecurityConfig.java is not modified. An API key
+  does not open the session API; a session cookie does not open the public
+  API.
+- Rate limit in memory, fixed one-minute window per key - same choice as
+  LoginAttemptService (no Redis at this scale). Known limit: counters reset
+  when the backend restarts.
+- Errors never leave through /error. Spring answers plain HTTP errors
+  (malformed id or JSON, unsupported method, unknown route,
+  ResponseStatusException) with sendError(), and Tomcat then re-dispatches
+  the request to /error. That dispatch is outside /api/public/**, so it
+  falls into the session chain, where an API-key request is anonymous: the
+  client received a misleading 401 instead of the real 400/404/405.
+  JsonErrorResponseWrapper intercepts sendError() and writes the JSON error
+  directly (see "Bugs found" below).
+- api_keys has no foreign keys (user_id / organization_id are plain ids,
+  like validation_runs.document_id), so deleting an organization or a
+  member behaves exactly as before F17.
+- PUT and DELETE were added on top of the roadmap's list (list, upload,
+  status, report, download). The subject's wording for this module asks for
+  GET, POST, PUT and DELETE - to be double-checked against the subject PDF.
+
+
+Backend changes (new package: publicapi):
+- ApiKey (JPA entity, table api_keys) + ApiKeyRepository. Columns: user_id,
+  organization_id, name, key_hash (unique), key_prefix, scopes, created_at,
+  last_used_at, revoked_at.
+- ApiKeyScope: documents:read / documents:write.
+- ApiKeyService: create (random key "fxk_" + 64 hex chars, hash stored),
+  list, revoke (soft delete), authenticate (unknown / revoked key, or
+  disabled account -> refused).
+- ApiKeyController: key management for the logged-in user (session + CSRF)
+    GET    /api/api-keys
+    POST   /api/api-keys        the full key is returned here only
+    DELETE /api/api-keys/{id}
+- ApiKeyAuthenticationFilter: reads X-API-Key, authenticates, applies the
+  rate limit, sets X-RateLimit-* headers. Not a Spring bean on purpose,
+  otherwise Spring Boot would run it on every request of the application.
+- JsonErrorResponseWrapper: turns sendError() into a JSON error body.
+- ApiRateLimiter: 60 requests per minute and per key by default.
+- PublicApiSecurityConfig: the security chain for /api/public/**.
+- PublicApiController + PublicApiService: the public endpoints
+    GET    /api/public/v1/documents               list (paginated)
+    POST   /api/public/v1/documents               upload (multipart "file")
+    GET    /api/public/v1/documents/{id}          status and metadata
+    PUT    /api/public/v1/documents/{id}          rename
+    DELETE /api/public/v1/documents/{id}          delete
+    POST   /api/public/v1/documents/{id}/validate run the Factur-X check
+    GET    /api/public/v1/documents/{id}/report   latest validation report
+    GET    /api/public/v1/documents/{id}/download the original file
+- OpenApiConfig: title, description and the X-API-Key scheme for Swagger.
+- pom.xml: new dependency springdoc-openapi-starter-webmvc-ui 3.1.1
+  (generates the OpenAPI description and serves Swagger UI; works with
+  Spring Boot 4.1).
+- application.properties: app.public-api.rate-limit.requests-per-minute and
+  the springdoc paths (kept under /api/ so nginx routes them to the
+  backend; only /api/public/v1/** is documented).
+- docker-compose.yml: PUBLIC_API_RATE_LIMIT passed to the backend
+  (optional, 60 by default).
+- No existing Java class was modified.
+- nginx/conf/nginx.conf: client_max_body_size 11m on /api/ (see "Bugs
+  found" below). This is the only change outside F17's own files that
+  alters existing behaviour.
+
+
+Frontend changes:
+- New page pages/ApiKeys.jsx, route /cles-api, entry "Clés API" in the
+  sidebar (Layout.jsx) and route in App.jsx.
+- Lists the user's keys: name, organization, prefix, permissions, creation
+  date, last use, state (Active / Révoquée).
+- "Nouvelle clé": name, organization, permissions. The key is then shown
+  once, with a copy button and a ready-to-use curl example.
+- "Révoquer", with a confirmation dialog.
+- "Documentation de l'API" button opening Swagger UI.
+
+
+Documentation:
+- Swagger UI:   https://localhost:8443/api/public/docs   (no key needed)
+- OpenAPI JSON: https://localhost:8443/api/public/v1/openapi
+- backend/src/main/java/com/facturx/app/publicapi/README.md: full
+  reference (design, table, endpoints, errors, curl examples).
+- backend/README.md: two "Public API (F17)" sections (flow + API).
+
+
+Errors (always {"error": "CODE", "message": "..."}):
+- 401 API_KEY_REQUIRED      no X-API-Key header
+- 401 INVALID_API_KEY       unknown or revoked key, or disabled account
+- 403 INSUFFICIENT_SCOPE    the key lacks the scope for this method
+- 403 ACCESS_DENIED         the owner's role does not allow the action
+- 404 DOCUMENT_NOT_FOUND    missing, or in another organization
+- 404 NOT_FOUND             no validation run yet, or unknown route
+- 400 VALIDATION_FAILED     invalid body (e.g. empty filename)
+- 400 BAD_REQUEST           malformed id / parameter / JSON, missing file
+- 405 METHOD_NOT_ALLOWED    HTTP method not supported on the route
+- 415 UNSUPPORTED_MEDIA_TYPE wrong Content-Type
+- 500 INTERNAL_ERROR        unexpected server failure
+- 413 FILE_TOO_LARGE        more than 10 MB (above 11 MB nginx answers
+                            first, with its own HTML 413 page)
+- 415 INVALID_FILE_TYPE     neither a PDF nor XML
+- 429 RATE_LIMIT_EXCEEDED   too many requests (see Retry-After)
+
+
+How to test - automated:
+Backend (needs Docker running, for Testcontainers):
+    cd backend
+    ./mvnw test -Dtest=PublicApiFlowTest     # the 26 F17 tests
+    ./mvnw test                              # whole suite, 117 tests
+Frontend:
+    cd frontend
+    npm ci
+    npx vitest run src/pages/__tests__/ApiKeys.test.jsx   # 8 tests
+    npx vitest run                                        # whole suite, 47
+
+What PublicApiFlowTest covers:
+- Key management: key returned once and never listed; session required; no
+  key for an organization you do not belong to; invalid name / scope
+  rejected; nobody can revoke someone else's key.
+- Authentication: valid key accepted; missing, unknown, revoked key
+  refused; key of a disabled account refused; a session cookie is not an
+  API key and an API key does not open the session API.
+- Scopes: a read-only key cannot upload, rename, delete or validate; a
+  write-only key cannot read.
+- Endpoints: upload -> list -> status -> rename -> download -> delete;
+  validate -> status VALID -> report; wrong file type; invalid filename;
+  pagination and size cap; malformed requests (bad id, bad JSON, missing
+  file, wrong method, unknown route) answer a JSON error with the real
+  status.
+- Isolation and roles: a key never reaches another organization's
+  documents (404 on all 6 routes); a client's key sees only its own
+  documents and cannot validate; a key stops working when its owner leaves
+  the organization.
+- Rate limit: the request after the limit gets 429 + Retry-After; another
+  key is unaffected.
+- Documentation: the OpenAPI description is public, lists the 8 operations
+  and nothing outside /api/public/v1; Swagger UI is reachable without a key.
+
+
+How to test - by hand, in the browser:
+1. docker compose up --build, then open https://localhost:8443
+2. Log in. You need to be a member of at least one organization.
+3. Sidebar -> "Clés API" -> "Nouvelle clé". Give it a name, pick the
+   organization, tick "Lecture" and "Écriture", create.
+4. Copy the key from the dialog - it is never shown again.
+5. Click "Documentation de l'API" (Swagger UI opens in a new tab).
+   "Authorize" -> paste the key -> then "Try it out" on any endpoint.
+6. Back on "Clés API": "Dernière utilisation" is now filled in. Click
+   "Révoquer" - the key shows as "Révoquée" and stops working.
+
+
+How to test - by hand, with curl:
+(-k because the local certificate is self-signed)
+
+    KEY="fxk_..."        # the key copied at step 4
+    API="https://localhost:8443/api/public/v1"
+
+    # no key -> 401 API_KEY_REQUIRED
+    curl -k "$API/documents"
+
+    # wrong key -> 401 INVALID_API_KEY
+    curl -k -H "X-API-Key: fxk_wrong" "$API/documents"
+
+    # list (-i shows the X-RateLimit-* headers)
+    curl -k -i -H "X-API-Key: $KEY" "$API/documents"
+
+    # upload a real Factur-X sample; note the "id" in the answer
+    curl -k -H "X-API-Key: $KEY" \
+         -F "file=@backend/src/test/resources/facturx-samples/EN16931_Einfach.pdf" \
+         "$API/documents"
+
+    # status (UPLOADED), then validate, then status again (VALID)
+    curl -k -H "X-API-Key: $KEY" "$API/documents/1"
+    curl -k -X POST -H "X-API-Key: $KEY" "$API/documents/1/validate"
+    curl -k -H "X-API-Key: $KEY" "$API/documents/1"
+
+    # readable validation report
+    curl -k -H "X-API-Key: $KEY" "$API/documents/1/report"
+
+    # rename
+    curl -k -X PUT -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
+         -d '{"filename":"facture-2026-001.pdf"}' "$API/documents/1"
+
+    # download
+    curl -k -H "X-API-Key: $KEY" -o out.pdf "$API/documents/1/download"
+
+    # delete -> 204, then 404
+    curl -k -X DELETE -H "X-API-Key: $KEY" "$API/documents/1"
+    curl -k -H "X-API-Key: $KEY" "$API/documents/1"
+
+Rate limit (61st request within a minute answers 429):
+    for i in $(seq 1 65); do
+      curl -k -s -o /dev/null -w "%{http_code} " -H "X-API-Key: $KEY" "$API/documents"
+    done
+For a quick demo, add PUBLIC_API_RATE_LIMIT=5 to .env and restart the
+backend: the 6th request answers 429.
+
+Malformed requests (each must answer its real status, never 401):
+    curl -k -H "X-API-Key: $KEY" "$API/documents/abc"            # 400
+    curl -k -X PATCH -H "X-API-Key: $KEY" "$API/documents/1"     # 405
+    curl -k -H "X-API-Key: $KEY" "$API/nothing"                  # 404
+
+Scopes: create a second key with "Lecture" only, then try an upload with
+it -> 403 INSUFFICIENT_SCOPE.
+
+Isolation: with a key of organization A, request the id of a document of
+organization B -> 404 DOCUMENT_NOT_FOUND.
+
+Database check:
+    docker exec -it facturx-postgres psql -U <POSTGRES_USER> -d facturx \
+      -c "select id, name, key_prefix, scopes, last_used_at, revoked_at from api_keys;"
+There is a key_hash column and no column holding the key itself.
+
+
+What was verified:
+- Backend: full suite green, 117 tests (26 new). The suite was also green
+  before the change.
+- Frontend: 47 tests green (8 new), lint and production build clean.
+- End to end on a full Docker stack, through nginx, with curl and in a
+  browser: create a key, list, upload, rename, validate, report, download,
+  delete, 429 after the limit, revoke, Swagger UI showing the 8 operations.
+- Edge cases on the real stack: malformed id / page / JSON, missing file
+  part, wrong Content-Type, unsupported method, unknown route, odd
+  filenames, 5 MB and 11 MB uploads, key sent in the wrong place
+  (Authorization header, query string), no session cookie ever set by the
+  public API, and 100 parallel requests on a fresh key: exactly 60 pass,
+  40 get 429 (the counter is atomic).
+
+
+Bugs found while testing on the real stack:
+1. Plain HTTP errors came back as 401 (F17 bug, fixed).
+   A request with a valid key but a malformed id, bad JSON, an unsupported
+   method or an unknown route - and GET .../report before any validation -
+   answered 401 UNAUTHENTICATED instead of 400/404/405. Cause: the /error
+   re-dispatch described in "Design decisions". The MockMvc tests could not
+   see it, because MockMvc does not perform that re-dispatch; it only
+   showed against the running stack. Fixed by JsonErrorResponseWrapper,
+   with a regression test asserting the status and the JSON body.
+2. Uploads over 1 MB were refused by nginx (existing bug, not F17, fixed).
+   nginx's default client_max_body_size is 1 MB, so any upload above that
+   got an HTML "413 Request Entity Too Large" from nginx and never reached
+   the backend - for the web application as well, despite the documented
+   10 MB limit (F06). Fixed with client_max_body_size 11m on /api/. Checked:
+   a 3 MB PDF now uploads through the web API (it was refused before), a
+   5 MB file reaches the backend's own checks.
+
+
+Known limits / not covered:
+- Only documents are exposed. Extraction drafts (F11) and generation (F13)
+  are not part of the public API.
+- A key has no expiry date: it lives until it is revoked.
+- Rate-limit counters are in memory: reset on backend restart, and not
+  shared if the backend were ever run as several instances.
+- Validation runs synchronously in the request, as in the web app. Once
+  the queue (F14) exists, POST /documents/{id}/validate is the natural
+  place to enqueue a job instead; QUEUED / PROCESSING are already part of
+  the documented statuses.
+
+
+Not F17 - found on the way, left untouched (other features' code):
+- GET /api/documents/{id}/download and GET /api/documents/{id}/report
+  (session API) do not check the caller's permissions: any logged-in user
+  can read any document by id.
+- POST /api/documents does not check that the caller belongs to the
+  organizationId it uploads into.
+- GET /api/users returns every user to any logged-in user.
+The public API does not inherit these: it applies its own checks in
+PublicApiService. They should be fixed with the owners of F06/F07.
