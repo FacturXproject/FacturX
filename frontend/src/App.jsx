@@ -24,6 +24,7 @@ import Terms from './pages/Terms';
 import LandingPage from './pages/LandingPage';
 import DocumentDetail from './pages/DocumentDetail';
 import InvoiceView from './pages/InvoiceView';
+import MyData from './pages/MyData';
 
 function Protected({ children }) {
   return (
@@ -54,6 +55,7 @@ export default function App() {
           <Route path="/invitations" element={<Protected><Invitations /></Protected>} />
           <Route path="/invitations/:token" element={<InvitationCheck />} />
           <Route path="/documents/:id/invoice" element={<Protected><InvoiceView /></Protected>} />
+          <Route path="/my-data" element={<Protected><MyData /></Protected>} />
           <Route path="/traitement" element={<Protected><Processing /></Protected>} />
           <Route path="/rapport" element={<Protected><ComplianceReport /></Protected>} />
           <Route path="/conversion" element={<Protected><Conversion /></Protected>} />

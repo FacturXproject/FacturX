@@ -19,6 +19,7 @@ public class User implements Serializable {
 
     public static final String STATUS_ACTIVE = "active";
     public static final String STATUS_DISABLED = "disabled";
+    public static final String STATUS_ANONYMIZED = "anonymized";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -46,6 +47,7 @@ public class User implements Serializable {
 
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
+
 
     public User() {
     }
