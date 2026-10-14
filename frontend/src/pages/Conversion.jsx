@@ -25,6 +25,22 @@ function toNumber(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function calculateTotals(lines, vatRate) {
+  const totalHT = lines.reduce((sum, line) => {
+    return sum + toNumber(line.qty) * toNumber(line.pu);
+  }, 0);
+
+  const rate = toNumber(vatRate);
+  const totalVAT = totalHT * rate / 100;
+  const totalTTC = totalHT + totalVAT;
+
+  return {
+    totalHT: Math.round((totalHT + Number.EPSILON) * 100) / 100,
+    totalVAT: Math.round((totalVAT + Number.EPSILON) * 100) / 100,
+    totalTTC: Math.round((totalTTC + Number.EPSILON) * 100) / 100,
+  };
+}
+
 // Traduit le brouillon renvoyé par GET /documents/{id}/draft (F11, champs en
 // anglais - voir ExtractionController) vers la forme attendue par cette page
 // (mockData.conversionData) : mêmes clés que le formulaire de correction F12
@@ -121,6 +137,8 @@ export default function Conversion() {
   const [lignes, setLignes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
 
   useEffect(() => {
     if (!documentId) {
@@ -149,9 +167,143 @@ export default function Conversion() {
     setData(d => ({ ...d, fields: { ...d.fields, [key]: { ...d.fields[key], value } } }));
   };
 
-  const updateLigne = (i, col, val) => {
-    setLignes(ls => ls.map((l, j) => j === i ? { ...l, [col]: val } : l));
+  const updateVatRate = (value) => {
+	setData(d => ({ ...d, tauxTva: value }));
   };
+
+  const updateLigne = (i, col, val) => {
+	setLignes(currentLines =>
+		currentLines.map((line, index) => {
+		if (index !== i) return line;
+
+		const updatedLine = { ...line, [col]: val };
+
+		const quantity = toNumber(updatedLine.qty);
+		const unitPrice = toNumber(updatedLine.pu);
+
+		updatedLine.total =
+			Math.round((quantity * unitPrice + Number.EPSILON) * 100) / 100;
+
+		return updatedLine;
+		})
+	);
+  };
+
+  
+	const addLigne = () => {
+	setLignes(currentLines => [
+		...currentLines,
+		{
+		description: '',
+		qty: '1',
+		pu: '0.00',
+		total: 0,
+		},
+	]);
+	};
+
+	const removeLigne = (indexToRemove) => {
+	setLignes(currentLines =>
+		currentLines.filter((_, index) => index !== indexToRemove)
+	);
+	};
+  const totals = calculateTotals(lignes, data?.tauxTva ?? 0);
+
+	const handleSave = async () => {
+	if (!data || !documentId) return;
+
+	setSaving(true);
+	setSaveMessage('');
+
+	
+	const errors = [];
+
+	if (!data.fields.numeroFacture.value?.trim()) {
+	errors.push('Invoice number is required.');
+	}
+
+	if (!data.fields.dateFacture.value?.trim()) {
+	errors.push('Invoice date is required.');
+	}
+
+	if (!data.fields.vendeurNom.value?.trim()) {
+	errors.push('Seller name is required.');
+	}
+
+	if (!data.fields.acheteurNom.value?.trim()) {
+	errors.push('Buyer name is required.');
+	}
+
+	lignes.forEach((line, index) => {
+	if (!line.description?.trim()) {
+		errors.push(`Line ${index + 1}: description is required.`);
+	}
+
+	const quantity = Number(line.qty);
+	const unitPrice = Number(line.pu);
+
+	if (!Number.isFinite(quantity) || quantity <= 0) {
+		errors.push(`Line ${index + 1}: quantity must be greater than zero.`);
+	}
+
+	if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+		errors.push(`Line ${index + 1}: unit price cannot be negative.`);
+	}
+	});
+
+	const vatRate = Number(data.tauxTva);
+
+	if (!Number.isFinite(vatRate) || vatRate < 0 || vatRate > 100) {
+	errors.push('VAT rate must be between 0 and 100%.');
+	}
+
+	if (errors.length > 0) {
+	setSaveMessage(errors.join(' '));
+	setSaving(false);
+	return;
+	}
+
+	const fields = {
+		invoiceNumber: data.fields.numeroFacture.value,
+		invoiceDate: data.fields.dateFacture.value,
+		dueDate: data.fields.dateEcheance.value,
+		sellerName: data.fields.vendeurNom.value,
+		sellerSiren: data.fields.vendeurSiren.value,
+		sellerVat: data.fields.vendeurTva.value,
+		sellerAddress: data.fields.vendeurAdresse.value,
+		buyerName: data.fields.acheteurNom.value,
+		buyerSiren: data.fields.acheteurSiren.value,
+		buyerAddress: data.fields.acheteurAdresse.value,
+		vatRate: String(data.tauxTva ?? ''),
+		totalHt: String(totals.totalHT),
+		totalVat: String(totals.totalVAT),
+		totalTtc: String(totals.totalTTC),
+	};
+
+	const payload = {
+		fields,
+		lines: lignes.map(line => ({
+		description: line.description,
+		quantity: String(line.qty),
+		unitPrice: String(line.pu),
+		total: String(line.total),
+		})),
+	};
+
+	try {
+		await api.put(`/documents/${documentId}/draft`, payload);
+		setSaveMessage('Corrections enregistrées avec succès.');
+	} catch (err) {
+		console.error('Save draft error:', err);
+		setSaveMessage(
+		err.response?.data?.message ||
+		err.response?.data?.error ||
+		"Impossible d'enregistrer les corrections."
+		);
+	} finally {
+		setSaving(false);
+	}
+	};
 
   if (loading) {
     return (
@@ -240,48 +392,178 @@ export default function Conversion() {
               Lignes
             </div>
             {lignes.length === 0 && (
-              <p style={{ margin: 0, fontSize: '12.5px', color: '#9ca3af' }}>
-                Aucune ligne détectée automatiquement — ajoutez-les manuellement.
-              </p>
-            )}
-            {lignes.length > 0 && (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-                <thead>
-                  <tr style={{ background: '#f9fafb' }}>
-                    {['Description', 'Qté', 'P.U.', 'Total'].map(h => (
-                      <th key={h} style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 500, color: '#6b7280', borderBottom: '1px solid #e5e7eb' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {lignes.map((l, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                      <td style={{ padding: '5px 6px' }}>
-                        <input value={l.description} onChange={e => updateLigne(i, 'description', e.target.value)}
-                          style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: '4px', padding: '3px 5px', fontSize: '11.5px', color: '#1a1a2e' }} />
-                      </td>
-                      <td style={{ padding: '5px 6px', width: '40px' }}>
-                        <input value={l.qty} onChange={e => updateLigne(i, 'qty', e.target.value)}
-                          style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: '4px', padding: '3px 5px', fontSize: '11.5px', textAlign: 'right' }} />
-                      </td>
-                      <td style={{ padding: '5px 6px', width: '70px' }}>
-                        <input value={l.pu} onChange={e => updateLigne(i, 'pu', e.target.value)}
-                          style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: '4px', padding: '3px 5px', fontSize: '11.5px', textAlign: 'right', fontFamily: 'monospace' }} />
-                      </td>
-                      <td style={{ padding: '5px 6px 5px 10px', fontFamily: 'monospace', color: '#374151', fontSize: '11.5px', whiteSpace: 'nowrap' }}>
-                        {(l.total || 0).toFixed(2)} €
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+			<p style={{ margin: 0, fontSize: '12.5px', color: '#9ca3af' }}>
+				No invoice lines detected automatically — add them manually.
+			</p>
+			)}
 
+			{lignes.length > 0 && (
+			<table
+				style={{
+				width: '100%',
+				borderCollapse: 'collapse',
+				fontSize: '12px',
+				}}
+			>
+				<thead>
+				<tr style={{ background: '#f9fafb' }}>
+					{['Description', 'Qty', 'Unit price', 'Total', 'Actions'].map((heading) => (
+					<th
+						key={heading}
+						style={{
+						padding: '6px 8px',
+						textAlign: 'left',
+						fontWeight: 500,
+						color: '#6b7280',
+						borderBottom: '1px solid #e5e7eb',
+						}}
+					>
+						{heading}
+					</th>
+					))}
+				</tr>
+				</thead>
+
+				<tbody>
+				{lignes.map((line, index) => (
+					<tr key={index} style={{ borderBottom: '1px solid #f3f4f6' }}>
+					<td style={{ padding: '5px 6px' }}>
+						<input
+						value={line.description}
+						onChange={(e) =>
+							updateLigne(index, 'description', e.target.value)
+						}
+						aria-label={`Description for line ${index + 1}`}
+						style={{
+							width: '100%',
+							border: '1px solid #e5e7eb',
+							borderRadius: '4px',
+							padding: '3px 5px',
+							fontSize: '11.5px',
+							boxSizing: 'border-box',
+						}}
+						/>
+					</td>
+
+					<td style={{ padding: '5px 6px', width: '55px' }}>
+						<input
+						type="number"
+						min="0.01"
+						step="any"
+						value={line.qty}
+						onChange={(e) => updateLigne(index, 'qty', e.target.value)}
+						aria-label={`Quantity for line ${index + 1}`}
+						style={{
+							width: '100%',
+							border: '1px solid #e5e7eb',
+							borderRadius: '4px',
+							padding: '3px 5px',
+							fontSize: '11.5px',
+							textAlign: 'right',
+							boxSizing: 'border-box',
+						}}
+						/>
+					</td>
+
+					<td style={{ padding: '5px 6px', width: '85px' }}>
+						<input
+						type="number"
+						min="0"
+						step="any"
+						value={line.pu}
+						onChange={(e) =>
+							updateLigne(index, 'pu', e.target.value)
+						}
+						aria-label={`Unit price for line ${index + 1}`}
+						style={{
+							width: '100%',
+							border: '1px solid #e5e7eb',
+							borderRadius: '4px',
+							padding: '3px 5px',
+							fontSize: '11.5px',
+							textAlign: 'right',
+							boxSizing: 'border-box',
+						}}
+						/>
+					</td>
+
+					<td
+						style={{
+						padding: '5px 6px 5px 10px',
+						fontFamily: 'monospace',
+						color: '#374151',
+						whiteSpace: 'nowrap',
+						}}
+					>
+						{toNumber(line.total).toFixed(2)} €
+					</td>
+
+					<td style={{ padding: '5px 6px', textAlign: 'center' }}>
+						<button
+						type="button"
+						onClick={() => removeLigne(index)}
+						aria-label={`Delete line ${index + 1}`}
+						style={{
+							border: 'none',
+							background: 'transparent',
+							color: '#dc2626',
+							cursor: 'pointer',
+							fontSize: '16px',
+						}}
+						>
+						×
+						</button>
+					</td>
+					</tr>
+				))}
+				</tbody>
+			</table>
+			)}
+
+			<button
+			type="button"
+			onClick={addLigne}
+			style={{
+				marginTop: '8px',
+				padding: '7px 12px',
+				border: '1px solid #d1d5db',
+				borderRadius: '6px',
+				background: '#fff',
+				cursor: 'pointer',
+			}}
+			>
+			+ Add line
+			</button>
             <div style={{ marginTop: '10px', borderTop: '1px solid #e5e7eb', paddingTop: '10px' }}>
+				<div style={{
+					display: 'flex',
+					justifyContent: 'space-between',
+					alignItems: 'center',
+					fontSize: '12.5px',
+					padding: '4px 0 8px',
+					}}>
+					<label htmlFor="vat-rate">TVA (%)</label>
+					<input
+						id="vat-rate"
+						type="number"
+						min="0"
+						max="100"
+						step="0.01"
+						value={data.tauxTva}
+						onChange={e => updateVatRate(e.target.value)}
+						style={{
+						width: '75px',
+						padding: '4px 6px',
+						border: '1px solid #d1d5db',
+						borderRadius: '4px',
+						textAlign: 'right',
+						}}
+					/>
+				</div>
               {[
-                ['Total HT', `${data.totalHT.toFixed(2)} €`],
-                [`TVA ${data.tauxTva}%`, `${data.montantTva.toFixed(2)} €`],
-                ['Total TTC', `${data.totalTTC.toFixed(2)} €`],
+                ['Total HT', `${totals.totalHT.toFixed(2)} €`],
+                [`TVA ${data.tauxTva}%`, `${totals.totalVAT.toFixed(2)} €`],
+                ['Total TTC', `${totals.totalTTC.toFixed(2)} €`],
               ].map(([l, v], i) => (
                 <div key={l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: i === 2 ? '13px' : '12.5px', fontWeight: i === 2 ? 700 : 400, color: i === 2 ? '#1a1a2e' : '#6b7280', padding: '3px 0' }}>
                   <span>{l}</span>
@@ -292,7 +574,8 @@ export default function Conversion() {
           </div>
 
           <button
-            onClick={() => navigate('/succes')}
+            onClick={handleSave}
+            disabled={saving}
             style={{
               width: '100%', padding: '11px',
               background: '#1a2744', color: '#fff',
@@ -300,8 +583,20 @@ export default function Conversion() {
               fontSize: '14px', fontWeight: 600, cursor: 'pointer',
             }}
           >
-            Générer la facture Factur-X
+            {saving ? 'Enregistrement…' : 'Enregistrer les corrections'}
           </button>
+		  {saveMessage && (
+			<p
+				role="status"
+				style={{
+				marginTop: '10px',
+				fontSize: '13px',
+				color: saveMessage.includes('succès') ? '#15803d' : '#b91c1c',
+				}}
+			>
+				{saveMessage}
+			</p>
+		)}
         </div>
       </div>
     </div>

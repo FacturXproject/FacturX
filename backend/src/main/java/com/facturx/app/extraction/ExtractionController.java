@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
 @RestController
 @RequestMapping("/api/documents")
@@ -57,4 +59,21 @@ public class ExtractionController {
                 Permission.EXTRACT_DOCUMENT);
         return extractionService.getLatestDraft(id);
     }
+
+	// PUT /api/documents/{id}/draft - saves the user's corrections (F12).
+	@PutMapping("/{id}/draft")
+	public DraftInvoiceResponse updateDraft(
+			@PathVariable Long id,
+			@RequestBody DraftInvoiceUpdateRequest request,
+			Authentication authentication) {
+
+		Document document = documentService.getDocument(id);
+
+		permissionService.requirePermission(
+				currentUserId(authentication),
+				document.getOrganization().getId(),
+				Permission.EXTRACT_DOCUMENT);
+
+		return extractionService.updateDraft(id, request);
+	}
 }

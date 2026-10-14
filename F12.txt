@@ -1,0 +1,49 @@
+F12 — Human Correction Form: Validation Rules
+
+1. Purpose
+
+The human correction form allows users to review and correct fields extracted from a PDF invoice before the invoice is used by later processing steps.
+
+2. Required fields
+
+The following fields must not be empty when saving a draft:
+
+Invoice number
+
+Invoice date
+
+Seller name
+
+Buyer name
+
+Each invoice line must also have a description.
+
+3. Numeric validation
+
+Quantity must be a valid number greater than zero.
+
+Unit price must be a valid number greater than or equal to zero.
+
+VAT rate must be a valid number between 0 and 100, inclusive.
+
+Invalid numeric values must be rejected.
+
+4. Calculation rules
+
+The application recalculates invoice amounts from the invoice lines.
+
+Line total = quantity × unit price
+
+Total excluding VAT = sum of line totals
+
+VAT amount = total excluding VAT × VAT rate / 100
+
+Total including VAT = total excluding VAT + VAT amount
+
+Amounts are rounded to two decimal places.
+
+5. Saving and persistence
+
+The frontend validates the form before sending a save request. The backend must independently validate incoming data and recalculate totals before persisting the draft.
+
+A successfully saved draft must be retrievable after refreshing or reopening the invoice correction page.
