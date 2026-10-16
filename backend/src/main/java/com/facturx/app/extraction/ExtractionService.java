@@ -2,40 +2,41 @@ package com.facturx.app.extraction;
 
 import com.facturx.app.document.Document;
 import com.facturx.app.document.DocumentService;
+import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Objects;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
-
 @Service
 public class ExtractionService {
+
+    static final String SOURCE_MANUAL = "manual";
+    static final String SOURCE_CALCULATED = "calculated";
 
     private final DocumentService documentService;
     private final ExtractionClient extractionClient;
     private final DraftInvoiceRepository draftInvoiceRepository;
     private final ExtractedFieldRepository extractedFieldRepository;
     private final DraftLineRepository draftLineRepository;
+    private final DraftTaxRepository draftTaxRepository;
 
     public ExtractionService(
             DocumentService documentService,
             ExtractionClient extractionClient,
             DraftInvoiceRepository draftInvoiceRepository,
             ExtractedFieldRepository extractedFieldRepository,
-            DraftLineRepository draftLineRepository) {
+            DraftLineRepository draftLineRepository,
+            DraftTaxRepository draftTaxRepository) {
 
         this.documentService = documentService;
         this.extractionClient = extractionClient;
         this.draftInvoiceRepository = draftInvoiceRepository;
         this.extractedFieldRepository = extractedFieldRepository;
         this.draftLineRepository = draftLineRepository;
+        this.draftTaxRepository = draftTaxRepository;
     }
 
     // @Transactional : evite qu'un brouillon reste persiste avec des champs/lignes
@@ -82,202 +83,141 @@ public class ExtractionService {
             draftLine.setUnitPrice(line.unitPrice());
             draftLine.setTotal(line.total());
             draftLine.setConfidence(clamp(line.confidence()));
+            draftLine.setSource(response.source());
             draftLineRepository.save(draftLine);
         }
 
         return toResponse(draft);
     }
-	
 
+    /**
+     * F12 : enregistre les corrections de l'utilisateur sur le dernier brouillon du
+     * document. Tout est valide et recalcule ici (DraftCorrection), independamment du
+     * frontend ; les totaux envoyes par le client sont ignores.
+     */
+    @Transactional
+    public DraftInvoiceResponse updateDraft(Long documentId, DraftInvoiceUpdateRequest request) {
+        DraftCorrection.Result corrected = DraftCorrection.validate(request);
 
+        DraftInvoice draft = draftInvoiceRepository
+                .findTopByDocumentIdOrderByCreatedAtDesc(documentId)
+                .orElseThrow(DraftNotFoundException::new);
 
+        if (request.updatedAt() != null && !request.updatedAt().isEqual(draft.getUpdatedAt())) {
+            throw new DraftConflictException();
+        }
 
+        Map<String, ExtractedField> fieldsByName = new HashMap<>();
+        for (ExtractedField field : extractedFieldRepository.findByDraftInvoiceId(draft.getId())) {
+            fieldsByName.put(field.getFieldName(), field);
+        }
 
+        // Un champ modifie perd son score de confiance : ce n'est plus l'extracteur
+        // qui en repond mais l'utilisateur (source "manual"). Un champ inchange garde
+        // sa confiance et sa source d'origine.
+        for (Map.Entry<String, String> entry : corrected.fields().entrySet()) {
+            String name = entry.getKey();
+            String value = entry.getValue();
+            ExtractedField field = fieldsByName.get(name);
 
+            if (field == null) {
+                if (value == null) {
+                    continue;
+                }
+                field = new ExtractedField();
+                field.setDraftInvoice(draft);
+                field.setFieldName(name);
+            } else if (sameFieldValue(name, field.getValue(), value)) {
+                continue;
+            }
 
+            field.setValue(value);
+            field.setConfidence(null);
+            field.setSource(SOURCE_MANUAL);
+            extractedFieldRepository.save(field);
+        }
 
-	@Transactional
-	public DraftInvoiceResponse updateDraft(
-			Long documentId,
-			DraftInvoiceUpdateRequest request) {
+        saveCalculatedField(draft, fieldsByName, "totalHt", corrected.totalHt());
+        saveCalculatedField(draft, fieldsByName, "totalVat", corrected.totalVat());
+        saveCalculatedField(draft, fieldsByName, "totalTtc", corrected.totalTtc());
 
-		if (request == null || request.fields() == null || request.lines() == null) {
-			throw new ResponseStatusException(
-					HttpStatus.BAD_REQUEST,
-					"Invoice fields and lines are required.");
-		}
+        // Les lignes sont remplacees ; une ligne identique a celle de meme position
+        // conserve sa confiance et sa source, les autres passent en "manual".
+        List<DraftLine> oldLines = draftLineRepository.findByDraftInvoiceIdOrderByPositionAsc(draft.getId());
+        draftLineRepository.deleteAll(oldLines);
 
-		DraftInvoice draft = draftInvoiceRepository
-				.findFirstByDocumentIdOrderByCreatedAtDesc(documentId)
-				.orElseThrow(DraftNotFoundException::new);
+        for (int i = 0; i < corrected.lines().size(); i++) {
+            DraftCorrection.Line input = corrected.lines().get(i);
+            DraftLine old = i < oldLines.size() ? oldLines.get(i) : null;
+            boolean unchanged = old != null && sameLine(old, input);
 
-		Map<String, String> values = new HashMap<>(request.fields());
+            DraftLine line = new DraftLine();
+            line.setDraftInvoice(draft);
+            line.setPosition(i);
+            line.setDescription(input.description());
+            line.setQuantity(input.quantity().toPlainString());
+            line.setUnitPrice(input.unitPrice().toPlainString());
+            line.setVatRate(input.vatRate() != null ? DraftCorrection.plain(input.vatRate()) : null);
+            line.setTotal(input.total().toPlainString());
+            line.setConfidence(unchanged ? old.getConfidence() : null);
+            line.setSource(unchanged ? old.getSource() : SOURCE_MANUAL);
+            draftLineRepository.save(line);
+        }
 
-		// Required fields for the correction form.
-		requireText(values, "invoiceNumber");
-		requireText(values, "invoiceDate");
-		requireText(values, "sellerName");
-		requireText(values, "buyerName");
+        draftTaxRepository.deleteAll(draftTaxRepository.findByDraftInvoiceIdOrderByPositionAsc(draft.getId()));
+        for (int i = 0; i < corrected.taxes().size(); i++) {
+            DraftCorrection.Tax input = corrected.taxes().get(i);
+            DraftTax tax = new DraftTax();
+            tax.setDraftInvoice(draft);
+            tax.setPosition(i);
+            tax.setRate(input.rate());
+            tax.setTaxableAmount(input.taxableAmount());
+            tax.setTaxAmount(input.taxAmount());
+            draftTaxRepository.save(tax);
+        }
 
-		List<ExtractedField> existingFields =
-				extractedFieldRepository.findByDraftInvoiceId(draft.getId());
+        draft.markUpdated();
+        draftInvoiceRepository.save(draft);
 
-		Map<String, ExtractedField> fieldsByName = new HashMap<>();
-		for (ExtractedField field : existingFields) {
-			fieldsByName.put(field.getFieldName(), field);
-		}
+        return toResponse(draft);
+    }
 
-		// Calculate each line and the subtotal on the server.
-		BigDecimal totalHt = BigDecimal.ZERO;
-		List<BigDecimal> calculatedLineTotals = new ArrayList<>();
+    private void saveCalculatedField(DraftInvoice draft, Map<String, ExtractedField> fieldsByName,
+                                     String name, BigDecimal amount) {
+        ExtractedField field = fieldsByName.get(name);
+        if (field == null) {
+            field = new ExtractedField();
+            field.setDraftInvoice(draft);
+            field.setFieldName(name);
+        }
+        field.setValue(amount.toPlainString());
+        field.setConfidence(null);
+        field.setSource(SOURCE_CALCULATED);
+        extractedFieldRepository.save(field);
+    }
 
-		for (DraftInvoiceUpdateRequest.LineUpdateRequest line : request.lines()) {
-			if (line == null || line.description() == null
-					|| line.description().isBlank()) {
-				throw new ResponseStatusException(
-						HttpStatus.BAD_REQUEST,
-						"Every invoice line must have a description.");
-			}
+    // Le taux est compare numeriquement : "20,0" extrait et "20" renvoye par le
+    // formulaire ne sont pas une correction.
+    private boolean sameFieldValue(String name, String oldValue, String newValue) {
+        String old = DraftCorrection.normalizeText(oldValue);
+        if ("vatRate".equals(name) && old != null && newValue != null) {
+            BigDecimal oldRate = DraftCorrection.parseRate(old);
+            BigDecimal newRate = DraftCorrection.parseRate(newValue);
+            return oldRate != null && newRate != null && oldRate.compareTo(newRate) == 0;
+        }
+        return Objects.equals(old, newValue);
+    }
 
-			BigDecimal quantity = parseDecimal(line.quantity(), "quantity");
-			BigDecimal unitPrice = parseDecimal(line.unitPrice(), "unitPrice");
+    private boolean sameLine(DraftLine old, DraftCorrection.Line input) {
+        return Objects.equals(DraftCorrection.normalizeText(old.getDescription()), input.description())
+                && sameNumber(DraftCorrection.parseDecimal(old.getQuantity()), input.quantity())
+                && sameNumber(DraftCorrection.parseDecimal(old.getUnitPrice()), input.unitPrice())
+                && sameNumber(DraftCorrection.parseRate(old.getVatRate()), input.vatRate());
+    }
 
-			if (quantity.signum() <= 0 || unitPrice.signum() < 0) {
-				throw new ResponseStatusException(
-						HttpStatus.BAD_REQUEST,
-						"Quantity must be positive and unit price cannot be negative.");
-			}
-
-			BigDecimal lineTotal = quantity
-					.multiply(unitPrice)
-					.setScale(2, RoundingMode.HALF_UP);
-
-			calculatedLineTotals.add(lineTotal);
-			totalHt = totalHt.add(lineTotal);
-		}
-
-		totalHt = totalHt.setScale(2, RoundingMode.HALF_UP);
-
-		// VAT is calculated from the submitted rate; default to 0 when absent.
-		BigDecimal vatRate = values.get("vatRate") == null
-				|| values.get("vatRate").isBlank()
-				? BigDecimal.ZERO
-				: parseDecimal(values.get("vatRate"), "vatRate");
-
-		if (vatRate.signum() < 0 || vatRate.compareTo(new BigDecimal("100")) > 0) {
-			throw new ResponseStatusException(
-					HttpStatus.BAD_REQUEST,
-					"VAT rate must be between 0 and 100.");
-		}
-
-		BigDecimal totalVat = totalHt
-				.multiply(vatRate)
-				.divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
-
-		BigDecimal totalTtc = totalHt.add(totalVat)
-				.setScale(2, RoundingMode.HALF_UP);
-
-		// The server-calculated amounts override the values sent by the frontend.
-		values.put("totalHt", totalHt.toPlainString());
-		values.put("totalVat", totalVat.toPlainString());
-		values.put("totalTtc", totalTtc.toPlainString());
-		values.put("vatRate", vatRate.stripTrailingZeros().toPlainString());
-
-		// Update existing extracted fields without losing their confidence scores.
-		// Fields added manually are marked with source "manual".
-		for (Map.Entry<String, String> entry : values.entrySet()) {
-			String name = entry.getKey();
-
-			if (name == null || name.isBlank() || name.length() > 50) {
-				throw new ResponseStatusException(
-						HttpStatus.BAD_REQUEST, "Invalid invoice field name.");
-			}
-
-			String value = entry.getValue();
-			if (value != null && value.length() > 500) {
-				throw new ResponseStatusException(
-						HttpStatus.BAD_REQUEST,
-						"Field value is too long: " + name);
-			}
-
-			ExtractedField field = fieldsByName.get(name);
-
-			if (field == null) {
-				field = new ExtractedField();
-				field.setDraftInvoice(draft);
-				field.setFieldName(name);
-				field.setSource("manual");
-				field.setConfidence(null);
-			}
-
-			field.setValue(value);
-			extractedFieldRepository.save(field);
-		}
-
-		// Replace the draft's lines with the corrected lines.
-		List<DraftLine> oldLines =
-				draftLineRepository.findByDraftInvoiceIdOrderByPositionAsc(draft.getId());
-
-		draftLineRepository.deleteAll(oldLines);
-
-		for (int i = 0; i < request.lines().size(); i++) {
-			DraftInvoiceUpdateRequest.LineUpdateRequest input = request.lines().get(i);
-
-			DraftLine line = new DraftLine();
-			line.setDraftInvoice(draft);
-			line.setPosition(i);
-			line.setDescription(input.description().trim());
-			line.setQuantity(parseDecimal(input.quantity(), "quantity").toPlainString());
-			line.setUnitPrice(parseDecimal(input.unitPrice(), "unitPrice").toPlainString());
-			line.setTotal(calculatedLineTotals.get(i).toPlainString());
-
-			// A corrected line is not automatically considered high-confidence.
-			line.setConfidence(null);
-
-			draftLineRepository.save(line);
-		}
-		draft.touchUpdatedAt();
-		draftInvoiceRepository.save(draft);
-
-		return toResponse(draft);
-	}
-
-	private void requireText(Map<String, String> fields, String name) {
-		if (fields.get(name) == null || fields.get(name).isBlank()) {
-			throw new ResponseStatusException(
-					HttpStatus.BAD_REQUEST,
-					"Required field is missing: " + name);
-		}
-	}
-
-	private BigDecimal parseDecimal(String value, String fieldName) {
-		if (value == null || value.isBlank()) {
-			throw new ResponseStatusException(
-					HttpStatus.BAD_REQUEST,
-					"Missing numeric value: " + fieldName);
-		}
-
-		// Accept decimal commas and spaces used as thousands separators.
-		String normalized = value.trim().replaceAll("\\s+", "");
-
-		if (normalized.contains(",") && normalized.contains(".")) {
-			if (normalized.lastIndexOf(',') > normalized.lastIndexOf('.')) {
-				normalized = normalized.replace(".", "").replace(",", ".");
-			} else {
-				normalized = normalized.replace(",", "");
-			}
-		} else if (normalized.contains(",")) {
-			normalized = normalized.replace(",", ".");
-		}
-
-		try {
-			return new BigDecimal(normalized);
-		} catch (NumberFormatException exception) {
-			throw new ResponseStatusException(
-					HttpStatus.BAD_REQUEST,
-					"Invalid numeric value for " + fieldName + ": " + value);
-		}
-	}
+    private boolean sameNumber(BigDecimal a, BigDecimal b) {
+        return a == null ? b == null : b != null && a.compareTo(b) == 0;
+    }
 
     public DraftInvoiceResponse getLatestDraft(Long documentId) {
         DraftInvoice draft = draftInvoiceRepository
@@ -291,7 +231,8 @@ public class ExtractionService {
         return DraftInvoiceResponse.from(
                 draft,
                 extractedFieldRepository.findByDraftInvoiceId(draft.getId()),
-                draftLineRepository.findByDraftInvoiceIdOrderByPositionAsc(draft.getId()));
+                draftLineRepository.findByDraftInvoiceIdOrderByPositionAsc(draft.getId()),
+                draftTaxRepository.findByDraftInvoiceIdOrderByPositionAsc(draft.getId()));
     }
 
     private Double clamp(Double confidence) {

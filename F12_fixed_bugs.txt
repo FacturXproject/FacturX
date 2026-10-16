@@ -1,0 +1,133 @@
+F12 — Human correction form: review, fixes and tests
+===================================================
+
+The first version of F12 (commit 211cbb0) worked for the happy path, but code review
+and testing found several bugs and missing roadmap items. This file lists what was
+fixed, what was added, and how it was tested. Detailed rules: see F12.txt.
+
+
+1. Bugs fixed
+-------------
+
+1. Existing databases broke after the update (critical)
+   draft_invoices.updated_at was "NOT NULL" with no migration. With ddl-auto=update,
+   Postgres refuses to add a NOT NULL column to a table that already has rows, so the
+   column was never created and every draft query failed (F11 broken too).
+   -> The column is now nullable; old drafts fall back to created_at.
+
+2. Server freeze with scientific notation (critical, DoS)
+   A quantity like "1E+100000000" made the server build a number with 100 million
+   digits; the request never answered.
+   -> Strict number parsing: max 12 digits before / 6 after the decimal separator,
+      no scientific notation. Rejected in a few milliseconds.
+
+3. Line description over 500 characters returned HTTP 500
+   -> Now a clean 400 with a readable message.
+
+4. Server error messages never reached the user
+   ResponseStatusException messages are hidden by Spring Boot, so the user only saw
+   "Bad Request".
+   -> New JSON errors: 400 DRAFT_INVALID { message, errors[] } (all problems at once,
+      in French), 409 DRAFT_CONFLICT.
+
+5. Frontend and backend computed different totals
+   The frontend rounded only the final sum, the backend rounded each line
+   (e.g. 3 x 0.005: 0.02 on screen, 0.03 saved).
+   -> The frontend now uses the same rules with exact integer (BigInt) arithmetic, and
+      shows the server's answer after each save.
+
+6. Wrong confidence indicator after a correction
+   A corrected field kept the extractor's confidence ("high" for a value the extractor
+   never saw), and manually filled fields stayed "to check" forever.
+   -> A changed field/line loses its confidence and gets source "manual" (blue dot
+      "Corrigé manuellement"). Unchanged fields keep their confidence.
+
+7. Any field name was accepted and stored
+   -> Whitelist of editable fields; unknown names are refused. Totals sent by the
+      client are ignored.
+
+8. Missing validations
+   -> Dates are checked (format + real calendar date, due date not before invoice
+      date), an invoice needs at least one line, VAT rate is required, text is trimmed.
+
+9. Code quality
+   -> Mixed tabs/spaces, unused imports, dead code removed; mixed English/French UI
+      unified in French.
+
+
+2. Missing roadmap items added
+------------------------------
+
+- draft_taxes table: each line can have its own VAT rate; the server stores the VAT
+  breakdown per rate (rate, taxable amount, VAT amount), ready for F13.
+- Version / updated_at: the client sends back the updatedAt it loaded; a stale save
+  (other tab, other user) is refused with 409 instead of silently overwriting.
+  The draft row is locked during a save.
+- Required-field validation with highlighted fields, add/remove line, unsaved-changes
+  warning.
+- Tests (none existed for F12) and updated documentation (F12.txt).
+
+
+3. Main files
+-------------
+
+Backend  (backend/src/main/java/com/facturx/app/extraction/)
+  DraftCorrection.java            new - validation and calculation rules
+  DraftTax.java, DraftTaxRepository.java          new - draft_taxes
+  DraftValidationException.java, DraftConflictException.java   new
+  ExtractionService.java, ExtractionController.java, ExtractionExceptionHandler.java,
+  DraftInvoice.java, DraftLine.java, DraftInvoiceRepository.java,
+  DraftInvoiceUpdateRequest.java, DraftInvoiceResponse.java     updated
+Frontend
+  frontend/src/utils/invoiceDraft.js    new - same rules as the server
+  frontend/src/pages/Conversion.jsx     rewritten form
+Tests
+  backend/.../extraction/DraftCorrectionTest.java       15 unit tests
+  backend/.../extraction/DraftCorrectionFlowTest.java    7 integration tests
+  frontend/src/utils/__tests__/invoiceDraft.test.js      9 tests
+  frontend/src/pages/__tests__/Conversion.test.jsx       7 tests
+
+
+4. Tests run
+------------
+
+Automated test suites - all green:
+  Backend (JUnit + Testcontainers Postgres)   113 / 113   (22 new for F12)
+  Frontend (Vitest)                            55 / 55    (16 new for F12)
+  Extractor (pytest)                           25 / 25
+  Frontend build (vite build)                  OK
+  Lint (oxlint)                                no new warnings
+
+Database migration test:
+  Started the new backend on a Postgres containing the old F11 schema and an existing
+  draft. Schema updated without errors (nullable columns, draft_taxes created), the old
+  draft is still readable and editable.
+
+End-to-end browser test - 53 / 53 checks passed:
+  Full stack started with docker compose (nginx HTTPS, frontend, backend, Python
+  extractor, Postgres, mailpit), scenario played in Chromium (Playwright):
+  - register, create organisation, upload a real PDF invoice, extraction by the Python
+    service, correction form opens with the extracted data and confidence dots
+  - client-side validation: empty required field, invalid quantity, VAT > 100,
+    impossible date are refused and highlighted, nothing is sent
+  - correct fields, add a line with 5.5 % VAT, save: on-screen totals equal the saved
+    totals to the cent, VAT breakdown stored per rate
+  - reload, logout/login: corrections are still there; line deletion persists
+  - two tabs: the stale tab gets a 409 conflict, the newer correction is kept
+  - direct API calls bypassing the UI: invalid data -> 400 JSON, "1E+100000000"
+    rejected in ~5 ms, long description -> 400 (not 500), unknown field refused,
+    client totals ignored, unknown document -> 404
+  - a user outside the organisation gets 403 (read and write)
+  - regression smoke test: dashboard, document page, Factur-X validation report
+    (F08/F09), XML invoice viewer (F10), login/logout all work
+  - no JavaScript error in the browser console, no HTTP 500 in the server logs
+
+
+5. Known minor points (not blocking)
+------------------------------------
+
+- After a save, numbers are displayed as stored by the server ("750.00", "5.5")
+  instead of the French format ("750,00"). Cosmetic only.
+- Re-running the extraction on a document creates a new draft; previous manual
+  corrections are not carried over (same behaviour as F11).
+- The "Generate Factur-X" button will be added by F13.
