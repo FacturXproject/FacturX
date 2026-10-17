@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import api from '../services/api';
+import FacturXGenerationPanel from '../components/FacturXGenerationPanel';
 import {
   FIELD_API_NAMES,
   buildDraftPayload,
@@ -62,6 +63,8 @@ function toViewModel(draft) {
     tauxTva: normalizeText(f.vatRate?.value).replace(/\s*%$/, ''),
     tauxTvaConfidence: confidenceLevel(f.vatRate?.confidence, f.vatRate?.source),
     updatedAt: draft.updatedAt ?? null,
+    // F13 : enregistré au moins une fois depuis ce formulaire (même règle que le serveur).
+    humanChecked: Boolean(draft.updatedAt && draft.createdAt && new Date(draft.updatedAt) > new Date(draft.createdAt)),
   };
 }
 
@@ -304,7 +307,7 @@ export default function Conversion() {
           Conversion — vérification des données
         </h1>
         <p style={{ margin: 0, fontSize: '12.5px', color: '#6b7280' }}>
-          Vérifiez et corrigez les champs extraits, puis enregistrez le brouillon.
+          Vérifiez et corrigez les champs extraits, enregistrez le brouillon, puis générez la facture Factur-X.
           <span style={{ marginLeft: '8px', color: '#f59e0b', fontWeight: 500 }}>● À vérifier</span>
           <span style={{ marginLeft: '8px', color: '#16a34a', fontWeight: 500 }}>● Confiance élevée</span>
           <span style={{ marginLeft: '8px', color: '#2563eb', fontWeight: 500 }}>● Corrigé manuellement</span>
@@ -494,6 +497,15 @@ export default function Conversion() {
               )}
             </div>
           )}
+
+          <FacturXGenerationPanel
+            documentId={documentId}
+            blockedReason={
+              dirty ? 'Enregistrez d\u2019abord vos corrections avant de générer.'
+                : !data.humanChecked ? 'Vérifiez puis enregistrez le brouillon au moins une fois avant de générer : une facture n\u2019est jamais générée à partir de l\u2019extraction seule.'
+                : null
+            }
+          />
         </div>
       </div>
     </div>

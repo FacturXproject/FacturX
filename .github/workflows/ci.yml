@@ -32,6 +32,8 @@ jobs:
       - name: Run extractor tests
         working-directory: extractor
         run: |
+          # F13: the Factur-X generator embeds DejaVu fonts (PDF/A forbids non-embedded fonts)
+          sudo apt-get install -y --no-install-recommends fonts-dejavu-core
           pip install -r requirements-dev.txt
           pytest
 

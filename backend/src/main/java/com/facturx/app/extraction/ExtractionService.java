@@ -219,6 +219,37 @@ public class ExtractionService {
         return a == null ? b == null : b != null && a.compareTo(b) == 0;
     }
 
+    /**
+     * F13 : dernier brouillon du document, revalide avec les regles F12 a partir de ce
+     * qui est en base (et non de ce que le client pourrait envoyer). Leve
+     * {@link DraftValidationException} si le brouillon n'est pas (ou plus) valide.
+     */
+    public ValidatedDraft validatedDraftForGeneration(Long documentId) {
+        DraftInvoice draft = draftInvoiceRepository
+                .findFirstByDocumentIdOrderByCreatedAtDesc(documentId)
+                .orElseThrow(DraftNotFoundException::new);
+
+        Map<String, String> fields = new HashMap<>();
+        for (ExtractedField field : extractedFieldRepository.findByDraftInvoiceId(draft.getId())) {
+            if (DraftCorrection.EDITABLE_FIELDS.contains(field.getFieldName())) {
+                fields.put(field.getFieldName(), field.getValue());
+            }
+        }
+        List<DraftInvoiceUpdateRequest.LineUpdateRequest> lines = draftLineRepository
+                .findByDraftInvoiceIdOrderByPositionAsc(draft.getId())
+                .stream()
+                .map(line -> new DraftInvoiceUpdateRequest.LineUpdateRequest(
+                        line.getDescription(), line.getQuantity(), line.getUnitPrice(), line.getVatRate()))
+                .toList();
+
+        DraftCorrection.Result result = DraftCorrection.validate(new DraftInvoiceUpdateRequest(fields, lines, null));
+
+        // Un brouillon jamais enregistre depuis le formulaire F12 n'a pas ete verifie
+        // par un humain (updated_at = created_at, ou null pour les brouillons anterieurs a F12).
+        boolean humanChecked = draft.getUpdatedAt().isAfter(draft.getCreatedAt());
+        return new ValidatedDraft(draft.getId(), draft.getOrganizationId(), humanChecked, result);
+    }
+
     public DraftInvoiceResponse getLatestDraft(Long documentId) {
         DraftInvoice draft = draftInvoiceRepository
                 .findFirstByDocumentIdOrderByCreatedAtDesc(documentId)

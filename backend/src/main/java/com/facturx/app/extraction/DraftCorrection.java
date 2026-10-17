@@ -19,8 +19,9 @@ import java.util.regex.Pattern;
  * Classe pure, sans acces base : le service l'appelle avant toute ecriture, et le
  * frontend applique les memes regles (frontend/src/utils/invoiceDraft.js) pour
  * afficher les erreurs avant l'envoi. En cas de divergence, c'est le serveur qui fait foi.
+ * F13 la reutilise pour revalider le brouillon enregistre juste avant la generation.
  */
-final class DraftCorrection {
+public final class DraftCorrection {
 
     /** Champs modifiables par l'utilisateur (liste blanche : tout autre nom est refuse). */
     static final Set<String> EDITABLE_FIELDS = Set.of(
@@ -56,17 +57,17 @@ final class DraftCorrection {
     private static final Pattern FRENCH_DATE = Pattern.compile("(\\d{2})[/.\\-](\\d{2})[/.\\-](\\d{4})");
     private static final Pattern ISO_DATE = Pattern.compile("(\\d{4})-(\\d{2})-(\\d{2})");
 
-    record Line(String description, BigDecimal quantity, BigDecimal unitPrice,
+    public record Line(String description, BigDecimal quantity, BigDecimal unitPrice,
                 BigDecimal vatRate, BigDecimal total) {
     }
 
-    record Tax(BigDecimal rate, BigDecimal taxableAmount, BigDecimal taxAmount) {
+    public record Tax(BigDecimal rate, BigDecimal taxableAmount, BigDecimal taxAmount) {
     }
 
     /**
      * @param fields champs modifiables normalises (trim ; null si vide), dans l'ordre de la requete
      */
-    record Result(Map<String, String> fields, List<Line> lines, List<Tax> taxes,
+    public record Result(Map<String, String> fields, List<Line> lines, List<Tax> taxes,
                   BigDecimal totalHt, BigDecimal totalVat, BigDecimal totalTtc) {
     }
 
@@ -78,7 +79,7 @@ final class DraftCorrection {
      *
      * @throws DraftValidationException avec la liste complete des erreurs (pas seulement la premiere)
      */
-    static Result validate(DraftInvoiceUpdateRequest request) {
+    public static Result validate(DraftInvoiceUpdateRequest request) {
         if (request == null || request.fields() == null || request.lines() == null) {
             throw new DraftValidationException(List.of("Les champs et les lignes de la facture sont obligatoires."));
         }
@@ -240,7 +241,7 @@ final class DraftCorrection {
     }
 
     /** Taux de TVA entre 0 et 100 inclus, "%" final tolere ("5,5 %"). Null si invalide. */
-    static BigDecimal parseRate(String value) {
+    public static BigDecimal parseRate(String value) {
         if (value == null) {
             return null;
         }
@@ -256,7 +257,7 @@ final class DraftCorrection {
     }
 
     /** "20.50" -> "20.5", "20.00" -> "20", "0.0" -> "0". */
-    static String plain(BigDecimal value) {
+    public static String plain(BigDecimal value) {
         return value.stripTrailingZeros().toPlainString();
     }
 
@@ -282,7 +283,7 @@ final class DraftCorrection {
         return date;
     }
 
-    static LocalDate parseDate(String value) {
+    public static LocalDate parseDate(String value) {
         try {
             Matcher french = FRENCH_DATE.matcher(value);
             if (french.matches()) {

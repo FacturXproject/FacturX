@@ -9,6 +9,7 @@ vi.mock('../../services/api');
 const draft = (overrides = {}) => ({
   id: 1,
   documentId: 42,
+  createdAt: '2026-10-16T09:00:00Z',
   updatedAt: '2026-10-16T10:00:00Z',
   fields: {
     invoiceNumber: { value: 'FACT-001', confidence: 0.9, source: 'pdf-extraction-v1' },
@@ -156,5 +157,26 @@ describe('Conversion - formulaire de correction humaine (F12)', () => {
     fireEvent.change(screen.getByDisplayValue('ACME SAS'), { target: { value: 'ACME' } });
 
     expect(screen.getAllByLabelText('Corrigé manuellement').length).toBe(before + 1);
+  });
+
+  it("bloque la génération Factur-X d'un brouillon jamais enregistré", async () => {
+    api.get.mockImplementation((url) => Promise.resolve({
+      data: url.endsWith('/generations') ? [] : draft({ updatedAt: '2026-10-16T09:00:00Z' }),
+    }));
+    await loaded();
+
+    expect(screen.getByRole('button', { name: /Générer la facture Factur-X/ })).toBeDisabled();
+    expect(screen.getByText(/jamais générée à partir de l.extraction seule/)).toBeInTheDocument();
+  });
+
+  it('bloque la génération tant que des corrections ne sont pas enregistrées', async () => {
+    api.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith('/generations') ? [] : draft() }));
+    await loaded();
+
+    const generate = screen.getByRole('button', { name: /Générer la facture Factur-X/ });
+    expect(generate).toBeEnabled();
+    fireEvent.change(screen.getByDisplayValue('FACT-001'), { target: { value: 'FACT-002' } });
+    expect(generate).toBeDisabled();
+    expect(screen.getByText(/Enregistrez d.abord vos corrections avant de générer/)).toBeInTheDocument();
   });
 });
