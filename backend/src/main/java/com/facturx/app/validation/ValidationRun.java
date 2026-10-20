@@ -7,12 +7,16 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
 
 @Entity
-@Table(name = "validation_runs")
+@Table(name = "validation_runs", indexes = {
+        // F16: "latest run of a document" lookups (report + error search)
+        @Index(name = "idx_validation_runs_document", columnList = "document_id")
+})
 public class ValidationRun {
 
     @Id
