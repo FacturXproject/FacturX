@@ -144,17 +144,22 @@ passes 53 / 53 on the same stack.
 
 Status (yseddiki):
   1. Done - scripts/test-f13-generation.sh, run in CI after the healthcheck
-     ("Factur-X generation end-to-end"): upload -> extract -> draft -> EN16931 and
-     BASIC generation, fails unless VALID; also checks download, report, history
-     and 403 for another organisation.
+     ("Factur-X generation end-to-end"), 34 checks against the running stack:
+     rights (401, outsider and CLIENT 403, unknown document and document without
+     draft 404), draft preconditions (never checked by a human, unsupported
+     profile, missing seller VAT number -> 400 with the right code), EN16931 (by
+     default) and BASIC generation by owner and ACCOUNTANT -> VALID, history
+     order, download (PDF, Content-Disposition), report, generated file listed
+     as a VALID document, no cascade generation on a generated file, and access
+     to the generated file per role (ACCOUNTANT 200, CLIENT 403, outsider 403).
   2. Done - "Factures Factur-X générées" section on DocumentDetail, reusing
      GenerationList exported from FacturXGenerationPanel (hidden on 403, e.g. for
      a CLIENT without GENERATE_DOCUMENT). Test: DocumentDetail.test.jsx.
   3. Done - DocumentService.requireViewPermission on /download and /report.
      Test: DocumentFlowTest.userFromAnotherOrganizationCannotDownloadOrReadReport.
-  4. Routes /traitement and /succes removed from App.jsx (unknown routes redirect
-     to /). Files Processing.jsx, Success.jsx and __tests__/Processing.test.jsx
-     still to delete.
+  4. Done - routes /traitement and /succes removed from App.jsx (unknown routes
+     redirect to /); Processing.jsx, Success.jsx and __tests__/Processing.test.jsx
+     deleted.
 
 1. CI golden sample through the whole chain
    The roadmap asks that CI fails if a generated sample is non-conformant. Today
