@@ -391,4 +391,61 @@ class DocumentFlowTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.error")
                         .value("DOCUMENT_NOT_FOUND"));
     }
+
+    @Test
+    void userFromAnotherOrganizationCannotDownloadOrReadReport()
+            throws Exception {
+
+        Cookie owner = registerAndLogin("doc-owner");
+        long orgId = createOrganization(owner);
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "facture.pdf",
+                "application/pdf",
+                validPdfBytes()
+        );
+
+        MvcResult uploaded = mockMvc.perform(
+                        multipart(
+                                "/api/documents?organizationId=" + orgId
+                        )
+                                .file(file)
+                                .with(csrf())
+                                .cookie(owner))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        long documentId = new ObjectMapper()
+                .readTree(
+                        uploaded.getResponse().getContentAsString()
+                )
+                .get("id")
+                .asLong();
+
+        Cookie outsider = registerAndLogin("doc-outsider");
+        createOrganization(outsider);
+
+        mockMvc.perform(
+                        get(
+                                "/api/documents/"
+                                        + documentId
+                                        + "/download"
+                        )
+                                .cookie(outsider))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error")
+                        .value("ACCESS_DENIED"));
+
+        mockMvc.perform(
+                        get(
+                                "/api/documents/"
+                                        + documentId
+                                        + "/report"
+                        )
+                                .cookie(outsider))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error")
+                        .value("ACCESS_DENIED"));
+    }
 }

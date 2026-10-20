@@ -142,6 +142,20 @@ passes 53 / 53 on the same stack.
 5. Still to do
 --------------
 
+Status (yseddiki):
+  1. Done - scripts/test-f13-generation.sh, run in CI after the healthcheck
+     ("Factur-X generation end-to-end"): upload -> extract -> draft -> EN16931 and
+     BASIC generation, fails unless VALID; also checks download, report, history
+     and 403 for another organisation.
+  2. Done - "Factures Factur-X générées" section on DocumentDetail, reusing
+     GenerationList exported from FacturXGenerationPanel (hidden on 403, e.g. for
+     a CLIENT without GENERATE_DOCUMENT). Test: DocumentDetail.test.jsx.
+  3. Done - DocumentService.requireViewPermission on /download and /report.
+     Test: DocumentFlowTest.userFromAnotherOrganizationCannotDownloadOrReadReport.
+  4. Routes /traitement and /succes removed from App.jsx (unknown routes redirect
+     to /). Files Processing.jsx, Success.jsx and __tests__/Processing.test.jsx
+     still to delete.
+
 1. CI golden sample through the whole chain
    The roadmap asks that CI fails if a generated sample is non-conformant. Today
    the Java build validates a committed reference file, and the generator has its

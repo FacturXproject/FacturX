@@ -168,30 +168,36 @@ export default function FacturXGenerationPanel({ documentId, blockedReason }) {
           <div style={{ fontSize: '11.5px', fontWeight: 600, color: '#6b7280', marginBottom: '6px' }}>
             Générations précédentes
           </div>
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-            {previous.map(g => {
-              const style = STATUS[g.status] ?? STATUS.FAILED;
-              return (
-                <li key={g.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', padding: '5px 0', borderTop: '1px solid #f3f4f6' }}>
-                  <span style={{ color: style.color, fontWeight: 600, minWidth: '90px' }}>{style.label}</span>
-                  <span style={{ color: '#6b7280' }}>{g.profile} · {formatDate(g.createdAt)}</span>
-                  {g.generatedDocumentId && (
-                    <span style={{ marginLeft: 'auto', display: 'flex', gap: '10px' }}>
-                      <button type="button" onClick={() => handleDownload(g)}
-                        style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: '12px', padding: 0 }}>
-                        Télécharger
-                      </button>
-                      {g.validationRunId && (
-                        <Link to={`/rapport?documentId=${g.generatedDocumentId}`} style={{ color: '#2563eb', fontSize: '12px' }}>Rapport</Link>
-                      )}
-                    </span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+          <GenerationList generations={previous} onDownload={handleDownload} />
         </div>
       )}
     </div>
+  );
+}
+
+export function GenerationList({ generations, onDownload }) {
+  return (
+    <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+      {generations.map(g => {
+        const style = STATUS[g.status] ?? STATUS.FAILED;
+        return (
+          <li key={g.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', padding: '5px 0', borderTop: '1px solid #f3f4f6' }}>
+            <span style={{ color: style.color, fontWeight: 600, minWidth: '90px' }}>{style.label}</span>
+            <span style={{ color: '#6b7280' }}>{g.profile} · {formatDate(g.createdAt)}</span>
+            {g.generatedDocumentId && (
+              <span style={{ marginLeft: 'auto', display: 'flex', gap: '10px' }}>
+                <button type="button" onClick={() => onDownload(g)}
+                  style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: '12px', padding: 0 }}>
+                  Télécharger
+                </button>
+                {g.validationRunId && (
+                  <Link to={`/rapport?documentId=${g.generatedDocumentId}`} style={{ color: '#2563eb', fontSize: '12px' }}>Rapport</Link>
+                )}
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }

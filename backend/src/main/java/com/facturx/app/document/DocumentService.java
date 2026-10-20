@@ -117,6 +117,27 @@ public class DocumentService {
             .orElseThrow(DocumentNotFoundException::new);
     }
 
+    /**
+     * Lecture d'un document : tout membre ayant VIEW_ALL_DOCUMENTS dans l'organisation
+     * du document, ou son proprietaire s'il a VIEW_OWN_DOCUMENTS.
+     */
+    public void requireViewPermission(Document document, Long currentUserId) {
+        Long organizationId = document.getOrganization().getId();
+
+        if (permissionService.hasPermission(currentUserId, organizationId, Permission.VIEW_ALL_DOCUMENTS)) {
+            return;
+        }
+
+        boolean isOwner = document.getOwner() != null
+            && document.getOwner().getId().equals(currentUserId);
+
+        if (isOwner && permissionService.hasPermission(currentUserId, organizationId, Permission.VIEW_OWN_DOCUMENTS)) {
+            return;
+        }
+
+        throw new com.facturx.app.permission.AccessDeniedException();
+    }
+
     public byte[] readFileBytes(Document document) {
         try {
             return Files.readAllBytes(Paths.get(document.getStoragePath()));

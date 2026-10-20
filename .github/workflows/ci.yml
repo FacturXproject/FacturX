@@ -65,6 +65,15 @@ jobs:
           docker compose logs backend
           exit 1
 
+      # F13: golden sample through the whole chain (upload -> extract -> draft ->
+      # generate -> Mustang); the job fails unless the generated invoice is VALID.
+      - name: Factur-X generation end-to-end
+        run: ./scripts/test-f13-generation.sh
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs backend extractor
+
       - name: Stop containers
         if: always()
         run: docker compose down
