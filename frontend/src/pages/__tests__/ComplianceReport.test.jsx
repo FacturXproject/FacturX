@@ -82,13 +82,13 @@ describe('ComplianceReport - rapport reel F08/F09 (page Verifier)', () => {
 
   it("affiche le message de refus quand un role CLIENT n'a pas accès au rapport", async () => {
     api.get.mockRejectedValue({
-      response: { data: { message: 'You do not have permission to perform this action.' } },
+      response: { data: { message: "Vous n'avez pas la permission d'effectuer cette action." } },
     });
 
     renderAt('/rapport?documentId=99');
 
     await waitFor(() => {
-      expect(screen.getByText(/You do not have permission to perform this action/i)).toBeInTheDocument();
+      expect(screen.getByText(/Vous n'avez pas la permission d'effectuer cette action/i)).toBeInTheDocument();
     });
   });
 });

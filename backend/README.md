@@ -417,6 +417,49 @@ Operations related to validation belong under the `validation` feature package.
 
 ---
 
+## PDF Extraction (F11)
+
+Regex/heuristic field extraction from a plain PDF invoice, delegated to an internal
+FastAPI microservice (`extractor/`) that has no database access and no auth of its
+own - it only ever receives bytes and returns JSON. Spring Boot is what makes this
+safe to expose: it checks the user, the organisation and the document's permissions
+*before* calling the extractor, then validates the shape of what comes back and
+persists it.
+
+```text
+POST /api/documents/{id}/extract
+        ↓
+ExtractionController   → checks EXTRACT_DOCUMENT permission for the document's org
+        ↓
+ExtractionService       → reads the stored file, rejects anything that isn't a PDF
+        ↓
+ExtractionClient         → POST {app.extractor.url}/extract (multipart)
+        ↓
+extractor (Python)      → pdfplumber + regex, confidence score per field
+        ↓
+DraftInvoice + ExtractedField[] + DraftLine[] saved
+        ↓
+DraftInvoiceResponse { fields: {name: {value, confidence}}, lines[] }
+```
+
+Every field carries a `confidence` in `[0, 1]`; a field the extractor could not find
+comes back as `value: null, confidence: 0.0` rather than failing the whole request -
+a hard-to-read PDF still produces a (mostly empty) draft a human can complete in the
+correction form (F12), instead of a crash. **No extracted value is authoritative
+until a human has checked it (F12) - this is a draft, not a Factur-X file.**
+
+`GET /api/documents/{id}/draft` returns the most recent draft for a document (404 if
+none was ever extracted). Both endpoints require `Permission.EXTRACT_DOCUMENT`
+(granted to `ADMIN` and `ACCOUNTANT`, same as `VALIDATE_DOCUMENT` - see
+`PermissionService`), and only accept documents whose stored type is
+`application/pdf`.
+
+Operations related to extraction belong under the `extraction` feature package. The
+extractor's own logic and tests live in `extractor/` at the repo root (see its
+README) - it is a separate deployable, not part of this Maven module.
+
+---
+
 # Authentication
 
 Authentication is session-based.
@@ -916,6 +959,43 @@ Response:
       "actualValue": null,
       "expectedValue": null
     }
+  ]
+}
+```
+
+---
+
+## Extract Invoice Fields (F11)
+
+```http
+POST /api/documents/{id}/extract
+GET  /api/documents/{id}/draft
+```
+
+Requires an authenticated session and `Permission.EXTRACT_DOCUMENT` for the
+document's organisation (`ADMIN`/`ACCOUNTANT`). The document must already be
+uploaded (F06) and stored as `application/pdf`. See "PDF Extraction (F11)" above.
+
+```bash
+curl -X POST http://localhost:8080/api/documents/42/extract \
+  -b cookies.txt \
+  -H "X-XSRF-TOKEN: $(grep XSRF-TOKEN cookies.txt | awk '{print $NF}')"
+```
+
+Response (`DraftInvoiceResponse`):
+
+```json
+{
+  "id": 7,
+  "documentId": 42,
+  "source": "pdf-extraction-v1",
+  "createdAt": "2026-09-29T10:00:00Z",
+  "fields": {
+    "invoiceNumber": { "value": "FACT-2026-00142", "confidence": 0.85 },
+    "sellerSiren": { "value": null, "confidence": 0.0 }
+  },
+  "lines": [
+    { "description": "Prestation conseil IT", "quantity": "5", "unitPrice": "750.00", "total": "3750.00", "confidence": 0.5 }
   ]
 }
 ```

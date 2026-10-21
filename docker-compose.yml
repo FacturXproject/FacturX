@@ -60,6 +60,7 @@ services:
       - MAIL_PORT=${MAIL_PORT}
       - MAIL_FROM=${MAIL_FROM}
       - APP_BASE_URL=${APP_BASE_URL}
+      - EXTRACTOR_URL=http://extractor:8000
 
     volumes:
       - documents-storage:/app/uploads
@@ -69,7 +70,22 @@ services:
         condition: service_healthy
       mailpit:
         condition: service_started
+      extractor:
+        condition: service_started
 
+    networks:
+      - facturx-network
+
+
+  extractor:
+    build:
+      context: ./extractor
+      dockerfile: Dockerfile
+
+    container_name: facturx-extractor
+
+    # F11: internal-only Python microservice. No host port mapping - it is
+    # reached by the backend alone, through the Docker service name.
     networks:
       - facturx-network
 

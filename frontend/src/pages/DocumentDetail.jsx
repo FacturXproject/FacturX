@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import ValidationReportCard from '../components/ValidationReportCard';
+import { GenerationList } from '../components/FacturXGenerationPanel';
+import { downloadDocument } from '../utils/download';
 
 export default function DocumentDetail() {
   const { id } = useParams();
@@ -13,6 +15,10 @@ export default function DocumentDetail() {
   const [report, setReport] = useState(null);
   const [validating, setValidating] = useState(false);
   const [validationError, setValidationError] = useState(null);
+  const [extracting, setExtracting] = useState(false);
+  const [extractionError, setExtractionError] = useState(null);
+  const [generations, setGenerations] = useState([]);
+  const [downloadError, setDownloadError] = useState(null);
 
   const formatDate = (date) => {
     if (!date) return '';
@@ -102,13 +108,54 @@ export default function DocumentDetail() {
     }
   };
 
+  // F13: factures Factur-X generees a partir de ce document. 403 pour un role sans
+  // GENERATE_DOCUMENT : la section reste alors simplement masquee.
+  const loadGenerations = async () => {
+    try {
+      const response = await api.get(`/documents/${id}/generations`);
+      setGenerations(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      setGenerations([]);
+    }
+  };
+
   useEffect(() => {
     setDocument(null);
     setReport(null);
+    setGenerations([]);
+    setDownloadError(null);
     setLoading(true);
     loadDocument();
     loadReport();
+    loadGenerations();
   }, [id]);
+
+  const handleDownloadGenerated = async (generation) => {
+    setDownloadError(null);
+    try {
+      await downloadDocument(generation.generatedDocumentId, generation.filename);
+    } catch (error) {
+      setDownloadError('Téléchargement impossible.');
+    }
+  };
+
+  // F11: lance l'extraction PDF (POST /api/documents/{id}/extract) sur ce document
+  // deja depose, en reutilisant le documentId existant, puis ouvre la page de
+  // verification des champs extraits (F12) une fois le brouillon persiste.
+  const handleExtract = async () => {
+    setExtracting(true);
+    setExtractionError(null);
+    try {
+      await api.post(`/documents/${id}/extract`);
+      navigate(`/conversion?documentId=${id}`);
+    } catch (error) {
+      console.error('Extraction error:', error);
+      setExtractionError(
+        error.response?.data?.message || "Échec de l'extraction des données."
+      );
+      setExtracting(false);
+    }
+  };
 
   // F08: lance la validation Factur-X sur ce document (POST /api/documents/{id}/validate),
   // en reutilisant le documentId existant plutot qu'un nouvel upload independant.
@@ -330,22 +377,26 @@ export default function DocumentDetail() {
               paddingLeft: '24px',
             }}
           >
-            <button
-              onClick={() =>
-                navigate(`/convertir?documentId=${document.id}`)
-              }
-              style={{
-                padding: '9px 18px',
-                background: '#fff',
-                color: '#1a2744',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '13.5px',
-                cursor: 'pointer',
-              }}
-            >
-              Convertir en Factur-X
-            </button>
+            {/* F11: seul un PDF brut peut être converti (le service d'extraction
+                interne rejette tout autre type - voir ExtractionService). */}
+            {document.type === 'application/pdf' && (
+              <button
+                onClick={handleExtract}
+                disabled={extracting}
+                style={{
+                  padding: '9px 18px',
+                  background: '#fff',
+                  color: '#1a2744',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '13.5px',
+                  cursor: extracting ? 'default' : 'pointer',
+                  opacity: extracting ? 0.6 : 1,
+                }}
+              >
+                {extracting ? 'Extraction en cours…' : 'Convertir en Factur-X'}
+              </button>
+            )}
 
             <button
               onClick={handleValidate}
@@ -380,9 +431,73 @@ export default function DocumentDetail() {
             </p>
           )}
 
+          {/* EXTRACTION (F11) */}
+          {extractionError && (
+            <p
+              style={{
+                color: '#991b1b',
+                fontSize: '13.5px',
+                marginTop: '-16px',
+                marginBottom: '24px',
+                paddingLeft: '24px',
+              }}
+            >
+              {extractionError}
+            </p>
+          )}
+
           {report && (
             <div style={{ marginBottom: '32px' }}>
               <ValidationReportCard report={report} />
+            </div>
+          )}
+
+          {/* FACTURES FACTUR-X GÉNÉRÉES (F13) */}
+          {generations.length > 0 && (
+            <div
+              style={{
+                background: '#fff',
+                border: '1px solid #e5e7eb',
+                borderRadius: '10px',
+                overflow: 'hidden',
+                fontSize: '14px',
+                marginBottom: '32px',
+              }}
+            >
+              <div
+                style={{
+                  padding: '13px 24px',
+                  background: '#f8fafc',
+                  borderBottom: '1px solid #e5e7eb',
+                }}
+              >
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#475569',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                  }}
+                >
+                  Factures Factur-X générées
+                </h3>
+              </div>
+              <div style={{ padding: '12px 24px' }}>
+                <GenerationList
+                  generations={generations}
+                  onDownload={handleDownloadGenerated}
+                />
+                {downloadError && (
+                  <p
+                    role="alert"
+                    style={{ color: '#991b1b', fontSize: '13px', margin: '8px 0 0' }}
+                  >
+                    {downloadError}
+                  </p>
+                )}
+              </div>
             </div>
           )}
         </div>

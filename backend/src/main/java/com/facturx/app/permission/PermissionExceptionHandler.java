@@ -15,7 +15,7 @@ public class PermissionExceptionHandler {
 		return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
 			Map.of(
 				"error", "ACCESS_DENIED",
-				"message", "You do not have permission to perform this action."
+				"message", "Vous n'avez pas la permission d'effectuer cette action."
 			)
 		);
 	}
