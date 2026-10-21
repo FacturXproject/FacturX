@@ -25,6 +25,12 @@ public class Job {
 
 	private int attempts = 0;
 
+	@Column(name = "requested_by")
+	private Long requestedBy;
+
+	@Column(name = "profile", length = 20)
+	private String profile;
+
 	private String error;
 
 	private Instant startedAt;
@@ -66,6 +72,14 @@ public class Job {
 		return finishedAt;
 	}
 
+	public Long getRequestedBy() {
+		return requestedBy;
+	}
+
+	public String getProfile() {
+		return profile;
+	}
+
 	public void setType(JobType type) {
 		this.type = type;
 	}
@@ -92,5 +106,13 @@ public class Job {
 
 	public void setFinishedAt(Instant finishedAt) {
 		this.finishedAt = finishedAt;
+	}
+
+	public void setRequestedBy(Long requestedBy) {
+		this.requestedBy = requestedBy;
+	}
+
+	public void setProfile(String profile) {
+		this.profile = profile;
 	}
 }

@@ -16,10 +16,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.facturx.app.AbstractIntegrationTest;
+import com.facturx.app.generation.GenerationResponse;
+import com.facturx.app.generation.GenerationService;
+import com.facturx.app.generation.GenerationStatus;
 import com.facturx.app.validation.FacturXValidationService;
 
 import jakarta.servlet.http.Cookie;
 
+import java.time.OffsetDateTime;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -52,6 +56,9 @@ class JobFlowTest extends AbstractIntegrationTest {
 
 	@MockitoBean
 	private FacturXValidationService validationService;
+
+	@MockitoBean
+	private GenerationService generationService;
 
 	private static String uniqueEmail(String label) {
 		return label + "-" + UUID.randomUUID() + "@x.fr";
@@ -195,6 +202,52 @@ class JobFlowTest extends AbstractIntegrationTest {
 				.andExpect(
 						jsonPath("$.type")
 								.value("VALIDATION")
+				)
+				.andReturn();
+
+		return new ObjectMapper()
+				.readTree(
+						result.getResponse()
+								.getContentAsString()
+				)
+				.get("id")
+				.asLong();
+	}
+
+	private long createGenerationJob(
+			Cookie session,
+			long documentId)
+			throws Exception {
+
+		MvcResult result = mockMvc.perform(
+						post("/api/jobs/generation")
+								.param(
+										"documentId",
+										String.valueOf(documentId)
+								)
+								.with(csrf())
+								.cookie(session)
+								.contentType(
+										MediaType.APPLICATION_JSON
+								)
+								.content("""
+										{
+											"profile":"EN16931"
+										}
+										""")
+				)
+				.andExpect(status().isOk())
+				.andExpect(
+						jsonPath("$.documentId")
+								.value(documentId)
+				)
+				.andExpect(
+						jsonPath("$.type")
+								.value("GENERATION")
+				)
+				.andExpect(
+						jsonPath("$.profile")
+								.value("EN16931")
 				)
 				.andReturn();
 
@@ -514,9 +567,8 @@ class JobFlowTest extends AbstractIntegrationTest {
 				uploadPdf(session, organizationId);
 
 		Job firstJob =
-				jobService.createJob(
-						documentId,
-						JobType.VALIDATION
+				jobService.createValidationJob(
+						documentId
 				);
 
 		assertThat(
@@ -527,9 +579,8 @@ class JobFlowTest extends AbstractIntegrationTest {
 		).isTrue();
 
 		assertThatThrownBy(
-				() -> jobService.createJob(
-						documentId,
-						JobType.VALIDATION
+				() -> jobService.createValidationJob(
+						documentId
 				)
 		)
 				.isInstanceOf(
@@ -584,6 +635,254 @@ class JobFlowTest extends AbstractIntegrationTest {
 								)
 								.with(csrf())
 								.cookie(otherUserSession)
+				)
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	void generationJobMovesToDone()
+			throws Exception {
+
+		when(generationService.generate(
+				anyLong(),
+				anyString(),
+				anyLong()
+		)).thenAnswer(invocation -> {
+
+			Long documentId =
+					invocation.getArgument(0);
+
+			return new GenerationResponse(
+					1L,
+					documentId,
+					100L,
+					"Factur-X_test.pdf",
+					"EN16931",
+					GenerationStatus.VALID,
+					10L,
+					0,
+					0,
+					null,
+					OffsetDateTime.now()
+			);
+		});
+
+		Cookie session =
+				registerAndLogin("generation-done");
+
+		long organizationId =
+				createOrganization(session);
+
+		long documentId =
+				uploadPdf(
+						session,
+						organizationId
+				);
+
+		long jobId =
+				createGenerationJob(
+						session,
+						documentId
+				);
+
+		Job job =
+				waitForStatus(
+						jobId,
+						JobStatus.DONE
+				);
+
+		assertThat(job.getType())
+				.isEqualTo(JobType.GENERATION);
+
+		assertThat(job.getProfile())
+				.isEqualTo("EN16931");
+
+		assertThat(job.getRequestedBy())
+				.isNotNull();
+
+		assertThat(job.getAttempts())
+				.isEqualTo(1);
+
+		assertThat(job.getError())
+				.isNull();
+
+		mockMvc.perform(
+						get("/api/jobs/" + jobId)
+								.cookie(session)
+				)
+				.andExpect(status().isOk())
+				.andExpect(
+						jsonPath("$.type")
+								.value("GENERATION")
+				)
+				.andExpect(
+						jsonPath("$.status")
+								.value("DONE")
+				)
+				.andExpect(
+						jsonPath("$.profile")
+								.value("EN16931")
+				);
+	}
+
+	@Test
+	void generationFailureMarksJobAsFailed()
+			throws Exception {
+
+		when(generationService.generate(
+				anyLong(),
+				anyString(),
+				anyLong()
+		)).thenAnswer(invocation -> {
+
+			Long documentId =
+					invocation.getArgument(0);
+
+			return new GenerationResponse(
+					1L,
+					documentId,
+					null,
+					null,
+					"EN16931",
+					GenerationStatus.FAILED,
+					null,
+					0,
+					0,
+					"Generation service unavailable",
+					OffsetDateTime.now()
+			);
+		});
+
+		Cookie session =
+				registerAndLogin("generation-failed");
+
+		long organizationId =
+				createOrganization(session);
+
+		long documentId =
+				uploadPdf(
+						session,
+						organizationId
+				);
+
+		long jobId =
+				createGenerationJob(
+						session,
+						documentId
+				);
+
+		Job job =
+				waitForStatus(
+						jobId,
+						JobStatus.FAILED
+				);
+
+		assertThat(job.getType())
+				.isEqualTo(JobType.GENERATION);
+
+		assertThat(job.getAttempts())
+				.isEqualTo(1);
+
+		assertThat(job.getError())
+				.isEqualTo(
+						"Generation service unavailable"
+				);
+	}
+
+	@Test
+	void invalidGeneratedDocumentStillMarksJobAsDone()
+			throws Exception {
+
+		when(generationService.generate(
+				anyLong(),
+				anyString(),
+				anyLong()
+		)).thenAnswer(invocation -> {
+
+			Long documentId =
+					invocation.getArgument(0);
+
+			return new GenerationResponse(
+					1L,
+					documentId,
+					100L,
+					"Factur-X_invalid.pdf",
+					"EN16931",
+					GenerationStatus.INVALID,
+					10L,
+					2,
+					0,
+					null,
+					OffsetDateTime.now()
+			);
+		});
+
+		Cookie session =
+				registerAndLogin("generation-invalid");
+
+		long organizationId =
+				createOrganization(session);
+
+		long documentId =
+				uploadPdf(
+						session,
+						organizationId
+				);
+
+		long jobId =
+				createGenerationJob(
+						session,
+						documentId
+				);
+
+		Job job =
+				waitForStatus(
+						jobId,
+						JobStatus.DONE
+				);
+
+		assertThat(job.getStatus())
+				.isEqualTo(JobStatus.DONE);
+
+		assertThat(job.getError())
+				.isNull();
+	}
+
+	@Test
+	void userWithoutPermissionCannotStartGenerationJob()
+			throws Exception {
+
+		Cookie ownerSession =
+				registerAndLogin("generation-owner");
+
+		long organizationId =
+				createOrganization(ownerSession);
+
+		long documentId =
+				uploadPdf(
+						ownerSession,
+						organizationId
+				);
+
+		Cookie otherUserSession =
+				registerAndLogin("generation-other");
+
+		mockMvc.perform(
+						post("/api/jobs/generation")
+								.param(
+										"documentId",
+										String.valueOf(documentId)
+								)
+								.with(csrf())
+								.cookie(otherUserSession)
+								.contentType(
+										MediaType.APPLICATION_JSON
+								)
+								.content("""
+										{
+											"profile":"EN16931"
+										}
+										""")
 				)
 				.andExpect(status().isForbidden());
 	}

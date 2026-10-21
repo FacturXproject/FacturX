@@ -8,6 +8,7 @@ public record JobResponse(
 		JobType type,
 		JobStatus status,
 		int attempts,
+		String profile,
 		String error,
 		Instant startedAt,
 		Instant finishedAt
@@ -20,6 +21,7 @@ public record JobResponse(
 				job.getType(),
 				job.getStatus(),
 				job.getAttempts(),
+				job.getProfile(),
 				job.getError(),
 				job.getStartedAt(),
 				job.getFinishedAt()

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import api from '../services/api';
 import { downloadDocument } from '../utils/download';
+import JobStatusPanel from './JobStatusPanel';
 
 // F13 : génération du Factur-X à partir du brouillon corrigé (F12), puis validation
 // indépendante du fichier par le moteur Java. Le serveur refuse de générer à partir
@@ -75,31 +76,72 @@ export default function FacturXGenerationPanel({ documentId, blockedReason }) {
   const [history, setHistory] = useState([]);
   const [error, setError] = useState(null);
   const [latestId, setLatestId] = useState(null);
+  const [job, setJob] = useState(null);
+
+  const loadHistory = useCallback(async () => {
+    if (!documentId) {
+      return [];
+    }
+
+    try {
+      const response = await api.get(
+        `/documents/${documentId}/generations`
+      );
+
+      const generations =
+        Array.isArray(response.data)
+          ? response.data
+          : [];
+
+      setHistory(generations);
+
+      return generations;
+    } catch {
+      setHistory([]);
+      return [];
+    }
+  }, [documentId]);
 
   useEffect(() => {
-    if (!documentId) return;
-    api.get(`/documents/${documentId}/generations`)
-      .then(response => setHistory(Array.isArray(response.data) ? response.data : []))
-      .catch(() => setHistory([]));
-  }, [documentId]);
+    loadHistory();
+  }, [loadHistory]);
 
   const handleGenerate = async () => {
     setGenerating(true);
     setError(null);
+    setJob(null);
+
     try {
-      const response = await api.post(`/documents/${documentId}/generate`, { profile });
-      setHistory(h => [response.data, ...h]);
-      setLatestId(response.data.id);
+      const response = await api.post(
+        `/jobs/generation?documentId=${documentId}`,
+        { profile }
+      );
+
+      setJob(response.data);
     } catch (err) {
       const body = err.response?.data;
+
       setError({
-        text: body?.errors?.length ? 'Génération impossible :' : body?.message || 'La génération a échoué.',
+        text:
+          body?.errors?.length
+            ? 'Génération impossible :'
+            : body?.message
+              || body?.error
+              || 'Impossible de démarrer la génération.',
         details: body?.errors ?? [],
       });
     } finally {
       setGenerating(false);
     }
   };
+
+  const handleJobDone = useCallback(async () => {
+    const generations = await loadHistory();
+
+    if (generations.length > 0) {
+      setLatestId(generations[0].id);
+    }
+  }, [loadHistory]);
 
   const handleDownload = async (generation) => {
     try {
@@ -112,6 +154,11 @@ export default function FacturXGenerationPanel({ documentId, blockedReason }) {
   const latest = history.find(g => g.id === latestId);
   const previous = history.filter(g => g.id !== latestId);
 
+  const jobRunning =
+    generating
+    || job?.status === 'QUEUED'
+    || job?.status === 'PROCESSING';
+
   return (
     <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', background: '#fff', padding: '16px 18px', marginTop: '12px' }}>
       <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -123,7 +170,7 @@ export default function FacturXGenerationPanel({ documentId, blockedReason }) {
           id="facturx-profile"
           value={profile}
           onChange={e => setProfile(e.target.value)}
-          disabled={generating}
+          disabled={jobRunning}
           style={{ padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: '5px', fontSize: '12.5px' }}
         >
           {PROFILES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
@@ -131,22 +178,21 @@ export default function FacturXGenerationPanel({ documentId, blockedReason }) {
         <button
           type="button"
           onClick={handleGenerate}
-          disabled={generating || Boolean(blockedReason)}
+          disabled={jobRunning || Boolean(blockedReason)}
           style={{
             flex: 1, padding: '9px', border: 'none', borderRadius: '7px',
             background: '#15803d', color: '#fff', fontSize: '13.5px', fontWeight: 600,
-            cursor: generating || blockedReason ? 'not-allowed' : 'pointer',
-            opacity: generating || blockedReason ? 0.55 : 1,
+            cursor: jobRunning || blockedReason ? 'not-allowed' : 'pointer',
+            opacity: jobRunning || blockedReason ? 0.55 : 1,
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
           }}
         >
-          {generating && <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />}
-          {generating ? 'Génération et validation…' : 'Générer la facture Factur-X'}
-        </button>
+          {jobRunning && <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />}
+          {jobRunning ? 'Génération et validation…' : 'Générer la facture Factur-X'}        </button>
       </div>
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
 
-      {blockedReason && !generating && (
+      {blockedReason && !jobRunning && (
         <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#6b7280' }}>{blockedReason}</p>
       )}
 
@@ -159,6 +205,13 @@ export default function FacturXGenerationPanel({ documentId, blockedReason }) {
             </ul>
           )}
         </div>
+      )}
+      {job && job.status !== 'DONE' && (
+        <JobStatusPanel
+          job={job}
+          onJobChange={setJob}
+          onDone={handleJobDone}
+        />
       )}
 
       {latest && <GenerationResult generation={latest} onDownload={handleDownload} />}

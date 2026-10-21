@@ -22,14 +22,45 @@ public class JobService {
 		this.jobWorker = jobWorker;
 	}
 
-	public synchronized Job createJob(Long documentId, JobType type) {
-
-		Document document = documentService.getDocument(documentId);
-
-		boolean alreadyRunning = jobRepository.existsByDocument_IdAndStatusIn(
+	public Job createValidationJob(Long documentId) {
+		return createJob(
 				documentId,
-				List.of(JobStatus.QUEUED, JobStatus.PROCESSING)
+				JobType.VALIDATION,
+				null,
+				null
 		);
+	}
+
+	public Job createGenerationJob(
+			Long documentId,
+			String profile,
+			Long userId) {
+
+		return createJob(
+				documentId,
+				JobType.GENERATION,
+				userId,
+				profile
+		);
+	}
+
+	private synchronized Job createJob(
+			Long documentId,
+			JobType type,
+			Long requestedBy,
+			String profile) {
+
+		Document document =
+				documentService.getDocument(documentId);
+
+		boolean alreadyRunning =
+				jobRepository.existsByDocument_IdAndStatusIn(
+						documentId,
+						List.of(
+								JobStatus.QUEUED,
+								JobStatus.PROCESSING
+						)
+				);
 
 		if (alreadyRunning) {
 			throw new IllegalStateException(
@@ -38,11 +69,15 @@ public class JobService {
 		}
 
 		Job job = new Job();
+
 		job.setDocument(document);
 		job.setType(type);
 		job.setStatus(JobStatus.QUEUED);
+		job.setRequestedBy(requestedBy);
+		job.setProfile(profile);
 
-		Job savedJob = jobRepository.save(job);
+		Job savedJob =
+				jobRepository.save(job);
 
 		jobWorker.process(savedJob);
 

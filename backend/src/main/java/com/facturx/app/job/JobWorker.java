@@ -2,6 +2,9 @@ package com.facturx.app.job;
 
 import com.facturx.app.document.Document;
 import com.facturx.app.document.DocumentService;
+import com.facturx.app.generation.GenerationResponse;
+import com.facturx.app.generation.GenerationService;
+import com.facturx.app.generation.GenerationStatus;
 import com.facturx.app.validation.FacturXValidationService;
 
 import org.springframework.scheduling.annotation.Async;
@@ -15,18 +18,22 @@ public class JobWorker {
 	private final JobRepository jobRepository;
 	private final DocumentService documentService;
 	private final FacturXValidationService validationService;
+	private final GenerationService generationService;
+
 	private static final int MAX_ATTEMPTS = 3;
 
 	public JobWorker(
 			JobRepository jobRepository,
 			DocumentService documentService,
-			FacturXValidationService validationService) {
+			FacturXValidationService validationService,
+			GenerationService generationService) {
 
 		this.jobRepository = jobRepository;
 		this.documentService = documentService;
 		this.validationService = validationService;
+		this.generationService = generationService;
 	}
-	
+
 	@Async
 	public void process(Job job) {
 
@@ -45,19 +52,16 @@ public class JobWorker {
 
 			if (job.getType() == JobType.VALIDATION) {
 
-				Document document = job.getDocument();
+				processValidation(job);
 
-				byte[] bytes = documentService.readFileBytes(document);
+			} else if (job.getType() == JobType.GENERATION) {
 
-				validationService.validate(
-						bytes,
-						document.getFilename(),
-						document.getId()
-				);
+				processGeneration(job);
 
 			} else {
+
 				throw new UnsupportedOperationException(
-						"Job type not implemented yet: " + job.getType()
+						"Job type not implemented: " + job.getType()
 				);
 			}
 
@@ -77,6 +81,46 @@ public class JobWorker {
 
 			job.setFinishedAt(Instant.now());
 			jobRepository.save(job);
+		}
+	}
+
+	private void processValidation(Job job) {
+
+		/*test for fail job
+		boolean forceFailure = true;
+
+		if (forceFailure) {
+			throw new IllegalStateException("F14 retry test");
+		}*/
+
+		Document document = job.getDocument();
+
+		byte[] bytes =
+				documentService.readFileBytes(document);
+
+		validationService.validate(
+				bytes,
+				document.getFilename(),
+				document.getId()
+		);
+	}
+
+	private void processGeneration(Job job) {
+
+		GenerationResponse response =
+				generationService.generate(
+						job.getDocument().getId(),
+						job.getProfile(),
+						job.getRequestedBy()
+				);
+
+		if (response.status() == GenerationStatus.FAILED) {
+
+			throw new IllegalStateException(
+					response.errorMessage() != null
+							? response.errorMessage()
+							: "Document generation failed"
+			);
 		}
 	}
 }
