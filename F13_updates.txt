@@ -194,3 +194,33 @@ Status (yseddiki):
    (/succes) were placeholders for this feature and are no longer used by the
    real flow. Remove them (routes in App.jsx and Processing.test.jsx) or point
    them to the real conversion page.
+
+
+
+
+6. Review fix - invoice line extraction
+---------------------------------------
+
+Review comment: on several invoices (e.g. sample_invoice_fedor_test.pdf) lines were
+missing (extract_tables() found no table -> lines: []) or wrong, so products had to
+be added by hand.
+
+Fix (extractor/app/extraction.py, _extract_lines):
+  - Lines are read under the table header (Désignation / Qté / P.U. / Total..., also
+    EN/DE labels), each value taken from its column.
+  - Ruled tables: columns mapped from the header; tables without such a header
+    (key/value blocks, totals) no longer produce fake lines.
+  - No grid (most invoices): fallback on word positions under the header, until
+    the totals block. Handles thousands ("3 750,00"), currency, VAT-rate column,
+    digits inside descriptions, wrapped descriptions. Confidence 0.4 (0.5 for
+    ruled tables).
+  - Response format unchanged: no backend / frontend change.
+
+Tests: extractor 45/45 (6 new), backend 126/126, F13 end-to-end 34/34.
+Result: sample_invoice_fedor_test.pdf, PDF_only_facture.pdf and our own generated
+PDF now give their lines (were 0); the German/English samples no longer return
+junk lines. Reviewer's PDF goes extract -> draft -> generate -> VALID with no
+manual input.
+
+Known limits: per-line VAT rate is not extracted; a table continued on the next
+page without a repeated header, or a two-line header, is not read.
