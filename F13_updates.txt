@@ -1,0 +1,226 @@
+F13 — Factur-X generation
+=========================
+
+Goal (roadmap): generate a Factur-X invoice from a valid draft, then have the Java
+engine validate it. Python generates, Java validates, and the two share no code:
+the generator never marks its own homework.
+
+
+
+
+1. How it works
+---------------
+
+  PDF uploaded (F06)
+    -> extraction by the Python service (F11)
+    -> human correction and save in the form (F12)
+    -> "Générer la facture Factur-X" (profile EN 16931 or BASIC)
+    -> Spring Boot re-validates the saved draft with the F12 rules
+    -> Python service POST /generate: CII XML + PDF/A-3 with the XML embedded
+    -> the file is stored as a new document of the organisation
+    -> Java engine (Mustang, F08) validates it independently: XML schema,
+       EN 16931 rules, French rules, PDF/A-3
+    -> result shown to the user: conformant / not conformant / failed,
+       download link, readable validation report (F09)
+
+
+
+
+2. What was built
+-----------------
+
+Python service (extractor/)
+  - app/generation.py: builds the CII XML (profiles EN 16931 and BASIC), renders a
+    clean invoice PDF (reportlab, multi-page, embedded DejaVu fonts as PDF/A
+    requires), embeds the XML and the PDF/A-3 / Factur-X metadata with the
+    factur-x library (which also checks the XML against the official XSD).
+  - The XML includes what the validators require: SIREN as legal ID and as French
+    electronic address (scheme 0225), seller VAT number, one tax block per VAT rate,
+    payment terms (due date, or "payment on receipt" when there is none) and the
+    mandatory French legal mentions (40 € recovery fee, late-payment penalties,
+    no early-payment discount).
+  - POST /generate (JSON in, PDF out). Amounts travel as decimal strings.
+  - Dockerfile installs fonts-dejavu-core; new dependencies: factur-x, reportlab.
+
+Backend (backend/.../generation/)
+  - POST /api/documents/{id}/generate  { "profile": "EN16931" | "BASIC" }
+  - GET  /api/documents/{id}/generations   (history for a source document)
+  - New permission GENERATE_DOCUMENT (ADMIN and ACCOUNTANT, like extraction).
+  - Generation is refused (400, readable French messages):
+      DRAFT_INVALID                   draft does not pass the F12 rules
+      GENERATION_DRAFT_NOT_CHECKED    draft never saved from the correction form
+                                      (an invoice is never generated from raw
+                                      extraction)
+      GENERATION_DRAFT_INCOMPLETE     VAT charged but no seller VAT number
+                                      (EN 16931 rule BR-S-02)
+      GENERATION_PROFILE_UNSUPPORTED  profile other than EN16931 / BASIC
+  - The generated file is saved as a normal document of the organisation, so it
+    appears in the documents list, can be downloaded
+    (GET /api/documents/{generatedId}/download) and has its own validation report
+    (GET /api/documents/{generatedId}/report).
+  - Result statuses: VALID, INVALID (report with errors), FAILED (service down or
+    technical error; the attempt is still recorded).
+
+Database
+  - New table generated_invoices: source document, generated document, draft,
+    organisation, profile, status, validation run (report), error message,
+    author, date. Created by ddl-auto=update (nullable-safe, no migration needed).
+
+Frontend
+  - Conversion page: new "Génération Factur-X" panel (FacturXGenerationPanel):
+    profile choice, generate button, result card (conformant / not conformant /
+    failed), download button, link to the validation report, history of previous
+    generations.
+  - The button is disabled, with an explanation, while there are unsaved
+    corrections or when the draft has never been saved by a human.
+
+CI
+  - The extractor test job installs fonts-dejavu-core (needed by the generator).
+
+
+
+
+3. Limits (supported profiles, excluded formats)
+------------------------------------------------
+
+  - Profiles produced: EN 16931 (default) and BASIC only. MINIMUM, BASIC WL,
+    EXTENDED and XRechnung are not produced.
+  - Currency EUR; country FR for seller and buyer (the draft has no country yet).
+  - VAT categories: S (standard / reduced rates) and Z (0 %). Exemptions
+    (E, AE, K, G...) need an exemption reason the draft does not hold.
+  - Unit of measure: "unit" (C62) for every line.
+  - No allowances / charges: invoices with discount lines cannot be represented
+    (F12 refuses negative unit prices).
+  - Generation is synchronous (about 2 s including validation); the job queue is F14.
+  - Validators may still show warnings, e.g. BR-FR-12 (buyer electronic address)
+    when the buyer has no SIREN. Warnings do not make the invoice non-conformant.
+
+
+
+
+4. Tests run
+------------
+
+Automated tests - all green:
+  Backend (JUnit + Testcontainers)   125 / 125  (12 new for F13)
+    - GenerationFlowTest: full API flow with the real Mustang validator:
+      conformant file -> VALID, download, report and history; BASIC profile;
+      non-conformant file -> INVALID with BR-S-02 in the report; generator down ->
+      FAILED; invalid draft, never-saved draft, missing seller VAT number,
+      unsupported profile, no draft (404), outsider (403).
+    - GeneratedSampleConformanceTest: a reference file produced by the Python
+      generator must stay conformant for the Java engine (the build fails
+      otherwise), and the non-conformant reference must stay rejected.
+  Extractor (pytest)                 39 / 39    (14 new for F13: XML content per
+                                                 profile, embedded XML, PDF/A-3
+                                                 metadata, embedded fonts,
+                                                 multi-page, legal mentions,
+                                                 /generate API)
+  Frontend (Vitest)                  63 / 63    (8 new for F13)
+  Frontend build + lint              OK, no new warning
+
+Conformance of the generator (Mustang 2.25, same engine as the backend):
+  single rate, two rates (5.5 % + 20 %), 0 % rate, 45 lines on 3 pages, BASIC and
+  EN 16931 profiles: all valid (PDF/A-3 included).
+
+End-to-end browser test on the full docker compose stack - 21 / 21 checks:
+  upload a PDF -> extraction -> generation blocked until the draft is saved ->
+  missing seller VAT number refused with a clear message -> EN 16931 generation:
+  conformant, about 1.8 s -> real download (file re-validated outside the app:
+  valid, factur-x.xml embedded, total 5 769,60 €) -> validation report
+  "Conforme" -> BASIC generation and history -> generated files listed in the
+  documents (status VALID) -> two-VAT-rate invoice, 45-line invoice and a real
+  French invoice template corrected by hand: all conformant -> outsider gets 403,
+  unsupported profile refused -> no JavaScript error, no HTTP 5xx.
+
+Regression: the previous end-to-end suite (F12 + whole project smoke test) still
+passes 53 / 53 on the same stack.
+
+
+
+
+5. Still to do
+--------------
+
+Status (yseddiki):
+  1. Done - scripts/test-f13-generation.sh, run in CI after the healthcheck
+     ("Factur-X generation end-to-end"), 34 checks against the running stack:
+     rights (401, outsider and CLIENT 403, unknown document and document without
+     draft 404), draft preconditions (never checked by a human, unsupported
+     profile, missing seller VAT number -> 400 with the right code), EN16931 (by
+     default) and BASIC generation by owner and ACCOUNTANT -> VALID, history
+     order, download (PDF, Content-Disposition), report, generated file listed
+     as a VALID document, no cascade generation on a generated file, and access
+     to the generated file per role (ACCOUNTANT 200, CLIENT 403, outsider 403).
+  2. Done - "Factures Factur-X générées" section on DocumentDetail, reusing
+     GenerationList exported from FacturXGenerationPanel (hidden on 403, e.g. for
+     a CLIENT without GENERATE_DOCUMENT). Test: DocumentDetail.test.jsx.
+  3. Done - DocumentService.requireViewPermission on /download and /report.
+     Test: DocumentFlowTest.userFromAnotherOrganizationCannotDownloadOrReadReport.
+  4. Done - routes /traitement and /succes removed from App.jsx (unknown routes
+     redirect to /); Processing.jsx, Success.jsx and __tests__/Processing.test.jsx
+     deleted.
+
+1. CI golden sample through the whole chain
+   The roadmap asks that CI fails if a generated sample is non-conformant. Today
+   the Java build validates a committed reference file, and the generator has its
+   own unit tests, but the live chain is not run in CI. Add a step to
+   .github/workflows/ci.yml, after "Start containers", that runs the chain against
+   the running stack with curl (or a small script in scripts/):
+     register -> create organisation -> upload
+     extractor/tests sample PDF (or backend/src/test/resources sample) ->
+     POST /api/documents/{id}/extract -> PUT /api/documents/{id}/draft with
+     complete data (seller VAT number included) ->
+     POST /api/documents/{id}/generate -> fail the job unless "status" is "VALID".
+   Note: requests go through nginx on https://localhost:8443 (use curl -k); the
+   session cookie is "secure", so pass it explicitly with -H "Cookie: ..."
+   together with the XSRF-TOKEN cookie and the X-XSRF-TOKEN header.
+
+2. Generated invoices on the document page
+   On DocumentDetail (/documents/:id), show the Factur-X files generated from this
+   document (GET /api/documents/{id}/generations): status, profile, date, download
+   (frontend/src/utils/download.js) and a link to /rapport?documentId={generatedId}.
+   FacturXGenerationPanel already contains the list rendering that can be reused.
+
+3. Access control on download and report
+   GET /api/documents/{id}/download and GET /api/documents/{id}/report do not
+   check the organisation: any logged-in user who knows an id can fetch the file
+   or the report. Add the same permissionService.requirePermission(...) check as
+   the other document endpoints (VIEW_ALL_DOCUMENTS, or VIEW_OWN_DOCUMENTS for the
+   owner), plus a test with a user from another organisation (expect 403).
+
+4. Remove the old conversion mock pages
+   Processing.jsx (/traitement, "simulation de conversion") and Success.jsx
+   (/succes) were placeholders for this feature and are no longer used by the
+   real flow. Remove them (routes in App.jsx and Processing.test.jsx) or point
+   them to the real conversion page.
+
+
+
+
+6. Review fix - invoice line extraction
+---------------------------------------
+
+Review comment: on several invoices (e.g. sample_invoice_fedor_test.pdf) lines were
+missing (extract_tables() found no table -> lines: []) or wrong, so products had to
+be added by hand.
+
+Fix (extractor/app/extraction.py, _extract_lines):
+  - Lines are read under the table header (Désignation / Qté / P.U. / Total..., also
+    EN/DE labels), each value taken from its column.
+  - Ruled tables: columns mapped from the header; tables without such a header
+    (key/value blocks, totals) no longer produce fake lines.
+  - No grid (most invoices): fallback on word positions under the header, until
+    the totals block. Handles thousands ("3 750,00"), currency, VAT-rate column,
+    digits inside descriptions, wrapped descriptions. Confidence 0.4 (0.5 for
+    ruled tables).
+  - Response format unchanged: no backend / frontend change.
+
+Tests: extractor 45/45 (6 new), backend 126/126, F13 end-to-end 34/34.
+Result: sample_invoice_fedor_test.pdf, PDF_only_facture.pdf and our own generated
+PDF now give their lines (were 0); the German/English samples no longer return
+junk lines. Reviewer's PDF goes extract -> draft -> generate -> VALID with no
+manual input.
+
+Known limits: per-line VAT rate is not extracted; a table continued on the next
+page without a repeated header, or a two-line header, is not read.

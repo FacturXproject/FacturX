@@ -1,4 +1,4 @@
-# Extractor (F11 — Extraction PDF)
+# Extractor (F11 — Extraction PDF, F13 — Génération Factur-X)
 
 Internal FastAPI service. It has **no database access and no authentication**
 of its own: it receives a PDF, returns JSON, nothing else. Spring Boot checks
@@ -30,6 +30,28 @@ generated from it (F12/F13). No field returned here is authoritative.**
 - `GET /health` — liveness check, included in the aggregate health response.
 - `POST /extract` — see above. Returns `422` if the file cannot be opened as
   a PDF at all, `415` if it isn't a PDF, `400` if it's empty.
+- `POST /generate` (F13) — JSON body `{profile, invoice}` (see
+  `app/schemas.py`, `GenerationRequest`) built by Spring Boot from a draft that
+  was corrected by a human and re-validated (F12). Returns the Factur-X file
+  (`application/pdf`): a PDF/A-3 rendering of the invoice with the CII XML
+  embedded as `factur-x.xml`. `422` if the request is invalid.
+
+## Factur-X generation (F13)
+
+`app/generation.py` builds the CII XML (profiles **EN 16931** and **BASIC**
+only), renders the invoice with reportlab (DejaVu fonts, embedded — PDF/A
+forbids non-embedded fonts; package `fonts-dejavu-core`, or set
+`FACTURX_FONT_DIR`), then embeds the XML and the PDF/A-3 metadata with the
+`factur-x` library (which also checks the XML against the official XSD).
+
+This service does **not** decide whether the result is conformant: the Java
+engine (Mustang, F08) validates every generated file independently. The
+generator never marks its own homework.
+
+Limits: EUR invoices, VAT categories S (standard/reduced) and Z (zero rate)
+only, unit of measure "C62" (unit), country FR for both parties, no
+allowances/charges (discount lines), no exemption reasons. MINIMUM, BASIC WL,
+EXTENDED and XRechnung profiles are not produced.
 
 ## Development
 
