@@ -30,15 +30,11 @@ export default function XmlReader() {
 							return {
 								id,
 								name: details.data.name ?? `Organisation #${id}`,
-								role: organization.role,
-								userId: organization.userId,
 							};
 						} catch {
 							return {
 								id,
 								name: `Organisation #${id}`,
-								role: organization.role,
-								userId: organization.userId,
 							};
 						}
 					})
@@ -141,13 +137,6 @@ export default function XmlReader() {
 	}
 	};
 
-	const selectedOrganization = organizations.find(
-		(organization) =>
-			String(organization.id) === String(selectedOrganizationId)
-	);
-
-	const currentRole = selectedOrganization?.role;
-	const currentUserId = selectedOrganization?.userId;
 
 	if (loadingOrganizations) {
 		return (
@@ -417,17 +406,9 @@ export default function XmlReader() {
 							</thead>
 
 							<tbody>
-								{documents.map((document) => {
-									const canDelete =
-										currentRole === 'ADMIN' ||
-										(
-											String(document.ownerId) === String(currentUserId) &&
-											document.status === 'UPLOADED'
-										);
-
-									return (
-										<tr
-											key={document.id}
+								{documents.map((document) => (
+									<tr
+										key={document.id}
 										style={{
 											borderBottom: '1px solid #f3f4f6',
 										}}
@@ -504,28 +485,25 @@ export default function XmlReader() {
 											Lire la facture
 											</button>
 
-											{canDelete && (
-												<button
-													onClick={() => handleDeleteDocument(document.id)}
-													style={{
-														padding: '7px 13px',
-														borderRadius: '7px',
-														border: '1px solid #dc2626',
-														background: '#fff',
-														color: '#dc2626',
-														cursor: 'pointer',
-														fontSize: '12.5px',
-														fontWeight: 500,
-													}}
-												>
-													Supprimer
-												</button>
-											)}
+											<button
+											onClick={() => handleDeleteDocument(document.id)}
+											style={{
+												padding: '7px 13px',
+												borderRadius: '7px',
+												border: '1px solid #dc2626',
+												background: '#fff',
+												color: '#dc2626',
+												cursor: 'pointer',
+												fontSize: '12.5px',
+												fontWeight: 500,
+											}}
+											>
+											Supprimer
+											</button>
 										</div>
 										</td>
 									</tr>
-									);
-								})}
+								))}
 							</tbody>
 						</table>
 					</div>
