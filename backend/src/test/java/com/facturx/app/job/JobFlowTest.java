@@ -584,7 +584,7 @@ class JobFlowTest extends AbstractIntegrationTest {
 				)
 		)
 				.isInstanceOf(
-						IllegalStateException.class
+						JobConflictException.class
 				)
 				.hasMessageContaining(
 						"already queued or processing"

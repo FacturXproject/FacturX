@@ -6,7 +6,12 @@ import jakarta.persistence.*;
 import java.time.Instant;
 
 @Entity
-@Table(name = "jobs")
+@Table(
+	name = "jobs",
+	indexes = {
+		@Index(name = "idx_jobs_status", columnList = "status")
+	}
+)
 public class Job {
 
 	@Id
@@ -31,6 +36,7 @@ public class Job {
 	@Column(name = "profile", length = 20)
 	private String profile;
 
+	@Column(columnDefinition = "TEXT")
 	private String error;
 
 	private Instant startedAt;

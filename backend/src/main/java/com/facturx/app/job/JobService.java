@@ -63,7 +63,7 @@ public class JobService {
 				);
 
 		if (alreadyRunning) {
-			throw new IllegalStateException(
+			throw new JobConflictException(
 					"A job is already queued or processing for this document."
 			);
 		}
@@ -89,8 +89,7 @@ public class JobService {
 				.orElseThrow(() -> new RuntimeException("Job not found"));
 	}
 
-	public Job retryJob(Long jobId) {
-
+	public synchronized Job retryJob(Long jobId) {
 		Job job = getJob(jobId);
 
 		if (job.getStatus() != JobStatus.FAILED) {

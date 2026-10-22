@@ -86,12 +86,12 @@ public class JobWorker {
 
 	private void processValidation(Job job) {
 
-		/*test for fail job
+		/* test failure job
 		boolean forceFailure = true;
 
 		if (forceFailure) {
 			throw new IllegalStateException("F14 retry test");
-		}*/
+		} */
 
 		Document document = job.getDocument();
 

@@ -77,13 +77,15 @@ useEffect(() => {
 		}
 
 		timeoutId = setTimeout(poll, 1000);
-	} catch {
-		if (!cancelled) {
-		setPollError(
-			'Impossible de récupérer le statut du traitement.'
-		);
+		} catch {
+				if (!cancelled) {
+						setPollError(
+								'Impossible de récupérer le statut du traitement.'
+						);
+
+						timeoutId = setTimeout(poll, 1000);
+				}
 		}
-	}
 	};
 
 	timeoutId = setTimeout(poll, 500);
@@ -172,18 +174,6 @@ return (
 	>
 		Tentative {job.attempts}/3
 	</div>
-
-	{job.error && (
-		<div
-		style={{
-			marginTop: '8px',
-			color: '#b91c1c',
-			fontSize: '13px',
-		}}
-		>
-		{job.error}
-		</div>
-	)}
 
 	{pollError && (
 		<div

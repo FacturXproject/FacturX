@@ -10,9 +10,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice(basePackages = "com.facturx.app.job")
 public class JobExceptionHandler {
 
-	@ExceptionHandler(IllegalStateException.class)
+	@ExceptionHandler(JobConflictException.class)
 	public ResponseEntity<Map<String, String>> handleJobConflict(
-			IllegalStateException exception) {
+			JobConflictException exception) {
 
 		return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
 				"error", "JOB_CONFLICT",
