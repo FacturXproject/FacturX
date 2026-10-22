@@ -19,4 +19,24 @@ public class JobExceptionHandler {
 				"message", "Un traitement est déjà en cours pour ce document."
 		));
 	}
+
+	@ExceptionHandler(JobNotFoundException.class)
+	public ResponseEntity<Map<String, String>> handleJobNotFound(
+			JobNotFoundException exception) {
+
+		return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+				"error", "JOB_NOT_FOUND",
+				"message", exception.getMessage()
+		));
+	}
+
+	@ExceptionHandler(JobRetryException.class)
+	public ResponseEntity<Map<String, String>> handleJobRetryConflict(
+			JobRetryException exception) {
+
+		return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+				"error", "JOB_RETRY_CONFLICT",
+				"message", exception.getMessage()
+		));
+	}
 }

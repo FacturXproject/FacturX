@@ -20,6 +20,8 @@ import com.facturx.app.generation.GenerationResponse;
 import com.facturx.app.generation.GenerationService;
 import com.facturx.app.generation.GenerationStatus;
 import com.facturx.app.validation.FacturXValidationService;
+import com.facturx.app.document.Document;
+import com.facturx.app.document.DocumentService;
 
 import jakarta.servlet.http.Cookie;
 
@@ -27,6 +29,9 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import org.junit.jupiter.api.Test;
 
@@ -53,6 +58,9 @@ class JobFlowTest extends AbstractIntegrationTest {
 
 	@Autowired
 	private JobService jobService;
+
+	@Autowired
+	private DocumentService documentService;
 
 	@MockitoBean
 	private FacturXValidationService validationService;
@@ -524,7 +532,7 @@ class JobFlowTest extends AbstractIntegrationTest {
 				() -> jobService.retryJob(jobId)
 		)
 				.isInstanceOf(
-						IllegalStateException.class
+						JobRetryException.class
 				)
 				.hasMessageContaining(
 						"Maximum number of attempts"
@@ -532,10 +540,84 @@ class JobFlowTest extends AbstractIntegrationTest {
 	}
 
 	@Test
+	void unknownJobReturns404()
+			throws Exception {
+
+		Cookie session =
+				registerAndLogin("job-not-found");
+
+		mockMvc.perform(
+				get("/api/jobs/999999")
+						.cookie(session)
+		)
+				.andExpect(status().isNotFound())
+				.andExpect(
+						jsonPath("$.error")
+								.value("JOB_NOT_FOUND")
+				)
+				.andExpect(
+						jsonPath("$.message")
+								.value("Job not found: 999999")
+				);
+	}
+
+	@Test
+	void retryOfCompletedJobReturns409()
+			throws Exception {
+
+		when(validationService.validate(
+				any(byte[].class),
+				anyString(),
+				anyLong()
+		)).thenReturn(null);
+
+		Cookie session =
+				registerAndLogin("job-invalid-retry");
+
+		long organizationId =
+				createOrganization(session);
+
+		long documentId =
+				uploadPdf(
+						session,
+						organizationId
+				);
+
+		long jobId =
+				createValidationJob(
+						session,
+						documentId
+				);
+
+		waitForStatus(
+				jobId,
+				JobStatus.DONE
+		);
+
+		mockMvc.perform(
+				post("/api/jobs/" + jobId + "/retry")
+						.with(csrf())
+						.cookie(session)
+		)
+				.andExpect(status().isConflict())
+				.andExpect(
+						jsonPath("$.error")
+								.value("JOB_RETRY_CONFLICT")
+				)
+				.andExpect(
+						jsonPath("$.message")
+								.value("Only failed jobs can be retried.")
+				);
+	}
+
+	@Test
 	void secondActiveJobForSameDocumentIsRejected()
 			throws Exception {
 
-		CountDownLatch validationStarted =
+		CountDownLatch ready =
+				new CountDownLatch(2);
+
+		CountDownLatch start =
 				new CountDownLatch(1);
 
 		CountDownLatch allowValidationToFinish =
@@ -546,8 +628,6 @@ class JobFlowTest extends AbstractIntegrationTest {
 				anyString(),
 				anyLong()
 		)).thenAnswer(invocation -> {
-
-			validationStarted.countDown();
 
 			allowValidationToFinish.await(
 					3,
@@ -566,40 +646,86 @@ class JobFlowTest extends AbstractIntegrationTest {
 		long documentId =
 				uploadPdf(session, organizationId);
 
-		Job firstJob =
-				jobService.createValidationJob(
-						documentId
-				);
+		ExecutorService executor =
+				Executors.newFixedThreadPool(2);
 
-		assertThat(
-				validationStarted.await(
-						2,
-						TimeUnit.SECONDS
-				)
-		).isTrue();
+		try {
 
-		assertThatThrownBy(
-				() -> jobService.createValidationJob(
-						documentId
-				)
-		)
-				.isInstanceOf(
-						JobConflictException.class
-				)
-				.hasMessageContaining(
-						"already queued or processing"
-				);
+			Future<Object> first =
+					executor.submit(() -> {
 
-		allowValidationToFinish.countDown();
+						ready.countDown();
+						start.await();
 
-		Job finished =
-				waitForStatus(
-						firstJob.getId(),
-						JobStatus.DONE
-				);
+						try {
+							return jobService.createValidationJob(
+									documentId
+							);
+						} catch (Exception e) {
+							return e;
+						}
+					});
 
-		assertThat(finished.getStatus())
-				.isEqualTo(JobStatus.DONE);
+			Future<Object> second =
+					executor.submit(() -> {
+
+						ready.countDown();
+						start.await();
+
+						try {
+							return jobService.createValidationJob(
+									documentId
+							);
+						} catch (Exception e) {
+							return e;
+						}
+					});
+
+			assertThat(
+					ready.await(
+							2,
+							TimeUnit.SECONDS
+					)
+			).isTrue();
+
+			start.countDown();
+
+			Object firstResult =
+					first.get(
+							2,
+							TimeUnit.SECONDS
+					);
+
+			Object secondResult =
+					second.get(
+							2,
+							TimeUnit.SECONDS
+					);
+
+			long accepted =
+					java.util.stream.Stream
+							.of(firstResult, secondResult)
+							.filter(Job.class::isInstance)
+							.count();
+
+			long rejected =
+					java.util.stream.Stream
+							.of(firstResult, secondResult)
+							.filter(JobConflictException.class::isInstance)
+							.count();
+
+			assertThat(accepted)
+					.isEqualTo(1);
+
+			assertThat(rejected)
+					.isEqualTo(1);
+
+		} finally {
+
+			allowValidationToFinish.countDown();
+
+			executor.shutdownNow();
+		}
 	}
 
 	@Test
@@ -885,5 +1011,135 @@ class JobFlowTest extends AbstractIntegrationTest {
 										""")
 				)
 				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	void retryIsRejectedWhenAnotherJobIsActiveForSameDocument()
+			throws Exception {
+
+		CountDownLatch secondJobStarted =
+				new CountDownLatch(1);
+
+		CountDownLatch allowSecondJobToFinish =
+				new CountDownLatch(1);
+
+		when(validationService.validate(
+				any(byte[].class),
+				anyString(),
+				anyLong()
+		))
+				.thenThrow(
+						new RuntimeException("First job fails")
+				)
+				.thenAnswer(invocation -> {
+
+					secondJobStarted.countDown();
+
+					allowSecondJobToFinish.await(
+							3,
+							TimeUnit.SECONDS
+					);
+
+					return null;
+				});
+
+		Cookie session =
+				registerAndLogin("job-retry-conflict");
+
+		long organizationId =
+				createOrganization(session);
+
+		long documentId =
+				uploadPdf(session, organizationId);
+
+		// Job A -> FAILED
+		long failedJobId =
+				createValidationJob(
+						session,
+						documentId
+				);
+
+		waitForStatus(
+				failedJobId,
+				JobStatus.FAILED
+		);
+
+		// Job B -> PROCESSING
+		Job activeJob =
+				jobService.createValidationJob(
+						documentId
+				);
+
+		assertThat(
+				secondJobStarted.await(
+						2,
+						TimeUnit.SECONDS
+				)
+		).isTrue();
+
+		// Retry de A doit être refusé car B tourne déjà
+		assertThatThrownBy(
+				() -> jobService.retryJob(failedJobId)
+		)
+				.isInstanceOf(
+						JobConflictException.class
+				)
+				.hasMessageContaining(
+						"already queued or processing"
+				);
+
+		allowSecondJobToFinish.countDown();
+
+		waitForStatus(
+				activeJob.getId(),
+				JobStatus.DONE
+		);
+	}
+
+	@Test
+	void interruptedJobIsMarkedFailedOnRecovery()
+			throws Exception {
+
+		Cookie session =
+				registerAndLogin("job-recovery");
+
+		long organizationId =
+				createOrganization(session);
+
+		long documentId =
+				uploadPdf(
+						session,
+						organizationId
+				);
+
+		Document document =
+				documentService.getDocument(documentId);
+
+		Job interruptedJob = new Job();
+		interruptedJob.setDocument(document);
+		interruptedJob.setType(JobType.VALIDATION);
+		interruptedJob.setStatus(JobStatus.PROCESSING);
+		interruptedJob.setAttempts(1);
+
+		interruptedJob =
+				jobRepository.save(interruptedJob);
+
+		jobService.recoverInterruptedJobs();
+
+		Job recovered =
+				jobRepository.findById(
+						interruptedJob.getId()
+				).orElseThrow();
+
+		assertThat(recovered.getStatus())
+				.isEqualTo(JobStatus.FAILED);
+
+		assertThat(recovered.getError())
+				.isEqualTo(
+						"Job interrupted by application restart."
+				);
+
+		assertThat(recovered.getFinishedAt())
+				.isNotNull();
 	}
 }

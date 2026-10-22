@@ -4,6 +4,9 @@ import com.facturx.app.document.Document;
 import com.facturx.app.document.DocumentService;
 import org.springframework.stereotype.Service;
 import java.util.List;
+import java.time.Instant;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 
 @Service
 public class JobService {
@@ -86,23 +89,38 @@ public class JobService {
 
 	public Job getJob(Long jobId) {
 		return jobRepository.findById(jobId)
-				.orElseThrow(() -> new RuntimeException("Job not found"));
+				.orElseThrow(() -> new JobNotFoundException(jobId));
 	}
 
 	public synchronized Job retryJob(Long jobId) {
 		Job job = getJob(jobId);
 
 		if (job.getStatus() != JobStatus.FAILED) {
-			throw new IllegalStateException(
+			throw new JobRetryException(
 					"Only failed jobs can be retried."
 			);
 		}
 
 		if (job.getAttempts() >= 3) {
-			throw new IllegalStateException(
+			throw new JobRetryException(
 					"Maximum number of attempts reached."
 			);
 		}
+
+		boolean anotherJobRunning =
+			jobRepository.existsByDocument_IdAndStatusIn(
+					job.getDocument().getId(),
+					List.of(
+							JobStatus.QUEUED,
+							JobStatus.PROCESSING
+					)
+			);
+
+	if (anotherJobRunning) {
+		throw new JobConflictException(
+				"A job is already queued or processing for this document."
+		);
+	}
 
 		job.setStatus(JobStatus.QUEUED);
 		job.setError(null);
@@ -113,6 +131,28 @@ public class JobService {
 		jobWorker.process(savedJob);
 
 		return savedJob;
+	}
+
+	@EventListener(ApplicationReadyEvent.class)
+	public void recoverInterruptedJobs() {
+
+		List<Job> interruptedJobs =
+				jobRepository.findByStatusIn(
+						List.of(
+								JobStatus.QUEUED,
+								JobStatus.PROCESSING
+						)
+				);
+
+		for (Job job : interruptedJobs) {
+			job.setStatus(JobStatus.FAILED);
+			job.setError(
+					"Job interrupted by application restart."
+			);
+			job.setFinishedAt(Instant.now());
+		}
+
+		jobRepository.saveAll(interruptedJobs);
 	}
 
 }
