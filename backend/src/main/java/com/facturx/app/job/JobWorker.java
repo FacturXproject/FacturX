@@ -86,7 +86,7 @@ public class JobWorker {
 
 	private void processValidation(Job job) {
 
-		/* test failure job
+		/* //test failure job
 		boolean forceFailure = true;
 
 		if (forceFailure) {
