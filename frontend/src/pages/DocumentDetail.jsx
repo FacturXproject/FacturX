@@ -1,10 +1,11 @@
 import api from '../services/api';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import ValidationReportCard from '../components/ValidationReportCard';
 import { GenerationList } from '../components/FacturXGenerationPanel';
 import { downloadDocument } from '../utils/download';
+import JobStatusPanel from '../components/JobStatusPanel';
 
 export default function DocumentDetail() {
   const { id } = useParams();
@@ -15,6 +16,7 @@ export default function DocumentDetail() {
   const [report, setReport] = useState(null);
   const [validating, setValidating] = useState(false);
   const [validationError, setValidationError] = useState(null);
+  const [validationJob, setValidationJob] = useState(null);
   const [extracting, setExtracting] = useState(false);
   const [extractionError, setExtractionError] = useState(null);
   const [generations, setGenerations] = useState([]);
@@ -125,6 +127,9 @@ export default function DocumentDetail() {
     setGenerations([]);
     setDownloadError(null);
     setLoading(true);
+    setValidationJob(null);
+    setValidationError(null);
+
     loadDocument();
     loadReport();
     loadGenerations();
@@ -157,23 +162,43 @@ export default function DocumentDetail() {
     }
   };
 
-  // F08: lance la validation Factur-X sur ce document (POST /api/documents/{id}/validate),
-  // en reutilisant le documentId existant plutot qu'un nouvel upload independant.
+// F14: lance la validation Factur-X en arrière-plan via un job,
+// en reutilisant le documentId existant.
   const handleValidate = async () => {
     setValidating(true);
     setValidationError(null);
+    setValidationJob(null);
+
     try {
-      await api.post(`/documents/${id}/validate`);
-      await Promise.all([loadDocument(), loadReport()]);
+      const response = await api.post(
+        `/jobs/validation?documentId=${id}`
+      );
+
+      setValidationJob(response.data);
     } catch (error) {
-      console.error('Validation error:', error);
+      console.error('Validation job error:', error);
+
       setValidationError(
-        error.response?.data?.message || "Échec de la validation du document."
+        error.response?.data?.message
+          || error.response?.data?.error
+          || "Impossible de démarrer la validation."
       );
     } finally {
       setValidating(false);
     }
   };
+
+  const handleValidationJobDone = useCallback(async () => {
+    await Promise.all([
+      loadDocument(),
+      loadReport(),
+    ]);
+  }, [id]);
+
+  const validationJobRunning =
+  validating
+  || validationJob?.status === 'QUEUED'
+  || validationJob?.status === 'PROCESSING';
 
   return (
     <div>
@@ -400,7 +425,7 @@ export default function DocumentDetail() {
 
             <button
               onClick={handleValidate}
-              disabled={validating}
+              disabled={validationJobRunning}
               style={{
                 padding: '9px 18px',
                 background: '#fff',
@@ -408,11 +433,11 @@ export default function DocumentDetail() {
                 border: '1px solid #d1d5db',
                 borderRadius: '6px',
                 fontSize: '13.5px',
-                cursor: validating ? 'default' : 'pointer',
-                opacity: validating ? 0.6 : 1,
+                cursor: validationJobRunning ? 'default' : 'pointer',
+                opacity: validationJobRunning ? 0.6 : 1,
               }}
             >
-              {validating ? 'Validation en cours…' : 'Lancer la validation Factur-X'}
+              {validationJobRunning ? 'Validation en cours…' : 'Lancer la validation Factur-X'}
             </button>
           </div>
 
@@ -429,6 +454,22 @@ export default function DocumentDetail() {
             >
               {validationError}
             </p>
+          )}
+
+          {validationJob && validationJob.status !== 'DONE' && (
+            <div
+              style={{
+                paddingLeft: '24px',
+                paddingRight: '24px',
+                marginBottom: '24px',
+              }}
+            >
+              <JobStatusPanel
+                job={validationJob}
+                onJobChange={setValidationJob}
+                onDone={handleValidationJobDone}
+              />
+            </div>
           )}
 
           {/* EXTRACTION (F11) */}
