@@ -373,3 +373,10 @@ VALUES ('FX-SCH-A-000020', 'SCHEMATRON',
  'Renseignez un code de type de document (BT-3, par exemple 380 pour une facture commerciale) dans l''en-tête du document XML.')
 ON CONFLICT (code) DO UPDATE SET layer = EXCLUDED.layer, raw_text = EXCLUDED.raw_text,
  title_fr = EXCLUDED.title_fr, description_fr = EXCLUDED.description_fr, correction_hint_fr = EXCLUDED.correction_hint_fr;
+
+-- F16: filename search is a case-insensitive substring match (lower(filename) LIKE
+-- '%...%'), which a plain B-tree index can't serve. A trigram GIN index on
+-- lower(filename) can. JPA's @Index can't express an operator class, hence here;
+-- IF NOT EXISTS keeps it idempotent like the rest of this file.
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX IF NOT EXISTS idx_documents_filename_trgm ON documents USING gin (lower(filename) gin_trgm_ops);
