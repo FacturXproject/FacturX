@@ -40,22 +40,12 @@ public class ImportController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
         }
 
-        List<InvitationImportResponse> result;
-
-        try {
-            result = importService.importInvitations(
-                    file,
-                    principal.getUser().getId(),
-                    orgId,
-                    dryRun
-            );
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    e.getMessage(),
-                    e
-            );
-        }
+        List<InvitationImportResponse> result = importService.importInvitations(
+                file,
+                principal.getUser().getId(),
+                orgId,
+                dryRun
+        );
 
         if (!dryRun && result.stream().anyMatch(row -> !row.valid())) {
             return ResponseEntity.badRequest().body(result);

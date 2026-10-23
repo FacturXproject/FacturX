@@ -12,7 +12,6 @@ public interface InvitationRepository extends JpaRepository<Invitation, Long> {
 
     Optional<Invitation> findByEmailAndOrganizationIdAndStatus(
         String email, Long organizationId, InvitationStatus status);
-    boolean existsByOrganizationIdAndEmailIgnoreCaseAndStatusAndExpiresAtAfter(
-        Long organizationId, String email, InvitationStatus status,
-        java.time.LocalDateTime now);
+    boolean existsByOrganizationIdAndEmailIgnoreCaseAndStatus(
+        Long organizationId, String email, InvitationStatus status);
 }

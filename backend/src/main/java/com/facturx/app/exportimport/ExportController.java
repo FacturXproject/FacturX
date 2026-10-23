@@ -1,6 +1,7 @@
 package com.facturx.app.exportimport;
 
-import org.springframework.http.HttpStatus;
+import java.util.Locale;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpHeaders;
@@ -12,7 +13,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 import com.facturx.app.auth.AppUserPrincipal;
 
@@ -21,6 +21,8 @@ import com.facturx.app.auth.AppUserPrincipal;
 @RestController
 @RequestMapping("/api/organizations/{orgId}/export")
 public class ExportController {
+    private static final MediaType CSV = MediaType.parseMediaType("text/csv;charset=UTF-8");
+
     private final ExportService exportService;
 
     public  ExportController(ExportService exportService)
@@ -34,24 +36,16 @@ public class ExportController {
         @RequestParam(defaultValue = "json") String format)
     {
         Long userId = principal.getUser().getId();
-        if (format.equals("csv"))
+        switch (format.toLowerCase(Locale.ROOT))
         {
-            String csv = exportService.exportMembersCsv(userId, orgId);
-            return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"members.csv\"")
-                    .body(csv);
+            case "csv":
+                return file(CSV, "members.csv", exportService.exportMembersCsv(userId, orgId));
+            case "json":
+                return file(MediaType.APPLICATION_JSON, "members.json",
+                    exportService.transformJson(exportService.exportMembers(userId, orgId)));
+            default:
+                throw new InvalidExportFormatException("csv, json");
         }
-        if (format.equals("json"))
-        {
-            String json = exportService.transformJson(exportService.exportMembers(userId, orgId));
-            return ResponseEntity.ok()
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"members.json\"")
-                    .body(json);
-        }
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "format invalid");
-
     }
 
     @GetMapping("/documents")
@@ -60,24 +54,27 @@ public class ExportController {
         @RequestParam(defaultValue = "json") String format)
     {
         Long userId = principal.getUser().getId();
-        if (format.equals("csv"))
+        switch (format.toLowerCase(Locale.ROOT))
         {
-            String csv = exportService.exportDocumentsCsv(userId, orgId);
-            return ResponseEntity.ok()
-                        .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))
-                        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"documents.csv\"")
-                        .body(csv);
+            case "csv":
+                return file(CSV, "documents.csv", exportService.exportDocumentsCsv(userId, orgId));
+            case "json":
+                return file(MediaType.APPLICATION_JSON, "documents.json",
+                    exportService.transformJson(exportService.exportDocuments(userId, orgId)));
+            case "pdf":
+                return file(MediaType.APPLICATION_PDF, "documents.pdf",
+                    exportService.exportDocumentsPdf(userId, orgId));
+            default:
+                throw new InvalidExportFormatException("csv, json, pdf");
         }
-        if (format.equals("json"))
-        {
-           String json = exportService.transformJson(exportService.exportDocuments(userId, orgId));
-           return ResponseEntity.ok()
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .header(HttpHeaders.CONTENT_DISPOSITION,
-                                 "attachment; filename=\"documents.json\"")
-                            .body(json);
-        }
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "format invalid");
+    }
+
+    private static ResponseEntity<Object> file(MediaType type, String filename, Object body)
+    {
+        return ResponseEntity.ok()
+                .contentType(type)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .body(body);
     }
 
 }

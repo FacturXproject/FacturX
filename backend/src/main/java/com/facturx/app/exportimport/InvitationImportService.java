@@ -14,6 +14,7 @@ import jakarta.validation.Validator;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
+import org.apache.commons.csv.DuplicateHeaderMode;
 import org.apache.commons.io.input.BOMInputStream;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,17 +25,26 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 @Service
 public class InvitationImportService {
 
     private static final int MAX_ROWS = 500;
+
+    // Accepte aussi les libellés affichés dans l'application.
+    private static final Map<String, Role> ROLE_ALIASES = Map.of(
+            "ADMIN", Role.ADMIN,
+            "ADMINISTRATEUR", Role.ADMIN,
+            "ACCOUNTANT", Role.ACCOUNTANT,
+            "COMPTABLE", Role.ACCOUNTANT,
+            "CLIENT", Role.CLIENT
+    );
 
     private final PermissionService permissionService;
     private final OrganizationMemberRepository organizationMemberRepository;
@@ -73,13 +83,12 @@ public class InvitationImportService {
         );
 
         if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("Le fichier est vide");
+            throw new InvalidImportFileException("Le fichier est vide.");
         }
 
         List<InvitationImportResponse> result = new ArrayList<>();
         List<InvitationRequest> requests = new ArrayList<>();
         Set<String> seenEmails = new HashSet<>();
-        LocalDateTime now = LocalDateTime.now();
 
         try (
                 BufferedReader reader = new BufferedReader(
@@ -104,6 +113,8 @@ public class InvitationImportService {
                             .setHeader()
                             .setSkipHeaderRecord(true)
                             .setIgnoreHeaderCase(true)
+                            // Deux colonnes "email" : impossible de savoir laquelle lire.
+                            .setDuplicateHeaderMode(DuplicateHeaderMode.DISALLOW)
                             .setTrim(true)
                             .get()
                             .parse(reader)
@@ -115,8 +126,8 @@ public class InvitationImportService {
                     rowCount++;
 
                     if (rowCount > MAX_ROWS) {
-                        throw new IllegalArgumentException(
-                                "Maximum " + MAX_ROWS + " lignes"
+                        throw new InvalidImportFileException(
+                                "Le fichier dépasse " + MAX_ROWS + " lignes."
                         );
                     }
 
@@ -130,12 +141,10 @@ public class InvitationImportService {
                                     .trim().toUpperCase(Locale.ROOT)
                             : "";
 
-                    Role role = null;
+                    Role role = ROLE_ALIASES.get(roleText);
                     String error = null;
 
-                    try {
-                        role = Role.valueOf(roleText);
-                    } catch (IllegalArgumentException e) {
+                    if (role == null) {
                         error = "Rôle invalide : ADMIN, ACCOUNTANT ou CLIENT attendu";
                     }
 
@@ -159,21 +168,22 @@ public class InvitationImportService {
                         error = "Déjà membre de l'organisation";
                     }
 
+                    // Même règle que la création manuelle : une invitation PENDING,
+                    // même expirée, bloque une nouvelle invitation.
                     if (error == null
                             && invitationRepository
-                                    .existsByOrganizationIdAndEmailIgnoreCaseAndStatusAndExpiresAtAfter(
+                                    .existsByOrganizationIdAndEmailIgnoreCaseAndStatus(
                                             orgId,
                                             email,
-                                            InvitationStatus.PENDING,
-                                            now
+                                            InvitationStatus.PENDING
                                     )) {
-                        error = "Une invitation active existe déjà";
+                        error = "Une invitation est déjà en attente pour cet email";
                     }
 
                     result.add(new InvitationImportResponse(
                             rowCount + 1,
                             email,
-                            roleText,
+                            role != null ? role.name() : roleText,
                             error == null,
                             error
                     ));
@@ -181,15 +191,16 @@ public class InvitationImportService {
                     requests.add(request);
                 }
             }
-        } catch (UncheckedIOException | IOException e) {
-            throw new IllegalArgumentException(
-                    "Fichier CSV invalide ou illisible", e
+        } catch (UncheckedIOException | IOException | IllegalArgumentException e) {
+            // Commons CSV : guillemet non fermé, en-tête vide ou en double...
+            throw new InvalidImportFileException(
+                    "Fichier CSV invalide ou illisible.", e
             );
         }
 
         if (result.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "Le CSV ne contient aucune donnée"
+            throw new InvalidImportFileException(
+                    "Le fichier ne contient aucune ligne de données."
             );
         }
 
@@ -221,8 +232,8 @@ public class InvitationImportService {
 
         if (!parser.getHeaderMap().containsKey(emailHeader)
                 || !parser.getHeaderMap().containsKey(roleHeader)) {
-            throw new IllegalArgumentException(
-                    "Colonnes obligatoires : email, role"
+            throw new InvalidImportFileException(
+                    "Colonnes obligatoires : email et role."
             );
         }
 

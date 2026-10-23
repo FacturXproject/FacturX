@@ -4,6 +4,8 @@ import com.facturx.app.permission.Permission;
 import com.facturx.app.permission.PermissionService;
 import com.facturx.app.organization.OrganizationMember;
 import com.facturx.app.organization.OrganizationMemberRepository;
+import com.facturx.app.organization.OrganizationNotFoundException;
+import com.facturx.app.organization.OrganizationRepository;
 import com.facturx.app.document.DocumentRepository;
 import com.facturx.app.document.Document;
 import com.facturx.app.validation.ValidationReportService;
@@ -28,18 +30,24 @@ public class ExportService {
     private final OrganizationMemberRepository organizationMemberRepository;
     private final JsonMapper objectMapper;
     private final ValidationReportService validationReportService;
+    private final OrganizationRepository organizationRepository;
+    private final DocumentPdfExporter documentPdfExporter;
 
     public ExportService(PermissionService permissionService,
         DocumentRepository documentRepository,
         OrganizationMemberRepository organizationMemberRepository,
         JsonMapper objectMapper,
-        ValidationReportService validationReportService)
+        ValidationReportService validationReportService,
+        OrganizationRepository organizationRepository,
+        DocumentPdfExporter documentPdfExporter)
         {
             this.permissionService = permissionService;
             this.documentRepository = documentRepository;
             this.organizationMemberRepository = organizationMemberRepository;
             this.objectMapper = objectMapper;
             this.validationReportService = validationReportService;
+            this.organizationRepository = organizationRepository;
+            this.documentPdfExporter = documentPdfExporter;
         }
 
     public String transformJson(List<?> data) {
@@ -170,5 +178,13 @@ public class ExportService {
          return "\uFEFF" + transformCsv(rows);
     }
 
+    public byte[] exportDocumentsPdf(Long userId, Long orgId)
+    {
+        List<DocumentExportResponse> documents = exportDocuments(userId, orgId);
+        String organizationName = organizationRepository.findById(orgId)
+            .orElseThrow(OrganizationNotFoundException::new)
+            .getName();
+        return documentPdfExporter.render(organizationName, documents);
+    }
 
 }
