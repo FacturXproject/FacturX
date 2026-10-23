@@ -121,4 +121,23 @@ class DocumentWebSocketHandlerTest {
 
         verify(bob).sendMessage(any(TextMessage.class));
     }
+
+        @Test
+    void closeAllForUserClosesOnlyThatUser() throws Exception {
+        WebSocketSession alice1 = connect("s-alice-1", ALICE);
+        WebSocketSession alice2 = connect("s-alice-2", ALICE);
+        WebSocketSession bob = connect("s-bob", BOB);
+
+        handler.closeAllForUser(ALICE);
+        handler.broadcast(eventForOrg1());
+
+        verify(alice1).close(CloseStatus.POLICY_VIOLATION);
+        verify(alice2).close(CloseStatus.POLICY_VIOLATION);
+
+        verify(alice1, never()).sendMessage(any());
+        verify(alice2, never()).sendMessage(any());
+
+        verify(bob, never()).close(any());
+        verify(bob).sendMessage(any(TextMessage.class));
+    }
 }

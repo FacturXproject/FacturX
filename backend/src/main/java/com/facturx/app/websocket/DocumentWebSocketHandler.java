@@ -128,4 +128,22 @@ public class DocumentWebSocketHandler extends TextWebSocketHandler {
         sessions.remove(session.getId());
         userIds.remove(session.getId());
     }
+    public void closeAllForUser(Long userId) {
+    for (Map.Entry<String, Long> entry : userIds.entrySet()) {
+        if (!userId.equals(entry.getValue())) continue;
+
+        WebSocketSession session = sessions.remove(entry.getKey());
+        userIds.remove(entry.getKey());
+
+        if (session == null) continue;
+
+        try {
+            synchronized (session) {
+                session.close(CloseStatus.POLICY_VIOLATION);
+            }
+        } catch (Exception e) {
+            log.debug("WebSocket: failed to close session {}", session.getId(), e);
+        }
+    }
+}
 }

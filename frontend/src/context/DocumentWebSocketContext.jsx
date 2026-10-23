@@ -6,10 +6,13 @@ import {
   useLayoutEffect,
   useRef,
 } from 'react';
+import { useAuth } from './AuthContext';
 
 const DocumentWebSocketContext = createContext(null);
 
 export function DocumentWebSocketProvider({ children }) {
+  const { user } = useAuth();
+  const userId = user?.id;
   const listeners = useRef(new Set());
 
   const subscribe = useCallback((listener) => {
@@ -18,6 +21,8 @@ export function DocumentWebSocketProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    if (userId == null) return;
+
     let socket;
     let retryTimer;
     let stopped = false;
@@ -68,6 +73,7 @@ export function DocumentWebSocketProvider({ children }) {
       };
 
       socket.onerror = () => {
+        if (stopped) return;
         console.error('WebSocket connection error');
       };
 
@@ -92,7 +98,7 @@ export function DocumentWebSocketProvider({ children }) {
         socket.close();
       }
     };
-  }, []);
+  }, [userId]);
 
   return (
     <DocumentWebSocketContext.Provider value={subscribe}>

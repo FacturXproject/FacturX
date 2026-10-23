@@ -7,6 +7,9 @@ import { downloadDocument } from '../../utils/download';
 
 vi.mock('../../services/api');
 vi.mock('../../utils/download');
+vi.mock('../../context/DocumentWebSocketContext', () => ({
+  useDocumentStatusEvent: vi.fn(),
+}));
 
 const sourceDocument = {
   id: 42,

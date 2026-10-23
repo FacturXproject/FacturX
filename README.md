@@ -1635,3 +1635,63 @@ Do not leave these to week 6; they are much easier to gather while building.
 
 ---
 
+
+## F15 — Real-time events
+
+### Connexion et authentification
+
+Endpoint : `/ws` (`wss://localhost:8443/ws` en HTTPS).
+Le handshake utilise le cookie de session `EFACTURE_SESSION`.
+Une session authentifiée est requise. Les origines autorisées sont
+définies par `app.allowed-origins`, partagé entre CORS et WebSocket.
+
+### Format de l'événement
+
+```json
+{
+  "type": "document.status.changed",
+  "documentId": 100,
+  "organizationId": 1,
+  "status": "VALID"
+}
+```
+
+`status` correspond au nouveau statut du document :
+`UPLOADED`, `QUEUED`, `PROCESSING`, `VALID`, `INVALID` ou `FAILED`.
+`ownerId` reste interne au serveur et n'est pas transmis.
+
+### Visibilité
+
+Les permissions sont vérifiées côté serveur à chaque événement,
+pour l'organisation du document.
+
+| Permission | Événements reçus |
+| --- | --- |
+| VIEW_ALL_DOCUMENTS | Tous les documents de l'organisation |
+| VIEW_OWN_DOCUMENTS uniquement | Documents appartenant à l'utilisateur |
+| Aucune de ces permissions | Aucun |
+
+Les rôles ADMIN, ACCOUNTANT et CLIENT suivent les permissions qui
+leur sont attribuées. Aucun événement d'une autre organisation
+n'est envoyé sans les droits correspondants.
+
+### Déconnexion et reconnexion
+
+Au logout, le serveur ferme tous les WebSockets de l'utilisateur,
+y compris sur ses autres appareils, avec le code 1008.
+Le client ferme aussi sa connexion et annule les tentatives de
+reconnexion lorsque l'utilisateur n'est plus authentifié.
+
+Après une coupure, le client réessaie après 2 secondes.
+Il ne réessaie pas après le code 1008.
+Une connexion rétablie émet localement `websocket.reconnected`,
+utilisé pour recharger les données actuelles.
+Un nouveau login ouvre une nouvelle connexion sans refresh.
+
+### Développement Vite
+
+Le profil Spring `dev` autorise `http://localhost:5173` et désactive
+le flag Secure du cookie de session pour le développement HTTP.
+Vite transmet `/api` et `/ws` au backend sur `localhost:8080`,
+avec `ws: true` pour `/ws`.
+Le backend doit pouvoir accéder à PostgreSQL.
