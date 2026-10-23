@@ -7,7 +7,8 @@ import {
   FileCode2,
   LogOut,
   Users,
-  User
+  User,
+  KeyRound
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Footer from './Footer';
@@ -19,6 +20,7 @@ const navItems = [
   { to: '/verifier', icon: FileCheck2, label: 'Vérifier' },
   { to: '/convertir', icon: RefreshCw, label: 'Convertir' },
   { to: '/lecture-xml', icon: FileCode2, label: 'Lecture XML' },
+  { to: '/cles-api', icon: KeyRound, label: 'Clés API' },
   { to: '/profile', icon: User, label: 'Profil' },
 ];
 

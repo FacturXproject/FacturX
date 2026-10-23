@@ -22,6 +22,7 @@ import Terms from './pages/Terms';
 import LandingPage from './pages/LandingPage';
 import DocumentDetail from './pages/DocumentDetail';
 import InvoiceView from './pages/InvoiceView';
+import ApiKeysPage from './pages/ApiKeysPage';
 import { DocumentWebSocketProvider } from './context/DocumentWebSocketContext';
 
 function Protected({ children }) {
@@ -62,6 +63,7 @@ export default function App() {
           <Route path="/verifier" element={<Protected><UploadPage mode="verifier" /></Protected>} />
           <Route path="/convertir" element={<Protected><UploadPage mode="convertir" /></Protected>} />
           <Route path="/organisations" element={<Protected><OrganizationsPage /></Protected>} />
+          <Route path="/cles-api" element={<Protected><ApiKeysPage /></Protected>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
