@@ -26,7 +26,10 @@ public class PermissionService {
 			Permission.MANAGE_MEMBERS,
 			Permission.MANAGE_ORGANIZATION,
 			Permission.DELETE_ANY_DOCUMENT,
-			Permission.DELETE_OWN_PENDING_DOCUMENT
+			Permission.DELETE_OWN_PENDING_DOCUMENT,
+			Permission.EXPORT_DOCUMENTS,
+			Permission.EXPORT_MEMBERS,
+			Permission.IMPORT_INVITATIONS
 		),
 
 		Role.ACCOUNTANT, EnumSet.of(
@@ -35,7 +38,8 @@ public class PermissionService {
 			Permission.VIEW_OWN_DOCUMENTS,
 			Permission.VALIDATE_DOCUMENT,
 			Permission.EXTRACT_DOCUMENT,
-			Permission.DELETE_OWN_PENDING_DOCUMENT
+			Permission.DELETE_OWN_PENDING_DOCUMENT,
+			Permission.EXPORT_DOCUMENTS
 		),
 
 		Role.CLIENT, EnumSet.of(
