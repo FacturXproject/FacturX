@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { useDocumentStatusEvent } from '../context/DocumentWebSocketContext';
 
 function StatusBadge({ status }) {
   const getStatusStyle = () => {
@@ -99,7 +100,7 @@ function StatusBadge({ status }) {
 
           try {
             const documentsResponse = await api.get(
-              `/documents?organizationId=${organizationId}`
+              `/documents?organizationId=${organizationId}&sort=uploadedAt,desc&size=5`
             );
 
             const organizationDocuments =
@@ -170,6 +171,25 @@ function StatusBadge({ status }) {
 
     return type;
   };
+
+
+  useDocumentStatusEvent((event) => {
+    if (event.type === 'websocket.reconnected') {
+      loadRecentDocuments();
+      return;
+    }
+
+    if (event.type !== 'document.status.changed') return;
+
+    setDocuments(current =>
+      current.map(document =>
+        document.id === event.documentId
+          && document.organizationId === event.organizationId
+          ? { ...document, status: event.status }
+          : document
+      )
+    );
+  });
 
   return (
     <div
