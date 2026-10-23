@@ -12,10 +12,14 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.io.Serializable;
 import java.time.OffsetDateTime;
+import java.io.Serial;
 
 @Entity
 @Table(name = "users", uniqueConstraints = @UniqueConstraint(name = "ux_users_email", columnNames = "email"))
 public class User implements Serializable {
+
+    @Serial
+    private static final long serialVersionUID = -118327597444725206L;
 
     public static final String STATUS_ACTIVE = "active";
     public static final String STATUS_DISABLED = "disabled";

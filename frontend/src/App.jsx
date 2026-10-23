@@ -59,7 +59,6 @@ export default function App() {
           <Route path="/invitations/:token" element={<InvitationCheck />} />
           <Route path="/documents/:id/invoice" element={<Protected><InvoiceView /></Protected>} />
           <Route path="/my-data" element={<Protected><MyData /></Protected>} />
-          <Route path="/traitement" element={<Protected><Processing /></Protected>} />
           <Route path="/rapport" element={<Protected><ComplianceReport /></Protected>} />
           <Route path="/conversion" element={<Protected><Conversion /></Protected>} />
           <Route path="/profile" element={<Protected><Profile /></Protected>} />
