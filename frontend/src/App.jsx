@@ -21,6 +21,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import Terms from './pages/Terms';
 import LandingPage from './pages/LandingPage';
 import DocumentDetail from './pages/DocumentDetail';
+import Documents from './pages/Documents';
 import InvoiceView from './pages/InvoiceView';
 import MyData from './pages/MyData';
 import { DocumentWebSocketProvider } from './context/DocumentWebSocketContext';
@@ -51,6 +52,7 @@ export default function App() {
           <Route path="/organisations/:id" element={<Protected><OrganizationMembersPage /></Protected>} />
           <Route path="/" element={<LandingPage />} />
           <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
+          <Route path="/documents" element={<Protected><Documents /></Protected>} />
           <Route path="/documents/:id" element={<Protected><DocumentDetail /></Protected>} />
           <Route path="/invitations/new" element={<Protected><NewInvitation /></Protected>} />
           <Route path="/invitations" element={<Protected><Invitations /></Protected>} />

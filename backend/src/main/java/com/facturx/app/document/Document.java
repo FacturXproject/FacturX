@@ -6,7 +6,17 @@ import jakarta.persistence.*;
 import java.time.Instant;
 
 @Entity
-@Table(name = "documents")
+// F16: every search filters by organisation first, so each index leads with
+// organization_id and then the filtered/sorted column. Hibernate (ddl-auto=update)
+// creates any missing one by name on startup. Substring search on the filename
+// additionally uses a pg_trgm index declared in data.sql (JPA can't express it).
+@Table(name = "documents", indexes = {
+        @Index(name = "idx_documents_org_uploaded_at", columnList = "organization_id, uploaded_at"),
+        @Index(name = "idx_documents_org_status", columnList = "organization_id, status"),
+        @Index(name = "idx_documents_org_type", columnList = "organization_id, type"),
+        @Index(name = "idx_documents_org_filename", columnList = "organization_id, filename"),
+        @Index(name = "idx_documents_org_owner", columnList = "organization_id, owner_id")
+})
 public class Document {
 
     @Id
@@ -32,6 +42,7 @@ public class Document {
 
     private String storagePath;
 
+    @Column(name = "uploaded_at")
     private Instant uploadedAt = Instant.now();
     public Document() {}
 
