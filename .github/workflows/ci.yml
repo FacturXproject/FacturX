@@ -71,6 +71,11 @@ jobs:
       - name: Factur-X generation end-to-end
         run: ./scripts/test-f13-generation.sh
 
+      # F17: public API through Nginx - API key auth, scopes, organisation isolation,
+      # revocation, rate limit (429) and the public OpenAPI / Swagger UI docs.
+      - name: Public API end-to-end
+        run: ./scripts/test-f17-public-api.sh
+
       - name: Show logs on failure
         if: failure()
         run: docker compose logs backend extractor

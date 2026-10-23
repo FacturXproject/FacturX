@@ -1,0 +1,313 @@
+F17 — Secure public API
+=======================
+
+Goal (roadmap): let a technical client (accounting software vendor) work with
+documents through an API. Definition of Done: an API key gives access to at least
+5 documented, rate-limited endpoints.
+
+Result: 6 endpoints, API keys with scopes, per-key rate limit, OpenAPI / Swagger UI
+documentation, an "API keys" page in the frontend, backend + frontend + end-to-end
+tests.
+
+
+
+
+1. How it works
+---------------
+
+  User logs into the app (session, F01)
+    -> page "Clés API" (/cles-api): creates a key, picks an organisation and scopes
+    -> the full secret (fxk_...) is shown ONCE; only its SHA-256 hash is stored
+    -> the ERP sends the key in the X-API-Key header to /api/public/v1/...
+    -> Spring Security "public API" chain:
+         1. ApiKeyAuthenticationFilter finds the key by its hash
+            (unknown / revoked / owner disabled / owner no longer a member -> 401)
+         2. per-key rate limit (over the limit -> 429 + Retry-After)
+         3. scope check per route (missing scope -> 403 INSUFFICIENT_SCOPE)
+    -> PublicApiService: the document must belong to the key's organisation
+       (otherwise 404), and the owner's role permissions (F04) still apply
+       (otherwise 403 ACCESS_DENIED)
+    -> reuses the existing services: upload (F06), list/status (F07),
+       validation job (F14 -> F08), report (F09), download
+
+Rules:
+  - A key belongs to one user and acts in ONE organisation the user is a member of.
+  - A key can never do more than its owner: role permissions AND key scopes.
+  - The organisation comes from the key: the client never sends organizationId.
+  - A document of another organisation answers 404, like an unknown one
+    (we do not reveal that it exists).
+  - The session cookie is NOT accepted on /api/public/**: the API is stateless.
+    That is why CSRF is disabled on that chain only (nothing is sent
+    automatically by a browser). The session chain (SecurityConfig) is unchanged,
+    CSRF stays on for the app, including key management.
+
+
+
+
+2. What was built
+-----------------
+
+Backend — key management (backend/.../apikey/)
+  - ApiKey (table api_keys): organization_id, owner_id, name, prefix, key_hash
+    (unique), scopes, created_at, last_used_at, revoked_at.
+    Organisation or user deleted -> their keys are deleted by the database
+    (ON DELETE CASCADE), so deleting an organisation is not blocked.
+  - ApiKeyScope: DOCUMENTS_READ, DOCUMENTS_WRITE, DOCUMENTS_VALIDATE
+    (stored in one column "DOCUMENTS_READ,DOCUMENTS_WRITE" via ApiKeyScopesConverter).
+  - ApiKeyService: key generation, hash, list, revoke, authenticate.
+      Format: "fxk_" + 32 random bytes (SecureRandom) in base64url = 47 characters.
+      Hash: SHA-256. The secret is random (256 bits), so a slow hash (BCrypt) is
+      not needed and would make lookup by hash impossible.
+      prefix = first 12 characters (fxk_ + 8), only to recognise a key in the UI.
+      last_used_at is written at most once per minute (not one DB write per call).
+  - ApiKeyController (session + CSRF, used by the frontend):
+      GET    /api/api-keys        my keys (active and revoked), never the secret
+      POST   /api/api-keys        {name, organizationId, scopes} -> 201
+                                  {"apiKey": {...}, "key": "fxk_..."}
+      DELETE /api/api-keys/{id}   revoke (idempotent), returns the revoked key
+    Only a member of the organisation can create a key in it (403 otherwise).
+    Only the owner can revoke a key (404 otherwise, no information leak).
+    Validation: name required (max 100), organizationId required,
+    at least one scope -> 400 VALIDATION_FAILED.
+  - ApiKeyRateLimiter: fixed window per key, in memory, atomic
+    (ConcurrentHashMap.compute, concurrent calls cannot exceed the limit).
+    Same choice as LoginAttemptService (F01): one backend instance, no Redis needed.
+    Old windows are cleaned every 5 minutes (@Scheduled).
+  - ApiKeyAuthenticationFilter: reads X-API-Key (or "Authorization: Bearer fxk_..."),
+    authenticates, applies the rate limit, sets the response headers.
+    It is NOT a @Component on purpose: Spring Boot would then register it as a
+    servlet filter for every request. It exists only inside the public chain.
+  - ApiKeyAuthenticationToken / ApiKeyPrincipal: the authenticated key
+    (key id, owner id, organisation id, scopes -> authorities SCOPE_<scope>).
+
+Backend — security (backend/.../config/PublicApiSecurityConfig.java)
+  Two new SecurityFilterChains, evaluated BEFORE the existing session chain:
+  - @Order(1) /api/docs/**   : public, GET only, stateless (OpenAPI + Swagger UI).
+  - @Order(2) /api/public/** : API key only, stateless, no session, no CSRF,
+    no CORS (server-to-server API), scopes checked per route:
+        POST /api/public/v1/documents/*/validate -> DOCUMENTS_VALIDATE
+        POST /api/public/v1/documents            -> DOCUMENTS_WRITE
+        GET  /api/public/v1/documents/**         -> DOCUMENTS_READ
+    401 / 403 answered in JSON (ApiErrorWriter).
+  The existing SecurityConfig was not modified.
+
+Backend — public API (backend/.../publicapi/)
+  - PublicApiController, base /api/public/v1/documents:
+
+      Method  Route                       Scope     Response
+      GET     /documents?page=0&size=20   READ      page of documents (size <= 100,
+                                                    newest first)
+      POST    /documents  (multipart file) WRITE    201 created document
+      GET     /documents/{id}             READ      metadata and status
+      GET     /documents/{id}/report      READ      F09 report of the last validation
+      GET     /documents/{id}/download    READ      the file
+      POST    /documents/{id}/validate    VALIDATE  202 validation job (F14)
+
+  - PublicApiService: organisation check + role permissions, then calls the existing
+    DocumentService, PermissionService, ValidationReportService, JobService.
+  - UploadedFile: wraps the uploaded file so that
+      - the MIME type comes from the content (%PDF- -> application/pdf, otherwise
+        application/xml), not from what the client declared (curl often sends
+        application/octet-stream);
+      - the file name is reduced to its last segment (no "../" in the stored name).
+  - PublicPage<T>: stable page format {content, page, size, totalElements, totalPages},
+    independent from Spring Data.
+  - PublicApiExceptionHandler: every error of the public API in the same JSON format
+    {"error": "CODE", "message": "..."}. Highest priority, limited to
+    PublicApiController. It also covers Spring MVC errors (missing file, file too
+    big, wrong parameter type...): without it they would go to /error, which is
+    behind the session chain and would answer 401 to a client authenticated by key.
+  - OpenApiConfig: title, description (auth, rate limit, errors), "apiKey" security
+    scheme (header X-API-Key), relative server URL "/" so Swagger UI calls the API
+    on the origin that served it (Nginx).
+
+Error codes of the public API
+      401  API_KEY_MISSING, INVALID_API_KEY (unknown, revoked, owner disabled or
+           no longer a member)
+      403  INSUFFICIENT_SCOPE (key scope), ACCESS_DENIED (owner's role)
+      404  DOCUMENT_NOT_FOUND, NOT_FOUND (no validation yet for /report)
+      409  JOB_CONFLICT (a job is already queued / processing)
+      400  FILE_MISSING, INVALID_PARAMETER
+      413  FILE_TOO_LARGE      415  INVALID_FILE_TYPE
+      429  RATE_LIMITED (+ Retry-After)
+      500  INTERNAL_ERROR (logged)
+
+Rate limit headers on every authenticated response
+      X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset (seconds),
+      and Retry-After on 429.
+
+Configuration (backend/src/main/resources/application.properties)
+      app.public-api.rate-limit.requests=${PUBLIC_API_RATE_LIMIT:60}
+      app.public-api.rate-limit.window-seconds=60
+      springdoc.api-docs.path=/api/docs/openapi
+      springdoc.swagger-ui.path=/api/docs/swagger-ui.html
+      springdoc.paths-to-match=/api/public/**     (only the public API is documented)
+      spring.servlet.multipart.resolve-lazily=true
+  The last one: the multipart body is parsed when the controller reads the file, so
+  an oversized upload on the public API reaches its JSON error handler (413) instead
+  of /error (401). Behaviour of the existing upload endpoint is unchanged (all
+  previous tests pass).
+
+Dependency (backend/pom.xml)
+      org.springdoc:springdoc-openapi-starter-webmvc-ui 3.1.1 (Apache-2.0),
+      built for Spring Boot 4.1.0 like our project.
+
+Frontend
+  - src/pages/ApiKeysPage.jsx, route /cles-api, menu item "Clés API" (Layout.jsx):
+      - table of keys: name, organisation, prefix (fxk_xxxxxxxx…), scopes, created,
+        last used, status (Active / Révoquée), "Révoquer" button;
+      - "Créer une clé" modal: name, organisation (from /organizations), scopes
+        checkboxes (Lecture / Dépôt / Validation);
+      - the secret is shown once, with a "Copier" button and a warning;
+      - revoke with a confirmation;
+      - "Documentation de l'API" link -> /api/docs/swagger-ui/index.html;
+      - usage block with a curl example.
+  - Why /cles-api and not /api-keys: the Vite proxy key '/api' matches by prefix,
+    so "/api-keys" was sent to the backend and a page reload gave a 500.
+    /cles-api also matches the other French routes (/verifier, /convertir).
+
+Documentation
+  - README.md: new section "F17 — API publique" (keys, scopes, auth, rate limit,
+    endpoints, curl examples, error codes, OpenAPI links).
+  - Swagger UI:      https://localhost:8443/api/docs/swagger-ui/index.html
+  - OpenAPI spec:    https://localhost:8443/api/docs/openapi
+    In Swagger UI: "Authorize" -> paste the key -> "Try it out".
+
+
+
+
+3. Usage (curl)
+---------------
+
+  KEY=fxk_...                                  # copied from the "Clés API" page
+  API=https://localhost:8443/api/public/v1
+
+  # Upload an invoice
+  curl -k -H "X-API-Key: $KEY" -F "file=@facture.pdf" $API/documents
+
+  # List documents
+  curl -k -H "X-API-Key: $KEY" "$API/documents?page=0&size=20"
+
+  # Start the validation, then follow the status
+  curl -k -X POST -H "X-API-Key: $KEY" $API/documents/42/validate
+  curl -k -H "X-API-Key: $KEY" $API/documents/42
+
+  # Read the compliance report
+  curl -k -H "X-API-Key: $KEY" $API/documents/42/report
+
+  # Download the file
+  curl -k -H "X-API-Key: $KEY" -OJ $API/documents/42/download
+
+
+
+
+4. Tests
+--------
+
+Backend — PublicApiFlowTest (backend/src/test/java/com/facturx/app/apikey/),
+16 integration tests (MockMvc + PostgreSQL Testcontainers, rate limit set to 10
+for the test):
+  - createdKeyIsShownOnceAndOnlyItsHashIsStored
+  - keyManagementRequiresASession
+  - cannotCreateAKeyForAnOrganizationYouDoNotBelongTo
+  - creatingAKeyWithoutScopeOrNameIsRejected
+  - cannotRevokeSomeoneElsesKey
+  - validKeyGivesAccessToListUploadStatusDownloadAndReport
+  - bearerAuthorizationHeaderIsAccepted
+  - missingOrInvalidKeyIsRejected
+  - sessionCookieDoesNotAuthenticateThePublicApi
+  - revokedKeyIsRejected
+  - keyStopsWorkingWhenItsOwnerLeavesTheOrganization
+  - scopesAreEnforced
+  - validateScopeQueuesAValidationJob
+  - keyCannotReachAnotherOrganizationsDocuments
+  - rateLimitIsEnforcedPerKey
+  - openApiDocumentationIsPublicAndDescribesAtLeastFiveEndpoints
+
+Frontend — src/pages/__tests__/ApiKeysPage.test.jsx, 6 tests (Vitest):
+  - lists keys without the secret, with scopes and status
+  - empty state
+  - link to the API documentation
+  - creates a key, shows the secret once, then hides it
+  - revokes a key after confirmation
+  - create button disabled without an organisation
+
+End to end — scripts/test-f17-public-api.sh, 30 checks with curl through Nginx
+against the running stack (docker compose up), added to CI after the F13 step:
+  - key management: list without secret, CSRF required, foreign organisation 403
+  - auth: no key 401, unknown key 401, session cookie alone 401, Bearer accepted
+  - full lifecycle with a real Factur-X (EN16931_Einfach.pdf): upload 201, list,
+    status, report 404 before validation, validate 202, async status -> VALID,
+    report valid == true, downloaded file identical to the uploaded one
+  - scopes (read-only key cannot upload or validate), organisation isolation (404)
+  - revocation -> 401
+  - rate limit: 429 + Retry-After after 60 calls, another key not affected
+  - OpenAPI spec public with >= 5 operations, Swagger UI and its config reachable
+  The script works with bash 5 (CI) and with the bash 3.2 of macOS.
+
+How to run
+  Backend:    cd backend && ./mvnw test
+  Frontend:   cd frontend && npm ci && npx vitest run
+  End to end: docker compose up -d --build && ./scripts/test-f17-public-api.sh
+
+Results on this branch
+  - Backend: 163/163 (the 147 existing tests + 16 new), 0 failures.
+  - Frontend: 80/80 (including the 6 new), Vite build OK, no new lint warning
+    type (same set-state-in-effect warning as the other pages).
+  - End to end through Nginx: 30/30.
+  - Manual check in the browser: login, "Clés API" page, key creation, call with
+    that key (200), revocation (key -> 401 right away, "last used" updated),
+    Swagger UI showing the 6 operations and the "Authorize" button.
+
+
+
+
+5. Files
+--------
+
+New
+  backend/src/main/java/com/facturx/app/apikey/
+      ApiKey.java, ApiKeyScope.java, ApiKeyScopesConverter.java,
+      ApiKeyRepository.java, ApiKeyService.java, ApiKeyController.java,
+      ApiKeyCreateRequest.java, ApiKeyResponse.java, ApiKeyCreatedResponse.java,
+      ApiKeyNotFoundException.java, ApiKeyExceptionHandler.java,
+      ApiKeyPrincipal.java, ApiKeyAuthenticationToken.java,
+      ApiKeyAuthenticationFilter.java, ApiKeyRateLimiter.java, ApiErrorWriter.java
+  backend/src/main/java/com/facturx/app/publicapi/
+      PublicApiController.java, PublicApiService.java, PublicApiExceptionHandler.java,
+      PublicPage.java, UploadedFile.java, OpenApiConfig.java
+  backend/src/main/java/com/facturx/app/config/PublicApiSecurityConfig.java
+  backend/src/test/java/com/facturx/app/apikey/PublicApiFlowTest.java
+  frontend/src/pages/ApiKeysPage.jsx
+  frontend/src/pages/__tests__/ApiKeysPage.test.jsx
+  scripts/test-f17-public-api.sh
+  F17_updates.txt
+
+Modified
+  backend/pom.xml                                     springdoc dependency
+  backend/src/main/resources/application.properties   F17 properties
+  frontend/src/App.jsx                                route /cles-api
+  frontend/src/components/Layout.jsx                  menu item "Clés API"
+  .github/workflows/ci.yml                            step "Public API end-to-end"
+  README.md                                           section "F17 — API publique"
+
+
+
+
+6. Limits and notes
+-------------------
+
+  - The rate limit counter is in memory: it is reset when the backend restarts and
+    is per instance. Fine for our single backend; with several instances it would
+    need a shared store (Redis / database).
+  - Keys do not expire on their own; they are revoked by hand. Revoked keys stay in
+    the list (marked "Révoquée") for traceability.
+  - Only the key owner can see and revoke their keys; an organisation admin does
+    not see the other members' keys.
+  - The API has no CORS: it is meant for server-to-server calls, a key must not live
+    in a browser. Swagger UI works because it is served from the same origin.
+  - /api/docs/swagger-ui.html redirects to /api/docs/swagger-ui/index.html; the
+    frontend links to index.html directly.
+  - Not part of F17, noticed while testing: scripts/test-f13-generation.sh expects
+    backend/src/test/resources/facturx-samples/PDF_only_facture.pdf, which is not in
+    the repository, so that CI step may fail on its own.
