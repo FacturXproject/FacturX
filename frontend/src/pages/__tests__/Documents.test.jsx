@@ -72,6 +72,27 @@ describe('Documents - recherche avancee (F16)', () => {
     await waitFor(() => expect(searchCalls().at(-1)).toMatchObject({ q: 'acme' }));
   });
 
+  it('garde l espace de fin pendant la saisie d une recherche a plusieurs mots', async () => {
+    mockApi();
+    renderAt();
+    await screen.findByText('facture-001.pdf');
+
+    const input = screen.getByLabelText('Rechercher par nom de fichier');
+    fireEvent.change(input, { target: { value: 'Facture ' } });
+    await waitFor(() => expect(searchCalls().at(-1)).toMatchObject({ q: 'Facture' }));
+
+    expect(input).toHaveValue('Facture ');
+    fireEvent.change(input, { target: { value: 'Facture ACME' } });
+    await waitFor(() => expect(searchCalls().at(-1)).toMatchObject({ q: 'Facture ACME' }));
+  });
+
+  it('ignore une page ou une taille invalide dans l URL', async () => {
+    mockApi();
+    renderAt('/documents?org=5&page=abc&size=0');
+
+    await waitFor(() => expect(searchCalls()[0]).toMatchObject({ page: 0, size: 20 }));
+  });
+
   it('combine plusieurs statuts en une liste separee par des virgules', async () => {
     mockApi();
     renderAt();

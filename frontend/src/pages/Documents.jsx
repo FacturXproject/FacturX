@@ -60,14 +60,26 @@ function formatSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
 }
 
+// Entier >= 0 lu dans l'URL ; toute valeur absente, non numerique ou hors borne
+// retombe sur la valeur par defaut au lieu d'envoyer "NaN" au backend.
+function parsePositiveInt(raw, fallback, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
+  const n = Number(raw);
+  return raw != null && Number.isInteger(n) && n >= min && n <= max ? n : fallback;
+}
+
 // Champ texte qui ne pousse sa valeur qu'apres une pause de frappe.
 function useDebouncedParam(value, onCommit) {
   const [draft, setDraft] = useState(value);
 
-  useEffect(() => setDraft(value), [value]);
+  // Resynchronise le champ quand l'URL change (navigation, reinitialisation), mais
+  // pas quand l'URL ne fait que refleter la saisie en cours sans ses espaces de
+  // bord : sinon "Facture " redeviendrait "Facture" sous les doigts de l'utilisateur.
+  useEffect(() => {
+    setDraft((current) => (current.trim() === value ? current : value));
+  }, [value]);
 
   useEffect(() => {
-    if (draft === value) return undefined;
+    if (draft.trim() === value) return undefined;
     const timer = setTimeout(() => onCommit(draft), DEBOUNCE_MS);
     return () => clearTimeout(timer);
     // onCommit change a chaque rendu ; seule la saisie doit relancer le minuteur
@@ -99,8 +111,8 @@ export default function Documents() {
     [params]
   );
   const sort = params.get('sort') ?? 'uploadedAt,desc';
-  const page = Number(params.get('page') ?? 0);
-  const size = Number(params.get('size') ?? 20);
+  const page = parsePositiveInt(params.get('page'), 0);
+  const size = parsePositiveInt(params.get('size'), 20, { min: 1, max: 100 });
 
   const updateParams = (changes) => {
     setParams(

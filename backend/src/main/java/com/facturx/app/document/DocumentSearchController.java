@@ -26,7 +26,7 @@ public class DocumentSearchController {
 
     @GetMapping("/search")
     public DocumentSearchResponse search(
-            @RequestParam(required = false) Long organizationId,
+            @RequestParam(required = false) String organizationId,
             @RequestParam(required = false) String q,
             @RequestParam(required = false) List<String> status,
             @RequestParam(required = false) List<String> type,

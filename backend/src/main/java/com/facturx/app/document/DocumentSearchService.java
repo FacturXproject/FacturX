@@ -66,7 +66,7 @@ public class DocumentSearchService {
 
     /** Raw request parameters, exactly as received (all optional but organizationId). */
     public record SearchParams(
-            Long organizationId,
+            String organizationId,
             String q,
             List<String> status,
             List<String> type,
@@ -116,9 +116,10 @@ public class DocumentSearchService {
     // --- parameter validation ---------------------------------------------------------
 
     static DocumentSearchCriteria parse(SearchParams params) {
-        if (params.organizationId() == null) {
+        if (params.organizationId() == null || params.organizationId().isBlank()) {
             throw new InvalidSearchFilterException("organizationId", "L'organisation est obligatoire.");
         }
+        Long organizationId = parseId("organizationId", params.organizationId());
 
         LocalDate from = parseDate("from", params.from());
         LocalDate to = parseDate("to", params.to());
@@ -128,7 +129,7 @@ public class DocumentSearchService {
         }
 
         return new DocumentSearchCriteria(
-                params.organizationId(),
+                organizationId,
                 parseText("q", params.q()),
                 parseStatuses(params.status()),
                 parseTypes(params.type()),

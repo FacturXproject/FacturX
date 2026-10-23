@@ -292,6 +292,15 @@ class DocumentSearchTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void rejectsNonNumericOrganisationWithStructuredError() throws Exception {
+        mockMvc.perform(get("/api/documents/search").cookie(admin.session())
+                        .param("organizationId", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("INVALID_SEARCH_FILTER"))
+                .andExpect(jsonPath("$.field").value("organizationId"));
+    }
+
+    @Test
     void indexesExist() {
         List<String> indexes = jdbcTemplate.queryForList(
                 "SELECT indexname FROM pg_indexes WHERE tablename IN ('documents', 'validation_runs', 'validation_errors')",

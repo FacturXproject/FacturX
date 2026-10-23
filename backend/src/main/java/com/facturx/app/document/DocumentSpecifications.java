@@ -6,6 +6,7 @@ import com.facturx.app.validation.ValidationRun;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
@@ -27,6 +28,14 @@ final class DocumentSpecifications {
 
     static Specification<Document> matching(DocumentSearchCriteria criteria) {
         return (root, query, cb) -> {
+            // The response maps owner and organisation of every row: load them in the
+            // same query instead of one SELECT per distinct owner (N+1). Spring Data
+            // reuses this Specification for the count query, where a fetch is illegal.
+            if (query.getResultType() != Long.class && query.getResultType() != long.class) {
+                root.fetch("owner", JoinType.LEFT);
+                root.fetch("organization", JoinType.LEFT);
+            }
+
             List<Predicate> predicates = new ArrayList<>();
 
             predicates.add(cb.equal(root.get("organization").get("id"), criteria.organizationId()));
