@@ -15,6 +15,6 @@ public record ApiKeyCreateRequest(
         Long organizationId,
 
         @NotEmpty(message = "Choisissez au moins un scope.")
-        Set<ApiKeyScope> scopes
+        Set<@NotNull(message = "Scope invalide.") ApiKeyScope> scopes
 ) {
 }

@@ -75,7 +75,8 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
             return header.trim();
         }
         String authorization = request.getHeader("Authorization");
-        if (authorization != null && authorization.startsWith(BEARER)) {
+        // Le nom du schema est insensible a la casse (RFC 7235) : "bearer fxk_..." est valide.
+        if (authorization != null && authorization.regionMatches(true, 0, BEARER, 0, BEARER.length())) {
             String token = authorization.substring(BEARER.length()).trim();
             return token.isEmpty() ? null : token;
         }

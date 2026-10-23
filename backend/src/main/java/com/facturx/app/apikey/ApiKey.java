@@ -84,7 +84,16 @@ public class ApiKey {
     public void setName(String name) { this.name = name; }
     public void setPrefix(String prefix) { this.prefix = prefix; }
     public void setKeyHash(String keyHash) { this.keyHash = keyHash; }
-    public void setScopes(Set<ApiKeyScope> scopes) { this.scopes = EnumSet.copyOf(scopes); }
+    public void setScopes(Set<ApiKeyScope> scopes) {
+        // EnumSet.copyOf refuse une collection vide ou contenant null : on reste defensif.
+        EnumSet<ApiKeyScope> copy = EnumSet.noneOf(ApiKeyScope.class);
+        for (ApiKeyScope scope : scopes) {
+            if (scope != null) {
+                copy.add(scope);
+            }
+        }
+        this.scopes = copy;
+    }
     public void setLastUsedAt(Instant lastUsedAt) { this.lastUsedAt = lastUsedAt; }
     public void setRevokedAt(Instant revokedAt) { this.revokedAt = revokedAt; }
 }

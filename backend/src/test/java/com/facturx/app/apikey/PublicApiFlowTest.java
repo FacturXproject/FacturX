@@ -1,11 +1,14 @@
 package com.facturx.app.apikey;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -181,6 +184,18 @@ class PublicApiFlowTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.error").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.fields.name").exists())
                 .andExpect(jsonPath("$.fields.scopes").exists());
+
+        // Un scope null ou inconnu doit donner un 400 au format habituel (ni 500, ni corps vide)
+        for (String scopes : new String[] {"[\"DOCUMENTS_READ\",null]", "[\"ADMIN\"]"}) {
+            mockMvc.perform(post("/api/api-keys")
+                            .with(csrf())
+                            .cookie(session)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"name":"ERP","organizationId":%d,"scopes":%s}""".formatted(orgId, scopes)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error").value("VALIDATION_FAILED"));
+        }
     }
 
     @Test
@@ -241,6 +256,10 @@ class PublicApiFlowTest extends AbstractIntegrationTest {
         String key = createKey(session, orgId, "DOCUMENTS_READ");
 
         mockMvc.perform(get(API).header("Authorization", "Bearer " + key))
+                .andExpect(status().isOk());
+
+        // RFC 7235 : le nom du schema est insensible a la casse
+        mockMvc.perform(get(API).header("Authorization", "bearer " + key))
                 .andExpect(status().isOk());
     }
 
@@ -331,6 +350,44 @@ class PublicApiFlowTest extends AbstractIntegrationTest {
         mockMvc.perform(post(API + "/" + documentId + "/validate").header("X-API-Key", readOnly))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error").value("INSUFFICIENT_SCOPE"));
+    }
+
+    @Test
+    void headAndUnknownMethodsCannotBypassScopes() throws Exception {
+        Cookie session = registerAndLogin("api-scopes-head");
+        long orgId = createOrganization(session);
+        String readOnly = createKey(session, orgId, "DOCUMENTS_READ");
+        String writeOnly = createKey(session, orgId, "DOCUMENTS_WRITE");
+        long documentId = uploadWithKey(writeOnly, "f.pdf");
+
+        // HEAD est servi par le handler GET : il exige le meme scope (sinon une cle WRITE
+        // apprendrait l'existence, la taille et le nom du fichier)
+        mockMvc.perform(head(API + "/" + documentId + "/download").header("X-API-Key", writeOnly))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("INSUFFICIENT_SCOPE"));
+        mockMvc.perform(head(API + "/" + documentId).header("X-API-Key", writeOnly))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(head(API + "/" + documentId).header("X-API-Key", readOnly))
+                .andExpect(status().isOk());
+
+        // Aucune regle de scope pour PUT : refuse, meme avec tous les scopes
+        String full = createKey(session, orgId, "DOCUMENTS_READ", "DOCUMENTS_WRITE", "DOCUMENTS_VALIDATE");
+        mockMvc.perform(put(API + "/" + documentId).header("X-API-Key", full))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void downloadEncodesNonAsciiFilenames() throws Exception {
+        Cookie session = registerAndLogin("api-download-utf8");
+        long orgId = createOrganization(session);
+        String key = createKey(session, orgId, "DOCUMENTS_READ", "DOCUMENTS_WRITE");
+        long documentId = uploadWithKey(key, "Facture Société Été.pdf");
+
+        mockMvc.perform(get(API + "/" + documentId + "/download").header("X-API-Key", key))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Disposition",
+                        containsString("filename*=UTF-8''Facture%20Soci%C3%A9t%C3%A9%20%C3%89t%C3%A9.pdf")));
     }
 
     @Test

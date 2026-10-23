@@ -77,9 +77,14 @@ public class PublicApiSecurityConfig {
                                 .hasAuthority(ApiKeyScope.DOCUMENTS_VALIDATE.authority())
                         .requestMatchers(HttpMethod.POST, DOCUMENTS)
                                 .hasAuthority(ApiKeyScope.DOCUMENTS_WRITE.authority())
+                        // HEAD est servi par les handlers @GetMapping : meme scope que GET.
                         .requestMatchers(HttpMethod.GET, DOCUMENTS, DOCUMENTS + "/**")
                                 .hasAuthority(ApiKeyScope.DOCUMENTS_READ.authority())
-                        .anyRequest().authenticated())
+                        .requestMatchers(HttpMethod.HEAD, DOCUMENTS, DOCUMENTS + "/**")
+                                .hasAuthority(ApiKeyScope.DOCUMENTS_READ.authority())
+                        // Toute autre route ou methode est refusee : rien ne doit passer
+                        // avec une simple cle authentifiee sans regle de scope explicite.
+                        .anyRequest().denyAll())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint((request, response, e) -> ApiErrorWriter.write(response,
                                 HttpServletResponse.SC_UNAUTHORIZED,

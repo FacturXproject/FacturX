@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.nio.charset.StandardCharsets;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -106,7 +107,7 @@ public class PublicApiController {
         return ResponseEntity.ok()
                 .contentType(type)
                 .header(HttpHeaders.CONTENT_DISPOSITION,
-                        ContentDisposition.attachment().filename(document.getFilename()).build().toString())
+                        ContentDisposition.attachment().filename(document.getFilename(), StandardCharsets.UTF_8).build().toString())
                 .body(new ByteArrayResource(bytes));
     }
 
