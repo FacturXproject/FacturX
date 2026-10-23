@@ -22,11 +22,14 @@ import Terms from './pages/Terms';
 import LandingPage from './pages/LandingPage';
 import DocumentDetail from './pages/DocumentDetail';
 import InvoiceView from './pages/InvoiceView';
+import { DocumentWebSocketProvider } from './context/DocumentWebSocketContext';
 
 function Protected({ children }) {
   return (
     <ProtectedRoute>
-      <Layout>{children}</Layout>
+      <DocumentWebSocketProvider>
+        <Layout>{children}</Layout>
+      </DocumentWebSocketProvider>
     </ProtectedRoute>
   );
 }

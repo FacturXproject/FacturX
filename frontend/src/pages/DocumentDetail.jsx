@@ -6,6 +6,7 @@ import ValidationReportCard from '../components/ValidationReportCard';
 import { GenerationList } from '../components/FacturXGenerationPanel';
 import { downloadDocument } from '../utils/download';
 import JobStatusPanel from '../components/JobStatusPanel';
+import { useDocumentStatusEvent } from '../context/DocumentWebSocketContext';
 
 export default function DocumentDetail() {
   const { id } = useParams();
@@ -40,16 +41,12 @@ export default function DocumentDetail() {
     return `${mo.toFixed(1)} Mo`;
   };
 
-  // Affichage simple du type
   const formatType = (type) => {
     if (type === 'application/pdf') {
       return 'PDF';
     }
 
-    if (
-      type === 'application/xml' ||
-      type === 'text/xml'
-    ) {
+    if (type === 'application/xml' || type === 'text/xml') {
       return 'XML';
     }
 
@@ -87,7 +84,7 @@ export default function DocumentDetail() {
     }
   };
 
-  const loadDocument = async () => {
+  const loadDocument = useCallback(async () => {
     try {
       const response = await api.get(`/documents/${id}`);
       setDocument(response.data || null);
@@ -97,29 +94,27 @@ export default function DocumentDetail() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
-  // F08/F09: rapport de la derniere validation, s'il en existe deja une pour ce document.
-  const loadReport = async () => {
+  // F08/F09 : dernier rapport de validation.
+  const loadReport = useCallback(async () => {
     try {
       const response = await api.get(`/documents/${id}/report`);
       setReport(response.data || null);
-    } catch (error) {
-      // 404 tant qu'aucune validation n'a encore ete lancee pour ce document.
+    } catch {
       setReport(null);
     }
-  };
+  }, [id]);
 
-  // F13: factures Factur-X generees a partir de ce document. 403 pour un role sans
-  // GENERATE_DOCUMENT : la section reste alors simplement masquee.
-  const loadGenerations = async () => {
+  // F13 : factures Factur-X générées à partir du document.
+  const loadGenerations = useCallback(async () => {
     try {
       const response = await api.get(`/documents/${id}/generations`);
       setGenerations(Array.isArray(response.data) ? response.data : []);
-    } catch (error) {
+    } catch {
       setGenerations([]);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
     setDocument(null);
@@ -133,37 +128,69 @@ export default function DocumentDetail() {
     loadDocument();
     loadReport();
     loadGenerations();
-  }, [id]);
+  }, [loadDocument, loadReport, loadGenerations]);
+
+  // F15 : chaque événement reçu est traité directement.
+  useDocumentStatusEvent((event) => {
+    if (event.type === 'websocket.reconnected') {
+      loadDocument();
+      loadReport();
+      loadGenerations();
+      return;
+    }
+
+    if (event.type !== 'document.status.changed') return;
+    if (String(event.documentId) !== String(id)) return;
+
+    setDocument(current => {
+      if (
+        !current
+        || current.id !== event.documentId
+        || current.organizationId !== event.organizationId
+      ) {
+        return current;
+      }
+
+      return { ...current, status: event.status };
+    });
+
+    if (event.status === 'VALID' || event.status === 'INVALID') {
+      loadReport();
+    }
+  });
 
   const handleDownloadGenerated = async (generation) => {
     setDownloadError(null);
+
     try {
-      await downloadDocument(generation.generatedDocumentId, generation.filename);
-    } catch (error) {
+      await downloadDocument(
+        generation.generatedDocumentId,
+        generation.filename
+      );
+    } catch {
       setDownloadError('Téléchargement impossible.');
     }
   };
 
-  // F11: lance l'extraction PDF (POST /api/documents/{id}/extract) sur ce document
-  // deja depose, en reutilisant le documentId existant, puis ouvre la page de
-  // verification des champs extraits (F12) une fois le brouillon persiste.
+  // F11 : extraction du PDF puis ouverture du formulaire F12.
   const handleExtract = async () => {
     setExtracting(true);
     setExtractionError(null);
+
     try {
       await api.post(`/documents/${id}/extract`);
       navigate(`/conversion?documentId=${id}`);
     } catch (error) {
       console.error('Extraction error:', error);
       setExtractionError(
-        error.response?.data?.message || "Échec de l'extraction des données."
+        error.response?.data?.message
+          || "Échec de l'extraction des données."
       );
       setExtracting(false);
     }
   };
 
-// F14: lance la validation Factur-X en arrière-plan via un job,
-// en reutilisant le documentId existant.
+  // F14 : validation en arrière-plan via un job.
   const handleValidate = async () => {
     setValidating(true);
     setValidationError(null);
@@ -181,7 +208,7 @@ export default function DocumentDetail() {
       setValidationError(
         error.response?.data?.message
           || error.response?.data?.error
-          || "Impossible de démarrer la validation."
+          || 'Impossible de démarrer la validation.'
       );
     } finally {
       setValidating(false);
@@ -193,12 +220,12 @@ export default function DocumentDetail() {
       loadDocument(),
       loadReport(),
     ]);
-  }, [id]);
+  }, [loadDocument, loadReport]);
 
   const validationJobRunning =
-  validating
-  || validationJob?.status === 'QUEUED'
-  || validationJob?.status === 'PROCESSING';
+    validating
+    || validationJob?.status === 'QUEUED'
+    || validationJob?.status === 'PROCESSING';
 
   return (
     <div>
@@ -212,7 +239,9 @@ export default function DocumentDetail() {
         >
           {/* RETOUR */}
           <button
-            onClick={() => navigate(`/organisations/${document.organizationId}`)}
+            onClick={() =>
+              navigate(`/organisations/${document.organizationId}`)
+            }
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -263,7 +292,7 @@ export default function DocumentDetail() {
               fontSize: '14px',
             }}
           >
-            {/* TITRE INFORMATIONS GÉNÉRALES */}
+            {/* INFORMATIONS GÉNÉRALES */}
             <div
               style={{
                 padding: '13px 24px',
@@ -285,7 +314,6 @@ export default function DocumentDetail() {
               </h3>
             </div>
 
-            {/* INFORMATIONS GÉNÉRALES */}
             <div style={{ padding: '22px 24px' }}>
               <div
                 style={{
@@ -317,7 +345,7 @@ export default function DocumentDetail() {
               </div>
             </div>
 
-            {/* TITRE INFORMATIONS DU FICHIER */}
+            {/* INFORMATIONS DU FICHIER */}
             <div
               style={{
                 padding: '13px 24px',
@@ -340,7 +368,6 @@ export default function DocumentDetail() {
               </h3>
             </div>
 
-            {/* INFORMATIONS DU FICHIER */}
             <div style={{ padding: '22px 24px' }}>
               <div
                 style={{
@@ -350,16 +377,12 @@ export default function DocumentDetail() {
                   alignItems: 'center',
                 }}
               >
-                <span style={{ color: '#6b7280' }}>
-                  Type
-                </span>
+                <span style={{ color: '#6b7280' }}>Type</span>
                 <span style={{ fontWeight: 500 }}>
                   {formatType(document.type)}
                 </span>
 
-                <span style={{ color: '#6b7280' }}>
-                  Taille
-                </span>
+                <span style={{ color: '#6b7280' }}>Taille</span>
                 <span style={{ fontWeight: 500 }}>
                   {formatSize(document.size)}
                 </span>
@@ -371,9 +394,7 @@ export default function DocumentDetail() {
                   {formatDate(document.uploadedAt)}
                 </span>
 
-                <span style={{ color: '#6b7280' }}>
-                  Statut
-                </span>
+                <span style={{ color: '#6b7280' }}>Statut</span>
 
                 <span
                   style={{
@@ -402,8 +423,6 @@ export default function DocumentDetail() {
               paddingLeft: '24px',
             }}
           >
-            {/* F11: seul un PDF brut peut être converti (le service d'extraction
-                interne rejette tout autre type - voir ExtractionService). */}
             {document.type === 'application/pdf' && (
               <button
                 onClick={handleExtract}
@@ -419,7 +438,9 @@ export default function DocumentDetail() {
                   opacity: extracting ? 0.6 : 1,
                 }}
               >
-                {extracting ? 'Extraction en cours…' : 'Convertir en Factur-X'}
+                {extracting
+                  ? 'Extraction en cours…'
+                  : 'Convertir en Factur-X'}
               </button>
             )}
 
@@ -437,11 +458,13 @@ export default function DocumentDetail() {
                 opacity: validationJobRunning ? 0.6 : 1,
               }}
             >
-              {validationJobRunning ? 'Validation en cours…' : 'Lancer la validation Factur-X'}
+              {validationJobRunning
+                ? 'Validation en cours…'
+                : 'Lancer la validation Factur-X'}
             </button>
           </div>
 
-          {/* RAPPORT DE VALIDATION (F08/F09) */}
+          {/* RAPPORT DE VALIDATION */}
           {validationError && (
             <p
               style={{
@@ -472,7 +495,7 @@ export default function DocumentDetail() {
             </div>
           )}
 
-          {/* EXTRACTION (F11) */}
+          {/* EXTRACTION */}
           {extractionError && (
             <p
               style={{
@@ -493,7 +516,7 @@ export default function DocumentDetail() {
             </div>
           )}
 
-          {/* FACTURES FACTUR-X GÉNÉRÉES (F13) */}
+          {/* FACTURES FACTUR-X GÉNÉRÉES */}
           {generations.length > 0 && (
             <div
               style={{
@@ -525,15 +548,21 @@ export default function DocumentDetail() {
                   Factures Factur-X générées
                 </h3>
               </div>
+
               <div style={{ padding: '12px 24px' }}>
                 <GenerationList
                   generations={generations}
                   onDownload={handleDownloadGenerated}
                 />
+
                 {downloadError && (
                   <p
                     role="alert"
-                    style={{ color: '#991b1b', fontSize: '13px', margin: '8px 0 0' }}
+                    style={{
+                      color: '#991b1b',
+                      fontSize: '13px',
+                      margin: '8px 0 0',
+                    }}
                   >
                     {downloadError}
                   </p>
