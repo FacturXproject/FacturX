@@ -18,6 +18,20 @@ function makeFile(name, content, type) {
   return new File([content], name, { type });
 }
 
+const validationJob = (overrides = {}) => ({
+  id: 54,
+  documentId: 21,
+  type: 'VALIDATION',
+  status: 'QUEUED',
+  attempts: 0,
+  profile: null,
+  error: null,
+  startedAt: null,
+  finishedAt: null,
+  ...overrides,
+});
+
+
 function renderVerifier({ strict = false } = {}) {
   const tree = (
     <MemoryRouter>
@@ -44,11 +58,33 @@ describe('UploadPage - mode verifier (F06/F08 reels + choix de l\'organisation)'
       }
       if (url === '/organizations/5') return Promise.resolve({ data: { name: 'Cabinet A' } });
       if (url === '/organizations/6') return Promise.resolve({ data: { name: 'Cabinet B' } });
+
+      if (url === '/jobs/54') {
+        return Promise.resolve({
+          data: validationJob({
+            status: 'DONE',
+            attempts: 1,
+          }),
+        });
+      }
       return Promise.resolve({ data: {} });
     });
     api.post.mockImplementation((url) => {
-      if (url.startsWith('/documents?organizationId=')) return Promise.resolve({ data: { id: 21 } });
-      return Promise.resolve({ data: { valid: true } });
+      if (url.startsWith('/documents?organizationId=')) {
+        return Promise.resolve({
+          data: { id: 21 },
+        });
+      }
+
+      if (url === '/jobs/validation?documentId=21') {
+        return Promise.resolve({
+          data: validationJob(),
+        });
+      }
+
+      return Promise.reject(
+        new Error(`URL inattendue : ${url}`)
+      );
     });
 
     renderVerifier();
@@ -108,36 +144,97 @@ describe('UploadPage - mode verifier (F06/F08 reels + choix de l\'organisation)'
     expect(api.post).not.toHaveBeenCalled();
   });
 
-  it('un seul clic = un seul appel a /validate, meme sous React.StrictMode', async () => {
+  it('un seul clic = un seul job de validation, meme sous React.StrictMode', async () => {
     api.get.mockImplementation((url) => {
       if (url === '/organizations') {
-        return Promise.resolve({ data: [{ organizationId: 5, role: 'ADMIN' }] });
+        return Promise.resolve({
+          data: [{ organizationId: 5, role: 'ADMIN' }],
+        });
       }
-      if (url === '/organizations/5') return Promise.resolve({ data: { name: 'Cabinet X' } });
+
+      if (url === '/organizations/5') {
+        return Promise.resolve({
+          data: { name: 'Cabinet X' },
+        });
+      }
+
+      if (url === '/jobs/54') {
+        return Promise.resolve({
+          data: validationJob({
+            status: 'DONE',
+            attempts: 1,
+          }),
+        });
+      }
+
       return Promise.resolve({ data: {} });
     });
+
     api.post.mockImplementation((url) => {
-      if (url.startsWith('/documents?organizationId=')) return Promise.resolve({ data: { id: 21 } });
-      if (url === '/documents/21/validate') return Promise.resolve({ data: { valid: true } });
-      return Promise.reject(new Error(`URL inattendue : ${url}`));
+      if (url.startsWith('/documents?organizationId=')) {
+        return Promise.resolve({
+          data: { id: 21 },
+        });
+      }
+
+      if (url === '/jobs/validation?documentId=21') {
+        return Promise.resolve({
+          data: validationJob(),
+        });
+      }
+
+      return Promise.reject(
+        new Error(`URL inattendue : ${url}`)
+      );
     });
 
     renderVerifier({ strict: true });
 
-    await waitFor(() => expect(screen.getByText('Cabinet X')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.getByText('Cabinet X')
+      ).toBeInTheDocument()
+    );
 
-    const file = makeFile('facture.pdf', '%PDF-1.4', 'application/pdf');
-    const input = document.querySelector('input[type="file"]');
-    fireEvent.change(input, { target: { files: [file] } });
+    const file =
+      makeFile(
+        'facture.pdf',
+        '%PDF-1.4',
+        'application/pdf'
+      );
 
-    await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/rapport?documentId=21');
-    });
+    const input =
+      document.querySelector('input[type="file"]');
 
-    const uploadCalls = api.post.mock.calls.filter(([url]) => url.startsWith('/documents?organizationId='));
-    const validateCalls = api.post.mock.calls.filter(([url]) => url === '/documents/21/validate');
+    fireEvent.change(
+      input,
+      { target: { files: [file] } }
+    );
+
+    await waitFor(
+      () => {
+        expect(mockNavigate)
+          .toHaveBeenCalledWith(
+            '/rapport?documentId=21'
+          );
+      },
+      { timeout: 2000 }
+    );
+
+    const uploadCalls =
+      api.post.mock.calls.filter(
+        ([url]) =>
+          url.startsWith('/documents?organizationId=')
+      );
+
+    const validationCalls =
+      api.post.mock.calls.filter(
+        ([url]) =>
+          url === '/jobs/validation?documentId=21'
+      );
+
     expect(uploadCalls).toHaveLength(1);
-    expect(validateCalls).toHaveLength(1);
+    expect(validationCalls).toHaveLength(1);
   });
 
   it('affiche une erreur cote client pour un type de fichier invalide sans appeler le backend', async () => {

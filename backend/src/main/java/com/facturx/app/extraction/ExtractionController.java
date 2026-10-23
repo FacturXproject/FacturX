@@ -9,6 +9,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -56,5 +58,22 @@ public class ExtractionController {
                 document.getOrganization().getId(),
                 Permission.EXTRACT_DOCUMENT);
         return extractionService.getLatestDraft(id);
+    }
+
+    // PUT /api/documents/{id}/draft - enregistre les corrections de l'utilisateur (F12).
+    // Meme permission que l'extraction : corriger un brouillon fait partie de la conversion.
+    @PutMapping("/{id}/draft")
+    public DraftInvoiceResponse updateDraft(
+            @PathVariable Long id,
+            @RequestBody DraftInvoiceUpdateRequest request,
+            Authentication authentication) {
+
+        Document document = documentService.getDocument(id);
+        permissionService.requirePermission(
+                currentUserId(authentication),
+                document.getOrganization().getId(),
+                Permission.EXTRACT_DOCUMENT);
+
+        return extractionService.updateDraft(id, request);
     }
 }

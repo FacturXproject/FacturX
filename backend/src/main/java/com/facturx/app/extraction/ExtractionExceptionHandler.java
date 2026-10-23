@@ -1,5 +1,6 @@
 package com.facturx.app.extraction;
 
+import java.util.List;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +31,25 @@ public class ExtractionExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
                 "error", "DRAFT_NOT_FOUND",
                 "message", "Aucune extraction n'a encore été effectuée pour ce document."
+        ));
+    }
+
+    @ExceptionHandler(DraftValidationException.class)
+    public ResponseEntity<Map<String, Object>> handleDraftInvalid(DraftValidationException exception) {
+        List<String> errors = exception.getErrors();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                "error", "DRAFT_INVALID",
+                "message", exception.getMessage(),
+                "errors", errors
+        ));
+    }
+
+    @ExceptionHandler(DraftConflictException.class)
+    public ResponseEntity<Map<String, String>> handleDraftConflict() {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                "error", "DRAFT_CONFLICT",
+                "message", "Ce brouillon a été modifié entre-temps (autre onglet ou autre utilisateur). "
+                        + "Rechargez la page pour récupérer la dernière version."
         ));
     }
 }

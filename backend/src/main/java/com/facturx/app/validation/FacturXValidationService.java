@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import com.facturx.app.document.Document;
 import com.facturx.app.document.DocumentRepository;
 import com.facturx.app.document.DocumentStatus;
+import com.facturx.app.websocket.DocumentStatusChangedEvent;
+import com.facturx.app.websocket.DocumentWebSocketHandler;
 
 @Service
 public class FacturXValidationService {
@@ -20,17 +22,20 @@ public class FacturXValidationService {
     private final ValidationRunRepository validationRunRepository;
     private final ValidationErrorRepository validationErrorRepository;
     private final DocumentRepository documentRepository;
+    private final DocumentWebSocketHandler webSocketHandler;
 
     public FacturXValidationService(
             MustangValidationClient mustangValidationClient,
             ValidationRunRepository validationRunRepository,
             ValidationErrorRepository validationErrorRepository,
-            DocumentRepository documentRepository) {
+            DocumentRepository documentRepository,
+            DocumentWebSocketHandler webSocketHandler) {
 
         this.mustangValidationClient = mustangValidationClient;
         this.validationRunRepository = validationRunRepository;
         this.validationErrorRepository = validationErrorRepository;
         this.documentRepository = documentRepository;
+        this.webSocketHandler = webSocketHandler;
     }
 
     /**
@@ -52,6 +57,7 @@ public class FacturXValidationService {
 
             document.setStatus(DocumentStatus.PROCESSING);
             documentRepository.save(document);
+            notifyStatusChanged(document);
         }
 
         MustangValidationClient.MustangReport report;
@@ -64,6 +70,7 @@ public class FacturXValidationService {
             if (document != null) {
                 document.setStatus(DocumentStatus.FAILED);
                 documentRepository.save(document);
+                notifyStatusChanged(document);
             }
 
             throw e;
@@ -118,6 +125,38 @@ public class FacturXValidationService {
             validationErrorRepository.save(entity);
         }
 
-        return new ValidationResult(result.valid(), result.layerReached(), result.errors(), run.getId());
+        // Notify after saving the validation run and its errors
+        if (document != null) {
+            notifyStatusChanged(document);
+        }
+
+        return new ValidationResult(
+                result.valid(),
+                result.layerReached(),
+                result.errors(),
+                run.getId()
+        );
+    }
+
+    private void notifyStatusChanged(Document document) {
+        DocumentStatusChangedEvent event = new DocumentStatusChangedEvent(
+                "document.status.changed",
+                document.getId(),
+                document.getOrganization().getId(),
+                document.getStatus(),
+                document.getOwner() != null
+                        ? document.getOwner().getId()
+                        : null
+        );
+
+        try {
+            webSocketHandler.broadcast(event);
+        } catch (Exception e) {
+            log.warn(
+                    "WebSocket: failed to notify status change for document {}",
+                    document.getId(),
+                    e
+            );
+        }
     }
 }
