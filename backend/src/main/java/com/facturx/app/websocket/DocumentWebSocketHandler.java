@@ -11,6 +11,7 @@ import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
+import org.springframework.web.socket.server.support.HttpSessionHandshakeInterceptor;
 
 import com.facturx.app.auth.AppUserPrincipal;
 import com.facturx.app.permission.Permission;
@@ -128,22 +129,62 @@ public class DocumentWebSocketHandler extends TextWebSocketHandler {
         sessions.remove(session.getId());
         userIds.remove(session.getId());
     }
-    public void closeAllForUser(Long userId) {
-    for (Map.Entry<String, Long> entry : userIds.entrySet()) {
-        if (!userId.equals(entry.getValue())) continue;
 
-        WebSocketSession session = sessions.remove(entry.getKey());
-        userIds.remove(entry.getKey());
+    public void closeForHttpSession(String httpSessionId) {
+        if (httpSessionId == null) {
+            return;
+        }
 
-        if (session == null) continue;
+        for (WebSocketSession session : sessions.values()) {
+            Object id = session.getAttributes().get(
+                    HttpSessionHandshakeInterceptor.HTTP_SESSION_ID_ATTR_NAME
+            );
 
-        try {
-            synchronized (session) {
-                session.close(CloseStatus.POLICY_VIOLATION);
+            if (!httpSessionId.equals(id)) {
+                continue;
             }
-        } catch (Exception e) {
-            log.debug("WebSocket: failed to close session {}", session.getId(), e);
+
+            sessions.remove(session.getId());
+            userIds.remove(session.getId());
+
+            try {
+                synchronized (session) {
+                    session.close(CloseStatus.POLICY_VIOLATION);
+                }
+            } catch (Exception e) {
+                log.debug(
+                        "WebSocket: failed to close session {}",
+                        session.getId(),
+                        e
+                );
+            }
         }
     }
-}
+
+    public void closeAllForUser(Long userId) {
+        for (Map.Entry<String, Long> entry : userIds.entrySet()) {
+            if (!userId.equals(entry.getValue())) {
+                continue;
+            }
+
+            WebSocketSession session = sessions.remove(entry.getKey());
+            userIds.remove(entry.getKey());
+
+            if (session == null) {
+                continue;
+            }
+
+            try {
+                synchronized (session) {
+                    session.close(CloseStatus.POLICY_VIOLATION);
+                }
+            } catch (Exception e) {
+                log.debug(
+                        "WebSocket: failed to close session {}",
+                        session.getId(),
+                        e
+                );
+            }
+        }
+    }
 }

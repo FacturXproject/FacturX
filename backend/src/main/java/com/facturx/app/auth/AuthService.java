@@ -155,15 +155,17 @@ public class AuthService {
         Authentication authentication =
                 SecurityContextHolder.getContext().getAuthentication();
 
-        new SecurityContextLogoutHandler().logout(
-                httpRequest,
-                httpResponse,
-                authentication
-        );
+        var session = httpRequest.getSession(false);
+        String sessionId = session != null ? session.getId() : null;
 
-        if (authentication != null
-                && authentication.getPrincipal() instanceof AppUserPrincipal principal) {
-            webSocketHandler.closeAllForUser(principal.getUser().getId());
+        try {
+            webSocketHandler.closeForHttpSession(sessionId);
+        } finally {
+            new SecurityContextLogoutHandler().logout(
+                    httpRequest,
+                    httpResponse,
+                    authentication
+            );
         }
     }
 
