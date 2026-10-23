@@ -36,8 +36,16 @@ public class DraftLine {
     @Column(name = "total", length = 500)
     private String total;
 
+    // F12 : taux de TVA propre a la ligne ; null = taux par defaut de la facture.
+    @Column(name = "vat_rate", length = 20)
+    private String vatRate;
+
     @Column(name = "confidence")
     private Double confidence;
+
+    // F12 : origine de la ligne (source de l'extracteur, ou "manual" apres correction).
+    @Column(name = "source", length = 50)
+    private String source;
 
     public Long getId() { return id; }
     public DraftInvoice getDraftInvoice() { return draftInvoice; }
@@ -46,7 +54,9 @@ public class DraftLine {
     public String getQuantity() { return quantity; }
     public String getUnitPrice() { return unitPrice; }
     public String getTotal() { return total; }
+    public String getVatRate() { return vatRate; }
     public Double getConfidence() { return confidence; }
+    public String getSource() { return source; }
 
     public void setDraftInvoice(DraftInvoice draftInvoice) { this.draftInvoice = draftInvoice; }
     public void setPosition(int position) { this.position = position; }
@@ -54,5 +64,7 @@ public class DraftLine {
     public void setQuantity(String quantity) { this.quantity = quantity; }
     public void setUnitPrice(String unitPrice) { this.unitPrice = unitPrice; }
     public void setTotal(String total) { this.total = total; }
+    public void setVatRate(String vatRate) { this.vatRate = vatRate; }
     public void setConfidence(Double confidence) { this.confidence = confidence; }
+    public void setSource(String source) { this.source = source; }
 }

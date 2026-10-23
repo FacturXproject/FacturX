@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import api from '../services/api';
 import DocumentUploadForm from '../components/DocumentUploadForm';
+import { useDocumentStatusEvent } from '../context/DocumentWebSocketContext';
 
 const roleLabels = {
   ADMIN: 'Administrateur',
@@ -122,6 +123,7 @@ const totalPages = Math.ceil(documents.length / documentsPerPage);
       const response = await api.get('/documents', {
         params: {
           organizationId: id,
+          sort: 'uploadedAt,desc',
         },
       });
 
@@ -166,6 +168,24 @@ const totalPages = Math.ceil(documents.length / documentsPerPage);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, id]);
+
+    useDocumentStatusEvent((event) => {
+      if (event.type === 'websocket.reconnected') {
+        fetchDocuments();
+        return;
+      }
+
+      if (event.type !== 'document.status.changed') return;
+      if (String(event.organizationId) !== String(id)) return;
+
+      setDocuments(current =>
+        current.map(document =>
+          document.id === event.documentId
+            ? { ...document, status: event.status }
+            : document
+        )
+      );
+});
 
   const handleInvite = async (e) => {
     e.preventDefault();

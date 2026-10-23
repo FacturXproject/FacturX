@@ -1,60 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import StatusBadge from '../components/StatusBadge';
+import { useDocumentStatusEvent } from '../context/DocumentWebSocketContext';
 
-function StatusBadge({ status }) {
-  const getStatusStyle = () => {
-    switch (status) {
-      case 'VALID':
-        return {
-          background: '#dcfce7',
-          color: '#166534',
-          border: '1px solid #bbf7d0',
-        };
-
-      case 'INVALID':
-      case 'FAILED':
-        return {
-          background: '#fee2e2',
-          color: '#991b1b',
-          border: '1px solid #fecaca',
-        };
-
-      case 'PROCESSING':
-      case 'QUEUED':
-        return {
-          background: '#fef3c7',
-          color: '#92400e',
-          border: '1px solid #fde68a',
-        };
-
-      case 'UPLOADED':
-      default:
-        return {
-          background: '#f3f4f6',
-          color: '#374151',
-          border: '1px solid #d1d5db',
-        };
-    }
-  };
-
-  return (
-    <span
-      style={{
-        display: 'inline-block',
-        padding: '2px 8px',
-        borderRadius: '4px',
-        fontSize: '12px',
-        fontWeight: 500,
-        ...getStatusStyle(),
-      }}
-    >
-      {status}
-    </span>
-  );
-  }
-
-  export default function Dashboard({ onFileSelect }) {
+export default function Dashboard({ onFileSelect }) {
   const navigate = useNavigate();
 
   const [documents, setDocuments] = useState([]);
@@ -99,7 +49,7 @@ function StatusBadge({ status }) {
 
           try {
             const documentsResponse = await api.get(
-              `/documents?organizationId=${organizationId}`
+              `/documents?organizationId=${organizationId}&sort=uploadedAt,desc&size=5`
             );
 
             const organizationDocuments =
@@ -170,6 +120,25 @@ function StatusBadge({ status }) {
 
     return type;
   };
+
+
+  useDocumentStatusEvent((event) => {
+    if (event.type === 'websocket.reconnected') {
+      loadRecentDocuments();
+      return;
+    }
+
+    if (event.type !== 'document.status.changed') return;
+
+    setDocuments(current =>
+      current.map(document =>
+        document.id === event.documentId
+          && document.organizationId === event.organizationId
+          ? { ...document, status: event.status }
+          : document
+      )
+    );
+  });
 
   return (
     <div

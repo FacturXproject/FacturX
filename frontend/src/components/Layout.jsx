@@ -7,18 +7,22 @@ import {
   FileCode2,
   LogOut,
   Users,
-  User
+  User,
+  Search,
+  KeyRound,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Footer from './Footer';
 
 const navItems = [
   { to: '/dashboard', icon: ShieldCheck, label: 'Tableau de bord' },
+  { to: '/documents', icon: Search, label: 'Documents' },
   { to: '/organisations', icon: Building2, label: 'Organisations' },
   { to: '/invitations', icon: Users, label: 'Invitations' },
   { to: '/verifier', icon: FileCheck2, label: 'Vérifier' },
   { to: '/convertir', icon: RefreshCw, label: 'Convertir' },
   { to: '/lecture-xml', icon: FileCode2, label: 'Lecture XML' },
+  { to: '/cles-api', icon: KeyRound, label: 'Clés API' },
   { to: '/profile', icon: User, label: 'Profil' },
 ];
 

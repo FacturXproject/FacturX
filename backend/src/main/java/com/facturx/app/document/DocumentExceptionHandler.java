@@ -32,4 +32,13 @@ public class DocumentExceptionHandler {
                 "message", "Seuls les fichiers PDF et XML sont acceptés."
         ));
     }
+
+    @ExceptionHandler(InvalidSearchFilterException.class)
+    public ResponseEntity<Map<String, String>> handleInvalidSearchFilter(InvalidSearchFilterException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                "error", "INVALID_SEARCH_FILTER",
+                "field", e.getField(),
+                "message", e.getMessage()
+        ));
+    }
 }

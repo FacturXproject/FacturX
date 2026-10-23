@@ -1635,3 +1635,164 @@ Do not leave these to week 6; they are much easier to gather while building.
 
 ---
 
+
+## F15 — Real-time events
+
+### Connexion et authentification
+
+Endpoint : `/ws` (`wss://localhost:8443/ws` en HTTPS).
+Le handshake utilise le cookie de session `EFACTURE_SESSION`.
+Une session authentifiée est requise. Les origines autorisées sont
+définies par `app.allowed-origins`, partagé entre CORS et WebSocket.
+
+### Format de l'événement
+
+```json
+{
+  "type": "document.status.changed",
+  "documentId": 100,
+  "organizationId": 1,
+  "status": "VALID"
+}
+```
+
+`status` correspond au nouveau statut du document :
+`UPLOADED`, `QUEUED`, `PROCESSING`, `VALID`, `INVALID` ou `FAILED`.
+`ownerId` reste interne au serveur et n'est pas transmis.
+
+### Visibilité
+
+Les permissions sont vérifiées côté serveur à chaque événement,
+pour l'organisation du document.
+
+| Permission | Événements reçus |
+| --- | --- |
+| VIEW_ALL_DOCUMENTS | Tous les documents de l'organisation |
+| VIEW_OWN_DOCUMENTS uniquement | Documents appartenant à l'utilisateur |
+| Aucune de ces permissions | Aucun |
+
+Les rôles ADMIN, ACCOUNTANT et CLIENT suivent les permissions qui
+leur sont attribuées. Aucun événement d'une autre organisation
+n'est envoyé sans les droits correspondants.
+
+### Déconnexion et reconnexion
+
+Au logout, le serveur ferme tous les WebSockets de l'utilisateur,
+y compris sur ses autres appareils, avec le code 1008.
+Le client ferme aussi sa connexion et annule les tentatives de
+reconnexion lorsque l'utilisateur n'est plus authentifié.
+
+Après une coupure, le client réessaie après 2 secondes.
+Il ne réessaie pas après le code 1008.
+Une connexion rétablie émet localement `websocket.reconnected`,
+utilisé pour recharger les données actuelles.
+Un nouveau login ouvre une nouvelle connexion sans refresh.
+
+### Développement Vite
+
+Le profil Spring `dev` autorise `http://localhost:5173` et désactive
+le flag Secure du cookie de session pour le développement HTTP.
+Vite transmet `/api` et `/ws` au backend sur `localhost:8080`,
+avec `ws: true` pour `/ws`.
+Le backend doit pouvoir accéder à PostgreSQL.
+
+---
+
+
+## F17 — API publique
+
+API REST pour les logiciels comptables : déposer des factures, suivre leur
+statut, lancer la validation, lire le rapport et télécharger les fichiers.
+
+### Clés API
+
+Une clé se crée depuis la page **Clés API** de l'application (`/cles-api`).
+
+- Une clé appartient à un utilisateur et agit dans **une** organisation dont
+  il est membre. Elle n'a jamais plus de droits que lui : les permissions de
+  son rôle (F04) s'appliquent, limitées par les scopes de la clé.
+- Le secret (`fxk_` + 43 caractères) n'est affiché **qu'une fois**, à la
+  création. Seule son empreinte SHA-256 est stockée (`api_keys.key_hash`).
+- Une clé révoquée, ou dont le propriétaire a quitté l'organisation ou a été
+  désactivé, est refusée immédiatement (401).
+
+| Scope | Autorise |
+| --- | --- |
+| `DOCUMENTS_READ` | lister, statut, rapport, téléchargement |
+| `DOCUMENTS_WRITE` | dépôt |
+| `DOCUMENTS_VALIDATE` | lancer une validation Factur-X |
+
+Gestion (session + CSRF, utilisée par le frontend) :
+`GET /api/api-keys`, `POST /api/api-keys`, `DELETE /api/api-keys/{id}` (révocation).
+
+### Authentification et limite de débit
+
+La clé s'envoie dans l'en-tête `X-API-Key` (ou `Authorization: Bearer <clé>`).
+Le cookie de session n'est **pas** accepté sur `/api/public/**` : l'API est
+sans état, d'où l'absence de CSRF sur cette chaîne de sécurité.
+
+Limite : **60 requêtes par minute et par clé** (`app.public-api.rate-limit.*`,
+surchargeable par `PUBLIC_API_RATE_LIMIT`). Chaque réponse porte
+`X-RateLimit-Limit`, `X-RateLimit-Remaining` et `X-RateLimit-Reset` ; au-delà,
+HTTP `429` avec `Retry-After`. Le compteur est en mémoire, comme la limite de
+connexion F01 (une seule instance du backend).
+
+### Endpoints
+
+Base : `https://localhost:8443/api/public/v1`. L'organisation est celle de la
+clé, aucun `organizationId` à fournir.
+
+| Méthode | Route | Scope | Réponse |
+| --- | --- | --- | --- |
+| `GET` | `/documents?page=0&size=20` | READ | page de documents (`size` ≤ 100) |
+| `POST` | `/documents` (multipart `file`) | WRITE | `201` document créé |
+| `GET` | `/documents/{id}` | READ | métadonnées et statut |
+| `GET` | `/documents/{id}/report` | READ | rapport F09 de la dernière validation |
+| `GET` | `/documents/{id}/download` | READ | le fichier |
+| `POST` | `/documents/{id}/validate` | VALIDATE | `202` job de validation (F14) |
+
+Un document d'une autre organisation répond `404`, comme un document inconnu.
+
+### Exemples curl
+
+```bash
+KEY=fxk_...                                  # copiée depuis la page Clés API
+API=https://localhost:8443/api/public/v1
+
+# Déposer une facture
+curl -k -H "X-API-Key: $KEY" -F "file=@facture.pdf" $API/documents
+
+# Lister les documents
+curl -k -H "X-API-Key: $KEY" "$API/documents?page=0&size=20"
+
+# Lancer la validation, puis suivre le statut
+curl -k -X POST -H "X-API-Key: $KEY" $API/documents/42/validate
+curl -k -H "X-API-Key: $KEY" $API/documents/42
+
+# Lire le rapport de conformité
+curl -k -H "X-API-Key: $KEY" $API/documents/42/report
+
+# Télécharger le fichier
+curl -k -H "X-API-Key: $KEY" -OJ $API/documents/42/download
+```
+
+### Erreurs
+
+Toujours au format `{"error": "CODE", "message": "..."}`.
+
+| HTTP | `error` |
+| --- | --- |
+| 401 | `API_KEY_MISSING`, `INVALID_API_KEY` |
+| 403 | `INSUFFICIENT_SCOPE` (scope), `ACCESS_DENIED` (rôle du propriétaire) |
+| 404 | `DOCUMENT_NOT_FOUND`, `NOT_FOUND` (aucune validation encore) |
+| 409 | `JOB_CONFLICT` (traitement déjà en cours) |
+| 413 / 415 | `FILE_TOO_LARGE` / `INVALID_FILE_TYPE` |
+| 429 | `RATE_LIMITED` |
+
+### Documentation OpenAPI
+
+- Swagger UI : `https://localhost:8443/api/docs/swagger-ui/index.html`
+- Spécification OpenAPI 3 : `https://localhost:8443/api/docs/openapi`
+
+Publiques, en lecture seule ; seules les routes `/api/public/**` y figurent.
+Bouton **Authorize** : coller la clé pour essayer les endpoints.

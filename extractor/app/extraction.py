@@ -65,18 +65,46 @@ BUYER_BLOCK_PATTERN = re.compile(
 
 POSTAL_ADDRESS_LINE = re.compile(r".{0,60}\b\d{5}\b.{0,60}")
 
-# Table cells: a pure number/amount ("3", "1 080,00", "50,00 €") and a VAT-rate
-# cell ("20 %"). Anything else is text, even if it contains a digit
-# ("Licence Office 365", a reference like "A12").
-_NUMBER_CELL = re.compile(r"-?\d[\d\s]*(?:[.,]\d+)?\s*(?:€|EUR)?", re.IGNORECASE)
-_PERCENT_CELL = re.compile(r"\d{1,2}(?:[.,]\d+)?\s*%")
-
 # A totals row sitting inside the lines table is not an invoice line.
 _TOTALS_LABEL = re.compile(
     r"(?:sous[-\s]?total|total(?:\s+(?:h\.?t\.?|t\.?t\.?c\.?|tva))?|(?:montant\s+)?tva(?:\s+\d{1,2}(?:[.,]\d+)?\s*%)?"
     r"|net\s+[àa]\s+payer)\s*:?",
     re.IGNORECASE,
 )
+
+# Below the lines table, outside any grid: the totals block ends the table.
+_TOTALS_START = re.compile(
+    r"\s*(?:sous[-\s]?total|sub\s*total|total|montant|tva\b|tax\b|net\s+[àa]\s+payer|reste\s+[àa]\s+payer|acompte)",
+    re.IGNORECASE,
+)
+
+# Column labels of a lines table header, one word at a time. Checked in this
+# order: "Montant TVA" is a VAT column, "Prix total" a total, "Prix unitaire" a
+# unit price.
+_COLUMN_LABELS = [
+    ("vat", re.compile(r"tva|vat|tax|taxe|taux|steuer\w*|ust")),
+    ("total", re.compile(r"total|sous-total|subtotal|montant|amount|\w*betrag")),
+    ("quantity", re.compile(r"qt[eé]s?|qty|\w+/qty|quantit[eé]s?|quantity|nb|nombre|menge")),
+    ("unitPrice", re.compile(r"p\.?u\.?|prix|tarif|rate|price|\w+/price|\w*preis")),
+    ("description", re.compile(
+        r"d[eé]signation|description|libell[eé]|articles?|produits?|prestations?|services?"
+        r"|intitul[eé]|d[eé]tails?|objet|nature|items?|beschreibung|bezeichnung"
+    )),
+]
+_AMOUNT_COLUMNS = {"quantity", "unitPrice", "total"}
+
+# An amount inside a cell or a word: "3", "1 080,00", "1.080,00", "1,080.50"
+# (thousands separated by a space, a no-break space, a dot or a comma).
+_NUMBER = re.compile(r"[-+]?\d{1,3}(?:[   .,]\d{3})+(?:[.,]\d+)?(?!\d)|[-+]?\d+(?:[.,]\d+)?")
+# One word of a text line that is an amount, maybe with its currency or a "%".
+_NUMBER_WORD = re.compile(r"[€$£]?(?P<n>" + _NUMBER.pattern + r")(?:€|\$|£|EUR)?(?P<pct>%)?", re.IGNORECASE)
+_CURRENCY_WORD = re.compile(r"€|\$|£|EUR|USD", re.IGNORECASE)
+_THOUSANDS_HEAD = re.compile(r"[-+]?\d{1,3}")
+_THOUSANDS_TAIL = re.compile(r"\d{3}(?:[ .,]|$)")
+
+# Words closer than this (in font sizes) belong to the same value: "3 750,00",
+# "Office 365". Columns are always further apart.
+_SAME_VALUE_GAP = 0.45
 
 
 @dataclass
@@ -170,53 +198,218 @@ def _find_siren_near(text: str, anchor: str | None) -> tuple[str | None, float]:
     return _find_first(SIREN_PATTERNS, window)
 
 
+# --- Invoice lines ---------------------------------------------------------------
+# Lines are read under the header that names the table columns (Désignation, Qté,
+# P.U., Total...): from a ruled table when the PDF draws one, otherwise - most
+# invoices have no grid - from the position of the words under that header. A
+# table without such a header (a key/value block like "Order Number | 12345", the
+# totals block) holds no invoice line.
+
+def _column_of(label: str) -> str | None:
+    words = [re.sub(r"^\W+|[^\w.]+$", "", w) for w in label.lower().split()]
+    for kind, pattern in _COLUMN_LABELS:
+        if any(pattern.fullmatch(w) for w in words if w):
+            return kind
+    return None
+
+
+def _is_header(kinds) -> bool:
+    return "description" in kinds and len(_AMOUNT_COLUMNS & set(kinds)) >= 2
+
+
+def _number(value: str | None) -> str | None:
+    if not value:
+        return None
+    match = _NUMBER.search(value.replace(" ", " ").replace(" ", " "))
+    return match.group(0) if match else None
+
+
+def _line(description, quantity, unit_price, total, confidence) -> dict | None:
+    amounts = [v for v in (quantity, unit_price, total) if v is not None]
+    # A real line has at least two amounts, or a description and its total.
+    if len(amounts) < 2 and not (description and total):
+        return None
+    return {
+        "description": description or None,
+        "quantity": quantity,
+        "unitPrice": unit_price,
+        "total": total,
+        "confidence": confidence,
+    }
+
+
+def _table_lines(table: list[list]) -> list[dict]:
+    rows: list[dict] = []
+    columns: dict[str, int] | None = None
+    for raw_row in table:
+        if raw_row is None:
+            continue
+        # A cell wrapped over several lines in the PDF comes back with line
+        # breaks: collapse them, a description is a single line.
+        cells = [re.sub(r"\s+", " ", c).strip() if c else "" for c in raw_row]
+        if columns is None:
+            found: dict[str, int] = {}
+            for index, cell in enumerate(cells):
+                kind = _column_of(cell)
+                if kind and kind not in found:
+                    found[kind] = index
+            if _is_header(found):
+                columns = found
+            continue
+        # A totals row sitting inside the table is not an invoice line.
+        if any(_TOTALS_LABEL.fullmatch(c) for c in cells if c):
+            continue
+
+        def cell(kind):
+            index = columns.get(kind)
+            return cells[index] if index is not None and index < len(cells) else ""
+
+        line = _line(
+            cell("description"),
+            _number(cell("quantity")),
+            _number(cell("unitPrice")),
+            _number(cell("total")),
+            0.5,
+        )
+        if line:
+            rows.append(line)
+    return rows
+
+
+def _text_rows(page) -> list[dict]:
+    # Words of the page grouped into visual lines (same baseline), left to right.
+    rows: list[dict] = []
+    for word in sorted(page.extract_words(), key=lambda w: (round(w["top"]), w["x0"])):
+        word["text"] = word["text"].replace(" ", " ").replace(" ", " ")
+        if rows and abs(word["top"] - rows[-1]["top"]) <= 3:
+            rows[-1]["words"].append(word)
+        else:
+            rows.append({"top": word["top"], "words": [word]})
+    for row in rows:
+        row["words"].sort(key=lambda w: w["x0"])
+        row["size"] = max(w["bottom"] - w["top"] for w in row["words"])
+        row["text"] = " ".join(w["text"] for w in row["words"])
+    return rows
+
+
+def _header_columns(row: dict) -> list[dict] | None:
+    columns: list[dict] = []
+    for word in row["words"]:
+        kind = _column_of(word["text"])
+        if kind and all(c["kind"] != kind for c in columns):
+            columns.append({"kind": kind, "x0": word["x0"], "x1": word["x1"]})
+        elif columns and word["x0"] - columns[-1]["x1"] < row["size"]:
+            # Second word of a label: "P.U. HT", "Prix unitaire", "Total HT".
+            columns[-1]["x1"] = word["x1"]
+    return columns if _is_header([c["kind"] for c in columns]) else None
+
+
+def _trailing_amounts(words: list[dict], size: float, limit: int) -> tuple[list[dict], int]:
+    """Amounts at the end of a text line, right to left, and how many words are
+    left for the description. A number glued to the text before it is part of the
+    description ("Licence Office 365"), not a column."""
+    gap = size * _SAME_VALUE_GAP
+    amounts: list[dict] = []
+    percent = False
+    i = len(words) - 1
+    while i >= 0 and len(amounts) < limit:
+        text = words[i]["text"]
+        if _CURRENCY_WORD.fullmatch(text):
+            i -= 1
+            continue
+        if text == "%":
+            percent = True
+            i -= 1
+            continue
+        match = _NUMBER_WORD.fullmatch(text)
+        if not match:
+            break
+        value, first = match.group("n"), i
+        # "3 750,00" drawn as two words.
+        while (first > 0 and _THOUSANDS_TAIL.match(value)
+               and _THOUSANDS_HEAD.fullmatch(words[first - 1]["text"])
+               and words[first]["x0"] - words[first - 1]["x1"] < gap):
+            first -= 1
+            value = f"{words[first]['text']} {value}"
+        before = words[first - 1] if first > 0 else None
+        if (before and words[first]["x0"] - before["x1"] < gap
+                and not _NUMBER_WORD.fullmatch(before["text"])
+                and not _CURRENCY_WORD.fullmatch(before["text"]) and before["text"] != "%"):
+            break
+        amounts.insert(0, {
+            "value": value,
+            "x0": words[first]["x0"],
+            "x1": words[i]["x1"],
+            "percent": percent or bool(match.group("pct")),
+        })
+        percent = False
+        i = first - 1
+    return amounts, i + 1
+
+
+def _assign_columns(amounts: list[dict], columns: list[dict]) -> dict[str, str]:
+    """Each amount goes to the header column right above it; a VAT rate is not a
+    price. If two amounts land in the same column, fall back to their order."""
+    values: dict[str, str] = {}
+    for amount in amounts:
+        candidates = [c for c in columns if c["kind"] != "description" and (c["kind"] == "vat") == amount["percent"]]
+        if not candidates:
+            continue
+        middle = (amount["x0"] + amount["x1"]) / 2
+        best = min(candidates, key=lambda c: (
+            max(c["x0"] - amount["x1"], amount["x0"] - c["x1"], 0),
+            abs((c["x0"] + c["x1"]) / 2 - middle),
+        ))
+        if best["kind"] in values:
+            break
+        values[best["kind"]] = amount["value"]
+    else:
+        return values
+    plain = [a["value"] for a in amounts if not a["percent"]]
+    return {
+        "quantity": plain[0],
+        "total": plain[-1],
+        # Without a third amount, quantity and unit price can't be told apart.
+        "unitPrice": plain[-2] if len(plain) >= 3 else None,
+    }
+
+
+def _layout_lines(page) -> list[dict]:
+    lines: list[dict] = []
+    columns = None
+    previous_top = None
+    for row in _text_rows(page):
+        if columns is None:
+            columns = _header_columns(row)
+            previous_top = row["top"]
+            continue
+        size = row["size"]
+        # The table ends at the totals block or at a blank gap.
+        if row["top"] - previous_top > 4 * size or _TOTALS_START.match(row["text"]):
+            break
+        limit = sum(1 for c in columns if c["kind"] != "description")
+        amounts, text_words = _trailing_amounts(row["words"], size, limit)
+        description = " ".join(w["text"] for w in row["words"][:text_words])
+        if sum(1 for a in amounts if not a["percent"]) >= 2 and description:
+            values = _assign_columns(amounts, columns)
+            line = _line(description, values.get("quantity"), values.get("unitPrice"), values.get("total"), 0.4)
+            if line:
+                lines.append(line)
+        elif (not amounts and lines and row["top"] - previous_top <= 1.6 * size
+              and row["words"][0]["x0"] < min(c["x0"] for c in columns if c["kind"] != "description")):
+            # A description wrapped onto the next line.
+            lines[-1]["description"] = f"{lines[-1]['description']} {row['text']}"
+        previous_top = row["top"]
+    return lines
+
+
 def _extract_lines(pdf: "pdfplumber.PDF") -> list[dict]:
     rows: list[dict] = []
     for page in pdf.pages:
+        page_rows: list[dict] = []
         for table in page.extract_tables() or []:
-            for raw_row in table:
-                if raw_row is None:
-                    continue
-                # A cell wrapped over several lines in the PDF comes back with
-                # line breaks: collapse them, a description is a single line.
-                cells = [re.sub(r"\s+", " ", c).strip() if c else "" for c in raw_row]
-                if not any(cells):
-                    continue
-                # Skip header-looking rows (no digits at all - a real invoice
-                # line always has a quantity or an amount somewhere).
-                if not any(re.search(r"\d", c) for c in cells):
-                    continue
-                # A TVA/VAT-rate cell (e.g. "20 %") is not a price - excluded here
-                # so it can't be mistaken for unit_price/total when a table has a
-                # separate VAT column (Qte | P.U. | TVA | Total).
-                amount_cells = [c for c in cells if _NUMBER_CELL.fullmatch(c)]
-                text_cells = [
-                    c for c in cells
-                    if c and not _NUMBER_CELL.fullmatch(c) and not _PERCENT_CELL.fullmatch(c)
-                ]
-                # No pure number at all (e.g. a header like "Prix 2026"), or a
-                # totals row inside the table: not an invoice line.
-                if not amount_cells:
-                    continue
-                if any(_TOTALS_LABEL.fullmatch(c) for c in text_cells):
-                    continue
-                # The description is the longest *text* cell - taking the longest
-                # cell overall picked an amount whenever the description was
-                # shorter than it ("Audit" vs "240,00").
-                description = max(text_cells, key=len) if text_cells else ""
-                quantity = amount_cells[0]
-                total = amount_cells[-1]
-                # Need at least 3 distinct amount cells to tell quantity and unit
-                # price apart unambiguously - otherwise leave unit_price unset
-                # rather than guessing (e.g. duplicating quantity or total).
-                unit_price = amount_cells[-2] if len(amount_cells) >= 3 else None
-                rows.append({
-                    "description": description or None,
-                    "quantity": quantity,
-                    "unitPrice": unit_price,
-                    "total": total,
-                    "confidence": 0.5,
-                })
+            page_rows += _table_lines(table)
+        rows += page_rows or _layout_lines(page)
     return rows
 
 
