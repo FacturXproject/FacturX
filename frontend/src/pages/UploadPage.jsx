@@ -1,7 +1,8 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Upload, Loader2 } from 'lucide-react';
 import api from '../services/api';
+import JobStatusPanel from '../components/JobStatusPanel';
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10 Mo
 const ACCEPTED_TYPES = ['application/pdf', 'application/xml', 'text/xml'];
@@ -50,6 +51,7 @@ export default function UploadPage({ mode }) {
   const [selectedOrgId, setSelectedOrgId] = useState(null);
   const [stage, setStage] = useState(null); // null | 'uploading' | 'validating' | 'extracting'
   const [error, setError] = useState(null);
+  const [validationJob, setValidationJob] = useState(null);
 
   useEffect(() => {
     if (!needsOrg) return;
@@ -94,32 +96,40 @@ export default function UploadPage({ mode }) {
 
   const uploadAndVerify = async (file) => {
     const clientError = validateFile(file);
+
     if (clientError) {
       setError(clientError);
       return;
     }
+
     if (!selectedOrgId) {
       setError('Aucune organisation disponible pour déposer ce document.');
       return;
     }
 
     setError(null);
+    setValidationJob(null);
     setStage('uploading');
 
     const formData = new FormData();
     formData.append('file', file);
 
     let documentId;
+
     try {
       const response = await api.post(
         `/documents?organizationId=${selectedOrgId}`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' } }
       );
+
       documentId = response.data.id;
     } catch (err) {
       console.error('Upload error:', err);
-      setError(err.response?.data?.message || "Échec du dépôt du fichier.");
+      setError(
+        err.response?.data?.message
+        || "Échec du dépôt du fichier."
+      );
       setStage(null);
       return;
     }
@@ -127,17 +137,49 @@ export default function UploadPage({ mode }) {
     setStage('validating');
 
     try {
-      await api.post(`/documents/${documentId}/validate`);
-      navigate(`/rapport?documentId=${documentId}`);
+      const response = await api.post(
+        `/jobs/validation?documentId=${documentId}`
+      );
+
+      setValidationJob(response.data);
     } catch (err) {
-      console.error('Validation error:', err);
-      setError(err.response?.data?.message || "Échec de la validation du document.");
+      console.error('Validation job error:', err);
+
+      setError(
+        err.response?.data?.message
+        || err.response?.data?.error
+        || "Impossible de démarrer la validation."
+      );
+
       setStage(null);
     }
   };
 
-  // F06/F11: depose le PDF puis lance l'extraction (POST /documents/{id}/extract)
-  // sur le document cree, avant d'ouvrir la page de vérification des champs (F12).
+  const handleValidationJobChange = useCallback((updatedJob) => {
+    setValidationJob(updatedJob);
+
+    if (
+      updatedJob.status === 'QUEUED'
+      || updatedJob.status === 'PROCESSING'
+    ) {
+      setStage('validating');
+      return;
+    }
+
+    if (
+      updatedJob.status === 'DONE'
+      || updatedJob.status === 'FAILED'
+    ) {
+      setStage(null);
+    }
+  }, []);
+
+  const handleValidationJobDone = useCallback((job) => {
+    setStage(null);
+    navigate(`/rapport?documentId=${job.documentId}`);
+  }, [navigate]);
+
+
   const uploadAndExtract = async (file) => {
     const clientError = validateFile(file, { pdfOnly: true });
     if (clientError) {
@@ -340,6 +382,14 @@ export default function UploadPage({ mode }) {
         <p style={{ margin: '16px 0 0', fontSize: '13px', color: '#991b1b' }}>
           {error}
         </p>
+      )}
+
+      {isVerif && validationJob && (
+        <JobStatusPanel
+          job={validationJob}
+          onJobChange={handleValidationJobChange}
+          onDone={handleValidationJobDone}
+        />
       )}
 
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>

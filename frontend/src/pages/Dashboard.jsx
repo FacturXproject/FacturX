@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import StatusBadge from '../components/StatusBadge';
+import { useDocumentStatusEvent } from '../context/DocumentWebSocketContext';
 
 export default function Dashboard({ onFileSelect }) {
   const navigate = useNavigate();
@@ -48,7 +49,7 @@ export default function Dashboard({ onFileSelect }) {
 
           try {
             const documentsResponse = await api.get(
-              `/documents?organizationId=${organizationId}`
+              `/documents?organizationId=${organizationId}&sort=uploadedAt,desc&size=5`
             );
 
             const organizationDocuments =
@@ -119,6 +120,25 @@ export default function Dashboard({ onFileSelect }) {
 
     return type;
   };
+
+
+  useDocumentStatusEvent((event) => {
+    if (event.type === 'websocket.reconnected') {
+      loadRecentDocuments();
+      return;
+    }
+
+    if (event.type !== 'document.status.changed') return;
+
+    setDocuments(current =>
+      current.map(document =>
+        document.id === event.documentId
+          && document.organizationId === event.organizationId
+          ? { ...document, status: event.status }
+          : document
+      )
+    );
+  });
 
   return (
     <div

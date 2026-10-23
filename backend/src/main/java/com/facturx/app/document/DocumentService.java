@@ -80,6 +80,34 @@ public class DocumentService {
         }
     }
 
+    /**
+     * F13 : enregistre un fichier produit par l'application (Factur-X genere) comme un
+     * document de l'organisation, au meme titre qu'un depot : il apparait dans la
+     * liste des documents, se telecharge et se valide comme les autres.
+     */
+    public Document storeGenerated(byte[] bytes, String filename, Organization organization, Long ownerId) {
+        User owner = userRepository.findById(ownerId)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+        try {
+            Path storageDir = Paths.get(storageBasePath);
+            Files.createDirectories(storageDir);
+            Path targetPath = storageDir.resolve(UUID.randomUUID() + "_" + filename);
+            Files.write(targetPath, bytes);
+
+            Document document = new Document();
+            document.setOrganization(organization);
+            document.setOwner(owner);
+            document.setFilename(filename);
+            document.setType("application/pdf");
+            document.setSize(bytes.length);
+            document.setStoragePath(targetPath.toString());
+            document.setStatus(DocumentStatus.UPLOADED);
+            return documentRepository.save(document);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to store file", e);
+        }
+    }
+
     public List<Document> getMyDocuments(Long userId) {
         return documentRepository.findByOwnerIdOrderByUploadedAtDesc(userId);
     }
@@ -87,6 +115,27 @@ public class DocumentService {
     public Document getDocument(Long documentId) {
         return documentRepository.findById(documentId)
             .orElseThrow(DocumentNotFoundException::new);
+    }
+
+    /**
+     * Lecture d'un document : tout membre ayant VIEW_ALL_DOCUMENTS dans l'organisation
+     * du document, ou son proprietaire s'il a VIEW_OWN_DOCUMENTS.
+     */
+    public void requireViewPermission(Document document, Long currentUserId) {
+        Long organizationId = document.getOrganization().getId();
+
+        if (permissionService.hasPermission(currentUserId, organizationId, Permission.VIEW_ALL_DOCUMENTS)) {
+            return;
+        }
+
+        boolean isOwner = document.getOwner() != null
+            && document.getOwner().getId().equals(currentUserId);
+
+        if (isOwner && permissionService.hasPermission(currentUserId, organizationId, Permission.VIEW_OWN_DOCUMENTS)) {
+            return;
+        }
+
+        throw new com.facturx.app.permission.AccessDeniedException();
     }
 
     public byte[] readFileBytes(Document document) {

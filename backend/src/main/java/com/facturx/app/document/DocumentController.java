@@ -61,8 +61,9 @@ public class DocumentController {
 
     // GET /api/documents/{id} - telecharger le fichier
     @GetMapping("/{id}/download")
-    public ResponseEntity<ByteArrayResource> download(@PathVariable Long id) {
+    public ResponseEntity<ByteArrayResource> download(@PathVariable Long id, Authentication authentication) {
         Document document = documentService.getDocument(id);
+        documentService.requireViewPermission(document, currentUserId(authentication));
         byte[] bytes = documentService.readFileBytes(document);
 
         ByteArrayResource resource = new ByteArrayResource(bytes);
@@ -103,7 +104,8 @@ public class DocumentController {
     // GET /api/documents/{id}/report - rapport de validation lisible (F09) pour le
     // controle le plus recent de ce document.
     @GetMapping("/{id}/report")
-    public ValidationReport getValidationReport(@PathVariable Long id) {
+    public ValidationReport getValidationReport(@PathVariable Long id, Authentication authentication) {
+        documentService.requireViewPermission(documentService.getDocument(id), currentUserId(authentication));
         return validationReportService.getReportForDocument(id);
     }
 }
