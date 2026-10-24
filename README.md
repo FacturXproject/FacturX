@@ -1592,7 +1592,8 @@ endpoints
 
 *Frontend* — "mes données" page, request export, request deletion with confirmation
 *Backend* — user data export, deletion or anonymisation by role, strong confirmation
-*Database* — `deletion_requested` / `anonymized` status
+*Database* — `anonymized` status. No `deletion_requested` status: deletion is processed
+immediately after confirmation, so an intermediate status would never be visible
 *Tests* — export contains the user's data, deletion respects organisations and documents
 *Docs* — simplified retention policy
 
