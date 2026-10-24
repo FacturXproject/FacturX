@@ -10,6 +10,7 @@ export default function MyData() {
 	const [deleting, setDeleting] = useState(false);
 	const [error, setError] = useState('');
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+	const [deleteConfirmation, setDeleteConfirmation] = useState('');
 
 	const handleExport = async () => {
 	try {
@@ -41,7 +42,7 @@ export default function MyData() {
 		setError('');
 
 		await api.post('/gdpr/delete', {
-		confirmation: 'DELETE'
+			confirmation: deleteConfirmation
 		});
 
 		setUser(null);
@@ -49,10 +50,8 @@ export default function MyData() {
 	} catch (err) {
 		const backendError = err.response?.data?.error;
 
-		if (
-		backendError ===
-		'User is the last admin of an organization'
-		) {
+		if (backendError === 'LAST_ADMIN_REQUIRED')
+		{
 		setError(
 			'Vous êtes le dernier administrateur d’une organisation. Vous devez d’abord nommer un autre administrateur avant de supprimer votre compte.'
 		);
@@ -199,8 +198,34 @@ export default function MyData() {
 					fontSize: '14px',
 				}}
 				>
-				Cette action est irréversible et vos données personnelles seront anonymisées.
+				Cette action est irréversible et vos données personnelles seront supprimées.
 				</p>
+				<p
+					style={{
+						marginBottom: '8px',
+						fontSize: '14px',
+						color: '#374151',
+					}}
+					>
+					Tapez <strong>SUPPRIMER</strong> pour confirmer.
+					</p>
+
+					<input
+					type="text"
+					value={deleteConfirmation}
+					onChange={(event) => setDeleteConfirmation(event.target.value)}
+					placeholder="SUPPRIMER"
+					aria-label="Confirmation de suppression"
+					disabled={deleting}
+					style={{
+						width: '100%',
+						boxSizing: 'border-box',
+						padding: '10px 12px',
+						marginBottom: '14px',
+						border: '1px solid #d1d5db',
+						borderRadius: '7px',
+					}}
+					/>
 
 				<div
 				style={{
@@ -210,7 +235,10 @@ export default function MyData() {
 				>
 				<button
 					type="button"
-					onClick={() => setShowDeleteConfirm(false)}
+					onClick={() => {
+						setShowDeleteConfirm(false);
+						setDeleteConfirmation('');
+						}}
 					disabled={deleting}
 					style={{
 					padding: '9px 16px',
@@ -228,16 +256,22 @@ export default function MyData() {
 				<button
 					type="button"
 					onClick={handleDelete}
-					disabled={deleting}
+					disabled={deleting || deleteConfirmation !== 'SUPPRIMER'}
 					style={{
 					padding: '9px 16px',
 					borderRadius: '7px',
 					border: 'none',
 					background: '#1a2744',
 					color: '#fff',
-					cursor: deleting ? 'not-allowed' : 'pointer',
+					cursor:
+						deleting || deleteConfirmation !== 'SUPPRIMER'
+							? 'not-allowed'
+							: 'pointer',
 					fontWeight: 600,
-					opacity: deleting ? 0.6 : 1,
+					opacity:
+						deleting || deleteConfirmation !== 'SUPPRIMER'
+							? 0.6
+							: 1,
 					}}
 				>
 					{deleting

@@ -54,9 +54,20 @@ public class GdprController {
 
 		Long userId = principal.getUser().getId();
 
-		gdprService.anonymizeUser(
+		String principalName = principal.getUsername();
+
+		var session = httpRequest.getSession(false);
+		String currentSessionId =
+				session != null ? session.getId() : null;
+
+		gdprService.deleteOrAnonymizeUser(
 				userId,
 				request.confirmation()
+		);
+
+		authService.logoutOtherSessions(
+			principalName,
+			currentSessionId
 		);
 
 		authService.logout(

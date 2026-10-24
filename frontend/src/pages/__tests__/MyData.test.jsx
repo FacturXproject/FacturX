@@ -7,34 +7,34 @@ import api from '../../services/api';
 const { navigateMock, setUserMock } = vi.hoisted(() => ({
   navigateMock: vi.fn(),
   setUserMock: vi.fn(),
-}));
+  }));
 
-vi.mock('../../services/api');
+  vi.mock('../../services/api');
 
-vi.mock('../../context/AuthContext', () => ({
+  vi.mock('../../context/AuthContext', () => ({
   useAuth: () => ({
     setUser: setUserMock,
   }),
-}));
+  }));
 
-vi.mock('react-router-dom', async () => {
+  vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom');
 
   return {
     ...actual,
     useNavigate: () => navigateMock,
   };
-});
+  });
 
-function renderPage() {
+  function renderPage() {
   return render(
     <MemoryRouter>
       <MyData />
     </MemoryRouter>
   );
-}
+  }
 
-describe('MyData', () => {
+  describe('MyData', () => {
   let createObjectURLMock;
   let revokeObjectURLMock;
   let linkClickMock;
@@ -44,6 +44,7 @@ describe('MyData', () => {
 
     createObjectURLMock = vi.fn(() => 'blob:my-data');
     revokeObjectURLMock = vi.fn();
+
     linkClickMock = vi
       .spyOn(HTMLAnchorElement.prototype, 'click')
       .mockImplementation(() => {});
@@ -145,7 +146,38 @@ describe('MyData', () => {
     expect(api.post).not.toHaveBeenCalled();
   });
 
-  it('supprime le compte avec la confirmation DELETE puis deconnecte', async () => {
+  it('exige la saisie exacte de SUPPRIMER avant la suppression', () => {
+    renderPage();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Supprimer mon compte' })
+    );
+
+    const confirmButton = screen.getByRole('button', {
+      name: 'Confirmer la suppression',
+    });
+
+    const confirmationInput = screen.getByLabelText(
+      'Confirmation de suppression'
+    );
+
+    expect(confirmButton).toBeDisabled();
+
+    fireEvent.change(confirmationInput, {
+      target: { value: 'supprimer' },
+    });
+
+    expect(confirmButton).toBeDisabled();
+
+    fireEvent.change(confirmationInput, {
+      target: { value: 'SUPPRIMER' },
+    });
+
+    expect(confirmButton).toBeEnabled();
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('supprime le compte apres saisie de SUPPRIMER puis deconnecte', async () => {
     api.post.mockResolvedValue({});
 
     renderPage();
@@ -154,13 +186,18 @@ describe('MyData', () => {
       screen.getByRole('button', { name: 'Supprimer mon compte' })
     );
 
+    fireEvent.change(
+      screen.getByLabelText('Confirmation de suppression'),
+      { target: { value: 'SUPPRIMER' } }
+    );
+
     fireEvent.click(
       screen.getByRole('button', { name: 'Confirmer la suppression' })
     );
 
     await waitFor(() => {
       expect(api.post).toHaveBeenCalledWith('/gdpr/delete', {
-        confirmation: 'DELETE',
+        confirmation: 'SUPPRIMER',
       });
     });
 
@@ -172,7 +209,7 @@ describe('MyData', () => {
     api.post.mockRejectedValue({
       response: {
         data: {
-          error: 'User is the last admin of an organization',
+          error: 'LAST_ADMIN_REQUIRED',
         },
       },
     });
@@ -181,6 +218,11 @@ describe('MyData', () => {
 
     fireEvent.click(
       screen.getByRole('button', { name: 'Supprimer mon compte' })
+    );
+
+    fireEvent.change(
+      screen.getByLabelText('Confirmation de suppression'),
+      { target: { value: 'SUPPRIMER' } }
     );
 
     fireEvent.click(
@@ -210,6 +252,11 @@ describe('MyData', () => {
 
     fireEvent.click(
       screen.getByRole('button', { name: 'Supprimer mon compte' })
+    );
+
+    fireEvent.change(
+      screen.getByLabelText('Confirmation de suppression'),
+      { target: { value: 'SUPPRIMER' } }
     );
 
     fireEvent.click(
