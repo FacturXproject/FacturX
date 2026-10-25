@@ -10,6 +10,8 @@ public interface DocumentRepository extends JpaRepository<Document, Long>, JpaSp
     List<Document> findByOwnerIdOrderByUploadedAtDesc(Long userId);
     List<Document> findByOrganizationIdOrderByUploadedAtDesc(Long organizationId);
 
+    boolean existsByOwnerId(Long ownerId);
+    
     Page<Document> findByOrganizationId(Long organizationId, Pageable pageable);
     Page<Document> findByOrganizationIdAndOwnerId(Long organizationId, Long userId, Pageable pageable);
 

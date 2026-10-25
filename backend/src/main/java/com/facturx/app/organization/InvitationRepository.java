@@ -11,7 +11,11 @@ public interface InvitationRepository extends JpaRepository<Invitation, Long> {
     List<Invitation> findByOrganizationId(Long organizationId);
 
     Optional<Invitation> findByEmailAndOrganizationIdAndStatus(
-        String email, Long organizationId, InvitationStatus status);
+        String email, Long organizationId, InvitationStatus status
+    );
+
     boolean existsByOrganizationIdAndEmailIgnoreCaseAndStatus(
         Long organizationId, String email, InvitationStatus status);
+
+    List<Invitation> findByEmailIgnoreCaseOrderByCreatedAtDesc(String email);
 }
