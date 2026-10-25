@@ -22,6 +22,8 @@ import org.springframework.security.web.authentication.session.SessionAuthentica
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.session.FindByIndexNameSessionRepository;
+import org.springframework.session.Session;
 
 @Service
 public class AuthService {
@@ -38,19 +40,23 @@ public class AuthService {
     private final SessionAuthenticationStrategy sessionAuthenticationStrategy =
             new ChangeSessionIdAuthenticationStrategy();
 
-    public AuthService(
-            UserRepository userRepository,
-            PasswordEncoder passwordEncoder,
-            AuthenticationManager authenticationManager,
-            LoginAttemptService loginAttemptService,
-            DocumentWebSocketHandler webSocketHandler) {
+    private final FindByIndexNameSessionRepository<? extends Session> sessionRepository;
+
+        public AuthService(
+                UserRepository userRepository,
+                PasswordEncoder passwordEncoder,
+                AuthenticationManager authenticationManager,
+                LoginAttemptService loginAttemptService,
+                DocumentWebSocketHandler webSocketHandler,
+                FindByIndexNameSessionRepository<? extends Session> sessionRepository) {
 
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.loginAttemptService = loginAttemptService;
         this.webSocketHandler = webSocketHandler;
-    }
+        this.sessionRepository = sessionRepository;
+        }
 
     public UserResponse register(
             RegisterRequest request,
@@ -171,5 +177,21 @@ public class AuthService {
 
     private String normalize(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    public void logoutOtherSessions(
+        String principalName,
+        String currentSessionId) {
+
+    sessionRepository.findByPrincipalName(principalName)
+            .forEach((sessionId, session) -> {
+
+                if (sessionId.equals(currentSessionId)) {
+                    return;
+                }
+
+                webSocketHandler.closeForHttpSession(sessionId);
+                sessionRepository.deleteById(sessionId);
+            });
     }
 }
