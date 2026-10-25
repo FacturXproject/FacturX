@@ -186,6 +186,16 @@ public class GdprService {
 				organizationMemberRepository.deleteAll(memberships);
 				organizationMemberRepository.flush();
 
+				// Les invitations portent l'email en clair : elles doivent disparaitre
+				// aussi bien lors d'une suppression que d'une anonymisation.
+				invitationRepository.deleteAll(
+								invitationRepository
+												.findByEmailIgnoreCaseOrderByCreatedAtDesc(
+																user.getEmail()
+												)
+				);
+				invitationRepository.flush();
+
 				if (hasDocuments) {
 
 						user.setEmail(

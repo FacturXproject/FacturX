@@ -17,8 +17,10 @@ be visible.
 
 - **Last administrator**: deletion is refused (`409 LAST_ADMIN_REQUIRED`) while the user
   is the only admin of an organization. Another admin must be named first.
-- **User without documents**: the user row is physically deleted. Organization
-  memberships are removed and API keys are deleted with it (`ON DELETE CASCADE`).
+- **In both cases**, organization memberships are removed and every invitation
+  addressed to the user's email is deleted (it stores the email in clear text).
+- **User without documents**: the user row is physically deleted. API keys are
+  deleted with it (`ON DELETE CASCADE`).
 - **User with documents**: the user row is anonymized instead, because documents keep a
   foreign key to their owner. The application:
   - replaces the email with `deleted-<id>@anonymized.local`;
@@ -26,6 +28,7 @@ be visible.
   - invalidates the password hash;
   - sets the status to `anonymized`, so the account can no longer log in;
   - removes organization memberships (API keys stop working);
+  - deletes the invitations addressed to the former email;
   - keeps existing documents and their references.
 
 In both cases every session of the user is invalidated (not only the current one), so

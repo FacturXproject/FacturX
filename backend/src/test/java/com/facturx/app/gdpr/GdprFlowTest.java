@@ -443,6 +443,17 @@ class GdprFlowTest extends AbstractIntegrationTest {
 			Document savedDocument =
 							documentRepository.save(document);
 
+			Invitation pendingInvitation = new Invitation();
+			pendingInvitation.setOrganization(organization);
+			pendingInvitation.setEmail(user.email());
+			pendingInvitation.setRole(Role.CLIENT);
+			pendingInvitation.setStatus(InvitationStatus.PENDING);
+			pendingInvitation.setToken(UUID.randomUUID().toString());
+			pendingInvitation.setExpiresAt(
+							LocalDateTime.now().plusDays(7)
+			);
+			invitationRepository.save(pendingInvitation);
+
 			mockMvc.perform(
 											post("/api/gdpr/delete")
 															.with(csrf())
@@ -481,6 +492,14 @@ class GdprFlowTest extends AbstractIntegrationTest {
 
 			assertThat(
 							memberRepository.findByUserId(user.id())
+			).isEmpty();
+
+			// L'email en clair ne doit plus apparaitre dans les invitations
+			assertThat(
+							invitationRepository
+											.findByEmailIgnoreCaseOrderByCreatedAtDesc(
+															user.email()
+											)
 			).isEmpty();
 
 			Document preservedDocument =
