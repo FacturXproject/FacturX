@@ -25,6 +25,7 @@ import Documents from './pages/Documents';
 import InvoiceView from './pages/InvoiceView';
 import MyData from './pages/MyData';
 import ApiKeysPage from './pages/ApiKeysPage';
+import ExportImportPage from './pages/ExportImportPage';
 import { DocumentWebSocketProvider } from './context/DocumentWebSocketContext';
 
 function Protected({ children }) {
@@ -51,6 +52,7 @@ export default function App() {
           <Route path="/terms" element={<Terms />} />
 
           <Route path="/organisations/:id" element={<Protected><OrganizationMembersPage /></Protected>} />
+          <Route path="/organisations/:id/export-import" element={<Protected><ExportImportPage /></Protected>} />
           <Route path="/" element={<LandingPage />} />
           <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
           <Route path="/documents" element={<Protected><Documents /></Protected>} />

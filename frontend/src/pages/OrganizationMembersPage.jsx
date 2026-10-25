@@ -7,6 +7,7 @@ import {
   Mail,
   Clock,
   Eye,
+  ArrowDownUp,
 } from 'lucide-react';
 import api from '../services/api';
 import DocumentUploadForm from '../components/DocumentUploadForm';
@@ -358,6 +359,29 @@ const totalPages = Math.ceil(documents.length / documentsPerPage);
           </p>
         </div>
 
+        <div style={{ display: 'flex', gap: '8px' }}>
+        {(isAdmin || currentRole === 'ACCOUNTANT') && (
+          <button
+            onClick={() => navigate(`/organisations/${id}/export-import`)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: '#fff',
+              color: '#374151',
+              border: '1px solid #d1d5db',
+              borderRadius: '8px',
+              padding: '9px 14px',
+              fontSize: '13px',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            <ArrowDownUp size={15} />
+            Export / import
+          </button>
+        )}
+
         {isAdmin && (
           <button
             onClick={() => setShowDeleteConfirm(true)}
@@ -379,6 +403,7 @@ const totalPages = Math.ceil(documents.length / documentsPerPage);
             Supprimer l'organisation
           </button>
         )}
+        </div>
       </div>
 
       {loading && (

@@ -1797,3 +1797,111 @@ Toujours au format `{"error": "CODE", "message": "..."}`.
 
 Publiques, en lecture seule ; seules les routes `/api/public/**` y figurent.
 Bouton **Authorize** : coller la clé pour essayer les endpoints.
+
+## F20 — Export / import
+
+Page **Export / import** d'une organisation (`/organisations/{id}/export-import`),
+accessible depuis la page de l'organisation (bouton « Export / import »).
+Routes de session (cookie + CSRF), comme le reste de l'application.
+
+### Droits
+
+| Action | Admin | Comptable | Client |
+| --- | --- | --- | --- |
+| Exporter les documents (CSV, JSON, PDF) | oui | oui | non |
+| Exporter les membres (CSV, JSON) | oui | non | non |
+| Importer des invitations (CSV) | oui | non | non |
+
+Un utilisateur qui n'est pas membre de l'organisation reçoit `403`, comme un client.
+Un export ne contient jamais de données d'une autre organisation.
+
+### Export
+
+| Méthode | Route | Formats |
+| --- | --- | --- |
+| `GET` | `/api/organizations/{orgId}/export/documents?format=csv` | `csv`, `json` (défaut), `pdf` |
+| `GET` | `/api/organizations/{orgId}/export/members?format=csv` | `csv`, `json` (défaut) |
+
+Le fichier est envoyé en pièce jointe (`documents.csv`, `members.json`, ...).
+
+**Documents** : une ligne par document, du plus récent au plus ancien. Les colonnes
+conformité, erreurs et règles viennent de la dernière validation (F08 / F09).
+
+| Colonne CSV | Champ JSON | Contenu |
+| --- | --- | --- |
+| Identifiant | `id` | identifiant du document |
+| Organisation | `organizationName` | nom de l'organisation |
+| Déposé par | `uploadedBy` | prénom et nom |
+| Nom du fichier | `filename` | |
+| Type | `type` | `PDF` ou `XML` |
+| Taille (MB) | `sizeMb` | arrondie à 2 décimales |
+| Statut | `status` | `UPLOADED`, `QUEUED`, `PROCESSING`, `VALID`, `INVALID`, `FAILED` |
+| Date de dépôt | `uploadedAt` | `jj/mm/aaaa hh:mm`, heure de Paris |
+| Adresse e-mail | `email` | e-mail de la personne qui a déposé |
+| Conforme | `valid` | `Oui`, `Non` ou `Non validé` |
+| Nombre d’erreurs | `errorCount` | vide si jamais validé |
+| Codes des règles | `ruleCodes` | CSV : codes séparés par `;`, JSON : liste |
+
+**Membres** : `Nom complet`, `Adresse e-mail`, `Rôle` (JSON : `name`, `email`, `role`).
+
+CSV : UTF-8 avec BOM (Excel affiche correctement les accents), séparateur `,`, toutes
+les valeurs entre guillemets. Une valeur qui commence par `=`, `+`, `-` ou `@` est
+préfixée par `'` pour qu'un tableur ne l'exécute pas comme une formule.
+
+PDF : tableau A4 paysage, paginé, avec les mêmes informations (sans l'identifiant,
+l'organisation et l'e-mail), à imprimer ou archiver. Les caractères hors de l'alphabet
+latin (cyrillique, emoji, ...) y apparaissent sous la forme `?`. Le CSV et le JSON les
+conservent.
+
+### Import d'invitations
+
+`POST /api/organizations/{orgId}/import/invitations?dryRun=true`, multipart, champ `file`.
+
+Format du fichier :
+
+```csv
+email,role
+prenom.nom@exemple.fr,CLIENT
+comptable@exemple.fr,ACCOUNTANT
+```
+
+- Colonnes obligatoires `email` et `role` (majuscules ou minuscules), dans n'importe
+  quel ordre, colonnes supplémentaires ignorées. Les en-têtes de l'export des membres
+  (`Adresse e-mail`, `Rôle`) sont aussi acceptés : un export peut être réimporté
+  dans une autre organisation.
+- Rôles : `ADMIN`, `ACCOUNTANT`, `CLIENT`, ou les libellés `Administrateur`,
+  `Comptable`, `Client`.
+- Séparateur `,` ou `;` (détecté sur la première ligne), UTF-8, avec ou sans BOM.
+- 500 lignes de données au maximum, 10 Mo au maximum.
+
+Chaque ligne est vérifiée comme une invitation manuelle (F03) : e-mail valide, pas de
+doublon dans le fichier, pas déjà membre, pas d'invitation déjà en attente.
+
+Le traitement se fait en deux temps :
+
+1. `dryRun=true` (défaut) : **aperçu**, rien n'est créé. La réponse liste chaque ligne :
+   `{"lineNumber": 2, "email": "...", "role": "CLIENT", "valid": true, "error": null}`.
+2. `dryRun=false` : **import**, tout ou rien. Si une seule ligne est en erreur, la
+   réponse est `400` avec la même liste et **aucune** invitation n'est créée. Sinon
+   les invitations sont créées dans une seule transaction (`200`) et les e-mails ne
+   partent qu'une fois cette transaction validée. Un import annulé n'envoie donc
+   jamais de lien vers une invitation qui n'existe pas.
+
+La page de l'application fait l'aperçu dès que le fichier est choisi. Elle n'active le
+bouton d'envoi que si toutes les lignes sont valides.
+
+### Erreurs
+
+Format `{"error": "CODE", "message": "..."}`.
+
+| HTTP | `error` | Cas |
+| --- | --- | --- |
+| 400 | `INVALID_EXPORT_FORMAT` | format inconnu (`xlsx`, `pdf` pour les membres, ...) |
+| 400 | `INVALID_IMPORT_FILE` | fichier absent ou vide, colonnes manquantes ou en double, CSV mal formé, plus de 500 lignes |
+| 400 | *(liste des lignes)* | import avec au moins une ligne en erreur |
+| 403 | `ACCESS_DENIED` | rôle insuffisant ou non-membre |
+| 409 | `INVITATION_ALREADY_PENDING`, `USER_ALREADY_MEMBER` | conflit apparu entre l'aperçu et l'import ; rien n'est créé |
+| 413 | `FILE_TOO_LARGE` | fichier de plus de 10 Mo |
+
+Tests : `backend/.../exportimport/ExportImportFlowTest.java` (colonnes, isolation,
+droits, import invalide refusé sans rien créer), `frontend/.../ExportImportPage.test.jsx`.

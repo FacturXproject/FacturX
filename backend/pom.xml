@@ -108,6 +108,19 @@
 		</dependency>
 
 		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-csv</artifactId>
+			<version>1.14.0</version>
+		</dependency>
+
+		<!-- F20: PDF export of the document list. Same version as the one Mustang brings. -->
+		<dependency>
+			<groupId>org.apache.pdfbox</groupId>
+			<artifactId>pdfbox</artifactId>
+			<version>3.0.8</version>
+		</dependency>
+
+		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-websocket</artifactId>
 		</dependency>
@@ -119,6 +132,7 @@
 			<version>3.1.1</version>
 		</dependency>
 	</dependencies>
+
 
 	<build>
 		<plugins>
@@ -147,6 +161,7 @@
 					<argLine>-javaagent:${org.mockito:mockito-core:jar}</argLine>
 				</configuration>
 			</plugin>
+
 
 		</plugins>
 	</build>

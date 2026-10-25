@@ -8,11 +8,13 @@ import java.util.List;
 
 public interface DocumentRepository extends JpaRepository<Document, Long>, JpaSpecificationExecutor<Document> {
     List<Document> findByOwnerIdOrderByUploadedAtDesc(Long userId);
+    List<Document> findByOrganizationIdOrderByUploadedAtDesc(Long organizationId);
 
     boolean existsByOwnerId(Long ownerId);
     
     Page<Document> findByOrganizationId(Long organizationId, Pageable pageable);
     Page<Document> findByOrganizationIdAndOwnerId(Long organizationId, Long userId, Pageable pageable);
+
 
     boolean existsByOrganizationId(Long organizationId);
 }

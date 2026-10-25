@@ -1,6 +1,10 @@
 package com.facturx.app.organization;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -13,6 +17,8 @@ import com.facturx.app.permission.PermissionService;
 
 @Service
 public class InvitationService {
+
+    private static final Logger log = LoggerFactory.getLogger(InvitationService.class);
 
     private final InvitationRepository invitationRepository;
     private final OrganizationRepository organizationRepository;
@@ -88,13 +94,40 @@ public class InvitationService {
 
         invitationRepository.save(invitation);
 
-        emailService.sendInvitation(
-            invitation.getEmail(),
-            organization.getName(),
-            invitation.getToken()
-        );
+        sendInvitationEmail(invitation, organization);
 
         return toResponse(invitation);
+    }
+
+
+    // F20 : dans une transaction (import CSV), l'email part seulement après le commit,
+    // pour qu'un import annulé n'envoie jamais de lien vers une invitation inexistante.
+    private void sendInvitationEmail(
+            Invitation invitation,
+            Organization organization) {
+
+        String email = invitation.getEmail();
+        String organizationName = organization.getName();
+        String token = invitation.getToken();
+
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            emailService.sendInvitation(email, organizationName, token);
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(
+            new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        emailService.sendInvitation(email, organizationName, token);
+                    } catch (RuntimeException e) {
+                        // L'invitation est enregistrée : l'admin peut la renvoyer.
+                        log.warn("Invitation email to {} failed", email, e);
+                    }
+                }
+            }
+        );
     }
 
 
