@@ -18,10 +18,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 @AutoConfigureMockMvc
+// "test" profile: uploads go to /tmp/facturx-test-uploads (application-test.properties)
+// instead of /app/uploads, which isn't writable on the CI runner.
+@ActiveProfiles("test")
 class ValidationReportControllerTest extends AbstractIntegrationTest {
 
     private static final Pattern RUN_ID_PATTERN = Pattern.compile("\"runId\":(\\d+)");
