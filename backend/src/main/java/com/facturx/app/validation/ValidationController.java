@@ -1,7 +1,9 @@
 package com.facturx.app.validation;
 
+import com.facturx.app.auth.AppUserPrincipal;
 import java.io.IOException;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,13 +30,17 @@ public class ValidationController {
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ValidationResult validate(@RequestParam("file") MultipartFile file) {
+    public ValidationResult validate(@RequestParam("file") MultipartFile file,
+                                     Authentication authentication) {
         if (file.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Le fichier est vide."); 
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Le fichier est vide.");
         }
         String filename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "upload.pdf";
         try {
-            return validationService.validate(file.getBytes(), filename, null);
+            ValidationResult result = validationService.validate(file.getBytes(), filename, null);
+            AppUserPrincipal principal = (AppUserPrincipal) authentication.getPrincipal();
+            validationService.assignRequester(result.runId(), principal.getUser().getId());
+            return result;
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Impossible de lire le fichier.", e);
         }

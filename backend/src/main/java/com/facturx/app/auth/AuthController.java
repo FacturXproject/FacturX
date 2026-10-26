@@ -1,5 +1,6 @@
 package com.facturx.app.auth;
 
+import com.facturx.app.user.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -19,9 +20,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService; // init the class AuthService once recive an api on endpoint /api/auth
+    private final UserRepository userRepository;
 
-    public AuthController(AuthService authService) { // init the AuthController with the object AuthService
+    public AuthController(AuthService authService, UserRepository userRepository) { // init the AuthController with the object AuthService
         this.authService = authService;
+        this.userRepository = userRepository;
     }
 
     @PostMapping("/register")
@@ -49,6 +52,10 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<UserResponse> me(Authentication authentication) {
         AppUserPrincipal principal = (AppUserPrincipal) authentication.getPrincipal();
-        return ResponseEntity.ok(UserResponse.from(principal.getUser()));
+        // L'utilisateur stocke en session est fige au login : on relit la base pour que
+        // le SPA voie un profil modifie (PUT /api/me) apres un rechargement.
+        return userRepository.findById(principal.getUser().getId())
+                .map(user -> ResponseEntity.ok(UserResponse.from(user)))
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
     }
 }

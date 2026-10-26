@@ -66,6 +66,57 @@ class ValidationReportControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.errors").isEmpty());
     }
 
+    @Test
+    void anotherUserCannotReadARawValidationReport() throws Exception {
+        Cookie author = loginSession();
+        String runId = validateRaw(author);
+
+        mockMvc.perform(get("/api/validate/runs/" + runId + "/report").cookie(loginSession()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void outsiderCannotReadTheReportOfAnotherOrganizationsDocument() throws Exception {
+        Cookie owner = loginSession();
+        MvcResult org = mockMvc.perform(post("/api/organizations?name=Cabinet").with(csrf()).cookie(owner))
+                .andExpect(status().isOk())
+                .andReturn();
+        String orgId = org.getResponse().getContentAsString().replaceAll(".*\"id\":(\\d+).*", "$1");
+
+        MvcResult uploaded = mockMvc.perform(multipart("/api/documents?organizationId=" + orgId)
+                        .file(sampleFile("EN16931_Einfach.pdf")).with(csrf()).cookie(owner))
+                .andExpect(status().isOk())
+                .andReturn();
+        String documentId = uploaded.getResponse().getContentAsString().replaceAll("^\\{\"id\":(\\d+).*", "$1");
+
+        MvcResult validated = mockMvc.perform(post("/api/documents/" + documentId + "/validate").with(csrf()).cookie(owner))
+                .andExpect(status().isOk())
+                .andReturn();
+        Matcher matcher = RUN_ID_PATTERN.matcher(validated.getResponse().getContentAsString());
+        if (!matcher.find()) {
+            throw new IllegalStateException("No runId in validate response");
+        }
+        String runId = matcher.group(1);
+
+        mockMvc.perform(get("/api/validate/runs/" + runId + "/report").cookie(owner))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/validate/runs/" + runId + "/report").cookie(loginSession()))
+                .andExpect(status().isForbidden());
+    }
+
+    private String validateRaw(Cookie session) throws Exception {
+        MvcResult result = mockMvc.perform(multipart("/api/validate")
+                        .file(sampleFile("EN16931_Einfach.pdf")).with(csrf()).cookie(session))
+                .andExpect(status().isOk())
+                .andReturn();
+        Matcher matcher = RUN_ID_PATTERN.matcher(result.getResponse().getContentAsString());
+        if (!matcher.find()) {
+            throw new IllegalStateException("No runId in validate response");
+        }
+        return matcher.group(1);
+    }
+
     private Cookie loginSession() throws Exception {
         String email = "report-" + UUID.randomUUID() + "@x.fr";
         MvcResult result = mockMvc.perform(post("/api/auth/register").with(csrf())

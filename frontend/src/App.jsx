@@ -11,7 +11,6 @@ import XmlReader from './pages/XmlReader';
 import UploadPage from './pages/UploadPage';
 import HealthCheck from './pages/HealthCheck';
 import OrganizationsPage from './pages/OrganizationsPage';
-import Users from './pages/Users';
 import Layout from './components/Layout';
 import Invitations from './pages/Invitations';
 import OrganizationMembersPage from './pages/OrganizationMembersPage';
@@ -47,7 +46,6 @@ export default function App() {
           <Route path="/register" element={<Register />} />
 
           <Route path="/healthcheck" element={<HealthCheck />} />
-          <Route path="/users" element={<Users />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<Terms />} />
 

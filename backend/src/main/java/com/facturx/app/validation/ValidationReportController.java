@@ -1,5 +1,7 @@
 package com.facturx.app.validation;
 
+import com.facturx.app.auth.AppUserPrincipal;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,7 +26,8 @@ public class ValidationReportController {
     }
 
     @GetMapping("/{runId}/report")
-    public ValidationReport report(@PathVariable Long runId) {
-        return validationReportService.getReport(runId);
+    public ValidationReport report(@PathVariable Long runId, Authentication authentication) {
+        AppUserPrincipal principal = (AppUserPrincipal) authentication.getPrincipal();
+        return validationReportService.getReportForUser(runId, principal.getUser().getId());
     }
 }

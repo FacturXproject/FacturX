@@ -46,7 +46,10 @@ public class DocumentController {
     public DocumentResponse upload(@RequestParam("file") MultipartFile file,
                                     @RequestParam Long organizationId,
                                     Authentication authentication) {
-        Document document = documentService.upload(file, organizationId, currentUserId(authentication));
+        Long userId = currentUserId(authentication);
+        // Seul un membre ayant UPLOAD_DOCUMENT peut deposer dans cette organisation.
+        permissionService.requirePermission(userId, organizationId, Permission.UPLOAD_DOCUMENT);
+        Document document = documentService.upload(file, organizationId, userId);
         return DocumentResponse.from(document);
     }
 

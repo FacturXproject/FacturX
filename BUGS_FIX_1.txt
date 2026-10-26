@@ -1,0 +1,75 @@
+BUGS FIX #1
+===========
+
+PROBLEMS FOUND
+
+1. Upload into any organization
+   POST /api/documents?organizationId=X had no permission check. Any logged-in
+   user could upload a file into another firm's organization.
+
+2. Validation reports readable by anyone
+   GET /api/validate/runs/{runId}/report had no access check. Run IDs are
+   sequential, so any user could read other organizations' reports (file names,
+   errors, invoice values).
+
+3. Global user list exposed
+   GET /api/users returned every account (email, name, status) to any logged-in
+   user. The roadmap (F02) required removing it. The /users front page was also
+   unprotected.
+
+4. Uploads over 1 MB rejected
+   nginx.conf had no client_max_body_size, so Nginx used its 1 MB default and
+   returned an HTML 413. The UI and backend promise 10 MB.
+
+5. Profile name change "lost"
+   PUT /api/me saved to the database, but GET /api/auth/me returned the user
+   cached in the session. After a page reload the old name was shown again.
+
+
+
+
+FIXES
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+1. DocumentController.upload now requires UPLOAD_DOCUMENT in the target
+   organization (403 otherwise).
+
+2. Report access is now checked:
+   - run linked to a document: same rights as viewing that document (403);
+   - raw run (POST /api/validate): only its author. New column
+     validation_runs.requested_by, added automatically by Hibernate (404 otherwise).
+
+3. Removed UserController (GET /api/users), Users.jsx and the /users route.
+   Members are listed through GET /api/organizations/{id}/members. README updated.
+
+4. nginx.conf: client_max_body_size 12m.
+   Backend: spring.servlet.multipart.max-request-size=11MB (file limit stays
+   10 MB; larger files get a JSON 413).
+
+5. GET /api/auth/me reloads the user from the database.
+   UserService.updateProfile loads the user by id instead of saving the stale
+   session object (debug println removed).
+
+
+
+
+
+TESTS
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+New backend regression tests (5):
+- DocumentFlowTest.uploadingIntoAnotherOrganizationIsForbidden
+- ValidationReportControllerTest.anotherUserCannotReadARawValidationReport
+- ValidationReportControllerTest.outsiderCannotReadTheReportOfAnotherOrganizationsDocument
+- AuthFlowTest.theGlobalUserListIsNoLongerExposed
+- AuthFlowTest.meReflectsAProfileUpdateWithoutLoggingInAgain
+
+Results:
+- Backend (mvnw test): 216/216 passed (211 before + 5 new).
+- Frontend (vitest): 108/108 passed; lint 0 errors; build OK.
+- Team E2E scripts on the rebuilt stack: F13 34/34, F16 33/33, F17 30/30,
+  F20 43/43.
+- Manual checks through Nginx (https://localhost:8443):
+  outsider upload 403, member upload 200; reports 403/404 for others, 200 for
+  owner; /api/users 404; uploads of 1.5 / 5 / 9.9 MB return 200, 10.5 MB returns
+  JSON 413; new name shown after page reload in the UI.
+
+

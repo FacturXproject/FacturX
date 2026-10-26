@@ -138,6 +138,17 @@ public class FacturXValidationService {
         );
     }
 
+    /**
+     * Rattache une validation brute (sans document) a l'utilisateur qui l'a lancee,
+     * pour que lui seul puisse relire son rapport.
+     */
+    public void assignRequester(Long runId, Long userId) {
+        validationRunRepository.findById(runId).ifPresent(run -> {
+            run.setRequestedBy(userId);
+            validationRunRepository.save(run);
+        });
+    }
+
     private void notifyStatusChanged(Document document) {
         DocumentStatusChangedEvent event = new DocumentStatusChangedEvent(
                 "document.status.changed",

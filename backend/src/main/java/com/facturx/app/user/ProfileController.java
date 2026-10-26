@@ -51,7 +51,7 @@ public class ProfileController {
                 (AppUserPrincipal) authentication.getPrincipal();
 
         User updatedUser = userService.updateProfile(
-                principal.getUser(),
+                principal.getUser().getId(),
                 request.firstName(),
                 request.lastName()
         );

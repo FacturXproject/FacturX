@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.facturx.app.AbstractIntegrationTest;
@@ -174,6 +176,38 @@ class AuthFlowTest extends AbstractIntegrationTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(email)))
                 .andReturn();
         assertNeverLeaksPassword(result);
+    }
+
+    @Test
+    void meReflectsAProfileUpdateWithoutLoggingInAgain() throws Exception {
+        MvcResult registerResult = mockMvc.perform(post("/api/auth/register").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerBody(uniqueEmail("profile"), "correcthorsebattery")))
+                .andReturn();
+        Cookie session = sessionCookie(registerResult);
+
+        mockMvc.perform(put("/api/me").with(csrf()).cookie(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName":"Marie","lastName":"Curie"}"""))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/auth/me").cookie(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.firstName").value("Marie"))
+                .andExpect(jsonPath("$.lastName").value("Curie"));
+    }
+
+    @Test
+    void theGlobalUserListIsNoLongerExposed() throws Exception {
+        MvcResult registerResult = mockMvc.perform(post("/api/auth/register").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerBody(uniqueEmail("users"), "correcthorsebattery")))
+                .andReturn();
+        Cookie session = sessionCookie(registerResult);
+
+        mockMvc.perform(get("/api/users").cookie(session))
+                .andExpect(status().isNotFound());
     }
 
     @Test

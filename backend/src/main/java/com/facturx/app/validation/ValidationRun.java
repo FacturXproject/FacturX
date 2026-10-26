@@ -27,6 +27,11 @@ public class ValidationRun {
     @Column(name = "document_id")
     private Long documentId;
 
+    // Auteur d'une validation brute (POST /api/validate, sans document) : seul lui peut
+    // relire le rapport. Null pour les validations liees a un document.
+    @Column(name = "requested_by")
+    private Long requestedBy;
+
     @Column(nullable = false, length = 255)
     private String filename;
 
@@ -58,6 +63,14 @@ public class ValidationRun {
 
     public void setDocumentId(Long documentId) {
         this.documentId = documentId;
+    }
+
+    public Long getRequestedBy() {
+        return requestedBy;
+    }
+
+    public void setRequestedBy(Long requestedBy) {
+        this.requestedBy = requestedBy;
     }
 
     public String getFilename() {
