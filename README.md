@@ -399,7 +399,7 @@ http://localhost:8080
 The frontend uses relative API paths such as:
 
 ```text
-/api/users
+/api/organizations
 /api/healthcheck
 /api/auth/login
 ```
@@ -523,35 +523,15 @@ Invalidates the current authenticated session.
 
 ---
 
-## Get Users
+## Organization Members
 
 ```http
-GET /api/users
+GET /api/organizations/{id}/members
 ```
 
-Authentication is required.
+Authentication is required, and the caller must be a member of the organization.
 
-The endpoint returns a JSON array directly:
-
-```text
-List<User>
-```
-
-Example response:
-
-```json
-[
-  {
-    "id": 1,
-    "email": "user@test.com",
-    "firstName": "John",
-    "lastName": "Doe",
-    "status": "active"
-  }
-]
-```
-
-This endpoint is temporary and will be replaced by organization-scoped membership access when tenant isolation is introduced.
+The former global `GET /api/users` endpoint has been removed: it let any user list every account of every organization.
 
 ---
 

@@ -1,51 +1,24 @@
 package com.facturx.app.user;
-import java.util.List;
 import org.springframework.stereotype.Service;
 @Service
 public class UserService {
 
     private final UserRepository userRepository;
-    
+
     public UserService (UserRepository userRepository)  { /// to init the object userRepository defined under user/UserRepository.java
         this.userRepository = userRepository;
     }
 
-    public List<User> getAllUsers() {
+	// Recharge l'utilisateur depuis la base : l'objet stocke dans la session peut etre
+	// perime (profil modifie, statut change...) et ne doit pas ecraser la ligne en base.
+	public User updateProfile(Long userId, String firstName, String lastName) {
 
-        return userRepository.findAll();
-        
-    }
-	public User updateProfile(User user, String firstName, String lastName) {
+		User user = userRepository.findById(userId).orElseThrow();
 
-    System.out.println("=== UPDATE PROFILE ===");
-    System.out.println("ID: " + user.getId());
-    System.out.println("PRIMA: " + user.getFirstName() + " " + user.getLastName());
+		user.setFirstName(firstName);
+		user.setLastName(lastName);
 
-    user.setFirstName(firstName);
-    user.setLastName(lastName);
-
-    User savedUser = userRepository.save(user);
-
-    System.out.println("DOPO SAVE: " +
-            savedUser.getFirstName() + " " + savedUser.getLastName());
-
-    return savedUser;
-}
+		return userRepository.save(user);
+	}
 
 }
-
-
-//1. What does the client ask?
-//   -> GET /api/users
-
-//2. Who receives that HTTP request?
-//   -> UserController
-
-//3. Who contains the logic?
-//   -> UserService
-
-//4. Who talks to the database?
-//   -> UserRepository
-
-//5. What object represents each row?
-//   -> User

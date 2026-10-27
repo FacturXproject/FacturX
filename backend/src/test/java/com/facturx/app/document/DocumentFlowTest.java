@@ -110,6 +110,38 @@ class DocumentFlowTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void uploadingIntoAnotherOrganizationIsForbidden() throws Exception {
+
+        Cookie owner = registerAndLogin("doc-owner");
+        long orgId = createOrganization(owner);
+        Cookie outsider = registerAndLogin("doc-outsider");
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "intrus.pdf",
+                "application/pdf",
+                validPdfBytes()
+        );
+
+        mockMvc.perform(
+                        multipart(
+                                "/api/documents?organizationId=" + orgId
+                        )
+                                .file(file)
+                                .with(csrf())
+                                .cookie(outsider))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
+
+        // Rien n'a ete ajoute a l'organisation.
+        mockMvc.perform(
+                        get("/api/documents?organizationId=" + orgId)
+                                .cookie(owner))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
     void uploadingAValidPdfSucceeds() throws Exception {
 
         Cookie session = registerAndLogin("doc-pdf");

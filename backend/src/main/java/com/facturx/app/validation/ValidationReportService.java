@@ -1,5 +1,7 @@
 package com.facturx.app.validation;
 
+import com.facturx.app.document.Document;
+import com.facturx.app.document.DocumentService;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -24,19 +26,43 @@ public class ValidationReportService {
     private final ValidationRunRepository validationRunRepository;
     private final ValidationErrorRepository validationErrorRepository;
     private final RuleCatalogRepository ruleCatalogRepository;
+    private final DocumentService documentService;
 
     public ValidationReportService(ValidationRunRepository validationRunRepository,
                                     ValidationErrorRepository validationErrorRepository,
-                                    RuleCatalogRepository ruleCatalogRepository) {
+                                    RuleCatalogRepository ruleCatalogRepository,
+                                    DocumentService documentService) {
         this.validationRunRepository = validationRunRepository;
         this.validationErrorRepository = validationErrorRepository;
         this.ruleCatalogRepository = ruleCatalogRepository;
+        this.documentService = documentService;
     }
 
     public ValidationReport getReport(Long runId) {
         ValidationRun run = validationRunRepository.findById(runId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Aucun rapport de validation pour cet identifiant."));
+
+        return buildReport(run);
+    }
+
+    /**
+     * Rapport d'un run demande par un utilisateur (GET /api/validate/runs/{id}/report) :
+     * run lie a un document -> memes droits que la lecture du document ; run brut ->
+     * uniquement son auteur. Sinon 404, pour ne pas reveler l'existence du run.
+     */
+    public ValidationReport getReportForUser(Long runId, Long userId) {
+        ValidationRun run = validationRunRepository.findById(runId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Aucun rapport de validation pour cet identifiant."));
+
+        if (run.getDocumentId() != null) {
+            Document document = documentService.getDocument(run.getDocumentId());
+            documentService.requireViewPermission(document, userId);
+        } else if (!userId.equals(run.getRequestedBy())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Aucun rapport de validation pour cet identifiant.");
+        }
 
         return buildReport(run);
     }
