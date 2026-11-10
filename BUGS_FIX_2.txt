@@ -1,6 +1,29 @@
 BUGS FIX #2
 ===========
 
+FOR THE TEAM - READ BEFORE PULLING
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+.env and the TLS certificates are no longer in git. On `git pull`, git deletes
+your local .env. Your Docker database keeps its old password, so without your
+old .env the backend cannot connect.
+
+Existing folder - keep your .env:
+   cp .env .env.backup
+   git pull
+   mv .env.backup .env
+   (forgot? restore it: git show 9e4be9c:.env > .env)
+
+Or a fresh clone (local data is lost):
+   docker compose down -v      # in the OLD folder: frees container names, drops old DB
+   git clone https://github.com/FacturXproject/FacturX.git
+   cd FacturX && ./start.sh
+
+Start the project: ./start.sh  (creates .env and certificates if missing,
+then runs docker compose up --build)
+
+
+
+
 PROBLEMS FOUND
 
 1. Credentials in git
