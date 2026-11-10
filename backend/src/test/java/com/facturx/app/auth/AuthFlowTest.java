@@ -157,9 +157,9 @@ class AuthFlowTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void meWithoutASessionIsUnauthorized() throws Exception {
+    void meWithoutASessionReturnsNoContent() throws Exception {
         mockMvc.perform(get("/api/auth/me"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isNoContent());
     }
 
     @Test
@@ -223,7 +223,7 @@ class AuthFlowTest extends AbstractIntegrationTest {
                 .andExpect(status().isNoContent());
 
         mockMvc.perform(get("/api/auth/me").cookie(session))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isNoContent());
     }
 
     @Test

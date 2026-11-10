@@ -1,0 +1,57 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - link "Factur-X Conformité & Conversion" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - img [ref=e7]
+          - generic [ref=e10]:
+            - generic [ref=e11]: Factur-X
+            - generic [ref=e12]: Conformité & Conversion
+        - generic [ref=e13]:
+          - link "Se connecter" [ref=e14] [cursor=pointer]:
+            - /url: /login
+          - link "Créer un compte" [ref=e15] [cursor=pointer]:
+            - /url: /register
+    - main [ref=e16]:
+      - generic [ref=e17]:
+        - img [ref=e19]
+        - heading "Factur-X Validator" [level=1] [ref=e22]
+        - paragraph [ref=e23]: Validez, contrôlez et convertissez vos factures électroniques depuis une seule plateforme.
+        - generic [ref=e24]:
+          - link "Se connecter" [ref=e25] [cursor=pointer]:
+            - /url: /login
+            - text: Se connecter
+            - img [ref=e26]
+          - link "Créer un compte" [ref=e28] [cursor=pointer]:
+            - /url: /register
+      - generic [ref=e30]:
+        - generic [ref=e31]:
+          - img [ref=e32]
+          - heading "Validation" [level=2] [ref=e35]
+          - paragraph [ref=e36]: Vérifiez la conformité de vos factures électroniques et identifiez rapidement les éventuelles erreurs.
+        - generic [ref=e37]:
+          - img [ref=e38]
+          - heading "Lecture XML" [level=2] [ref=e43]
+          - paragraph [ref=e44]: Consultez facilement le contenu XML de vos documents et accédez aux informations essentielles.
+        - generic [ref=e45]:
+          - img [ref=e46]
+          - heading "Conversion" [level=2] [ref=e51]
+          - paragraph [ref=e52]: Convertissez vos documents électroniques dans les formats pris en charge par la plateforme.
+    - contentinfo [ref=e53]:
+      - link "Politique de confidentialité" [ref=e54] [cursor=pointer]:
+        - /url: /privacy
+      - link "Conditions d'utilisation" [ref=e55] [cursor=pointer]:
+        - /url: /terms
+  - generic [ref=e58]:
+    - generic [ref=e59]: "EPERM: operation not permitted, stat '/app/public/favicon.svg'"
+    - generic [ref=e60]: at Module.statSync (node:fs:1681:25) at Number.viaLocal (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51450:25) at file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51586:14 at viteServePublicMiddleware (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51665:5) at call (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:41364:7) at next (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:41308:5) at viteHMRPingMiddleware (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:63369:7) at call (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:41364:7) at next (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:41308:5) at next (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:41286:14) at viteProxyMiddleware (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:61863:5) at call (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:41364:7) at next (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:41308:5) at viteCachedTransformMiddleware (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62011:5) at call (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:41364:7) at next (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:41308:5) at viteHostCheckMiddleware (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:59324:12) at call (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:41364:7) at next (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:41308:5) at cors (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:41836:7) at file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:41872:17 at originCallback (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:41862:15) at file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:41867:13 at optionsCallback (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:41847:9) at corsMiddleware (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:41852:7) at call (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:41364:7) at next (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:41308:5) at viteRejectInvalidRequestMiddleware (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:63007:12) at call (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:41364:7) at next (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:41308:5) at Function.handle (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:41311:3) at Server.app (file:///app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:41176:37
+    - generic [ref=e61]:
+      - text: Click outside, press Esc key, or fix the code to dismiss.
+      - text: You can also disable this overlay by setting
+      - code [ref=e62]: server.hmr.overlay
+      - text: to
+      - code [ref=e63]: "false"
+      - text: in
+      - code [ref=e64]: vite.config.js
+      - text: .

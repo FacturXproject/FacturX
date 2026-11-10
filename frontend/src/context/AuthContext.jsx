@@ -11,7 +11,7 @@ export function AuthProvider({ children }) {
     setUnauthorizedHandler(() => setUser(null));
 
     api.get('/auth/me')
-      .then((res) => setUser(res.data))
+      .then((res) => setUser(res.data || null))
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
   }, []);

@@ -1,0 +1,65 @@
+BUGS FIX #3
+===========
+
+FOR THE TEAM
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+GET /api/auth/me no longer returns 401 without a session: it now returns
+204 No Content. If your code or test expects 401 from /me, update it.
+
+
+
+
+PROBLEMS FOUND
+
+1. 401 errors in the browser console
+   Opening the home page as a guest showed
+   "GET https://localhost:8443/api/auth/me 401 (Unauthorized)" twice.
+   AuthContext calls /me on start to restore the session; with no session the
+   backend answered 401, and the browser logs every failed request in red.
+   (Twice = React StrictMode in dev mode, not a bug.)
+
+2. README: no "Tech Lead" role
+   feturbin was listed only as Architect.
+
+3. README: Modules table did not say why each module earns its points.
+
+4. README: technology choices not in their own section
+   Only a short bold paragraph inside Technical Stack.
+
+
+
+
+FIXES
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+1. GET /api/auth/me is public (SecurityConfig) and returns 204 No Content
+   when there is no session or the user no longer exists (AuthController).
+   AuthContext.jsx: an empty response sets user to null. All other routes
+   still return 401 without a session. backend/README.md updated.
+
+2. README: feturbin is "Architect / Tech Lead" in Team Information and in
+   Individual Contributions.
+
+3. README: new "Why" column in the Modules table, one sentence per module
+   (wording based on roadmap.md, checked against the code).
+
+4. README: new subsection "Why have we chosen these technologies?" under
+   Technical Stack: Spring Boot, Mustangproject, Python, PostgreSQL,
+   React + Vite + Tailwind, Nginx, Docker Compose.
+
+
+
+
+
+TESTS
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+Updated backend tests (401 -> 204 on /me):
+- AuthFlowTest.meWithoutASessionReturnsNoContent (renamed), /me after logout
+- GdprFlowTest: /me after account deletion / anonymization
+
+Results:
+- Backend (mvn test): 218/218 passed.
+- Frontend (vitest): 108/108 passed; no lint error in AuthContext.jsx.
+- Manual check in the browser (fresh stack, ./start.sh):
+  guest on home page: /me 204, no error in the console;
+  register + reload: /me 200, /dashboard opens;
+  logout + reload: /me 204, /dashboard redirects to /.
