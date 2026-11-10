@@ -26,6 +26,13 @@ PROBLEMS FOUND
 4. README: technology choices not in their own section
    Only a short bold paragraph inside Technical Stack.
 
+5. Generated Factur-X invoice not linked to its source, not shown live
+   After a generation, the new invoice appeared in the lists as a plain
+   document: nothing showed which document it came from. Other users did not
+   see it without reloading the page: the WebSocket events were sent, but the
+   dashboard and the organization page only updated documents already in
+   their list and ignored new ones.
+
 
 
 
@@ -46,20 +53,39 @@ FIXES
    Technical Stack: Spring Boot, Mustangproject, Python, PostgreSQL,
    React + Vite + Tailwind, Nginx, Docker Compose.
 
+5. GET /api/documents/{id} returns sourceDocumentId (source of a generated
+   invoice, read from generated_invoices; null otherwise or if the source was
+   deleted). No database change.
+   Generated document page: "Document d'origine" link to the source.
+   Source document page: the generated file name links to the generated
+   document.
+   Dashboard and organization page: an event about a document not in the
+   list reloads the list.
+   README: F13 description and real-time section updated.
+
 
 
 
 
 TESTS
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------
-Updated backend tests (401 -> 204 on /me):
-- AuthFlowTest.meWithoutASessionReturnsNoContent (renamed), /me after logout
-- GdprFlowTest: /me after account deletion / anonymization
+Updated backend tests:
+- AuthFlowTest.meWithoutASessionReturnsNoContent (renamed), /me after logout:
+  401 -> 204
+- GdprFlowTest: /me after account deletion / anonymization: 401 -> 204
+- GenerationFlowTest: generated document has sourceDocumentId, source has none
+Updated frontend test:
+- Dashboard.test: event from another organization is ignored; event about a
+  new document reloads the list
 
 Results:
 - Backend (mvn test): 218/218 passed.
-- Frontend (vitest): 108/108 passed; no lint error in AuthContext.jsx.
+- Frontend (vitest): 109/109 passed; no lint error in changed files; build OK.
+- Team E2E script F13: 34/34.
 - Manual check in the browser (fresh stack, ./start.sh):
   guest on home page: /me 204, no error in the console;
   register + reload: /me 200, /dashboard opens;
   logout + reload: /me 204, /dashboard redirects to /.
+- Manual check with two users (A generates, B watches): the generated invoice
+  appears on B's dashboard and organization page without reload; links
+  source <-> generated work both ways.

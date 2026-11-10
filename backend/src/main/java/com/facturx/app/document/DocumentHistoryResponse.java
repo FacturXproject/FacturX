@@ -12,9 +12,15 @@ public record DocumentHistoryResponse(
         String type,
         long size,
         DocumentStatus status,
-        Instant uploadedAt
+        Instant uploadedAt,
+        // F13 : document d'origine d'une facture generee (null sinon).
+        Long sourceDocumentId
 ) {
     public static DocumentHistoryResponse from(Document document) {
+        return from(document, null);
+    }
+
+    public static DocumentHistoryResponse from(Document document, Long sourceDocumentId) {
         return new DocumentHistoryResponse(
                 document.getId(),
                 document.getOrganization() != null ? document.getOrganization().getId() : null,
@@ -25,7 +31,8 @@ public record DocumentHistoryResponse(
                 document.getType(),
                 document.getSize(),
                 document.getStatus(),
-                document.getUploadedAt()
+                document.getUploadedAt(),
+                sourceDocumentId
         );
     }
 

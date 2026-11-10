@@ -181,6 +181,14 @@ class GenerationFlowTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].status").value("VALID"))
                 .andExpect(jsonPath("$[0].generatedDocumentId").value(generatedId));
+
+        // Le document genere garde le lien vers son document d'origine.
+        mockMvc.perform(get("/api/documents/" + generatedId).cookie(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sourceDocumentId").value(documentId));
+        mockMvc.perform(get("/api/documents/" + documentId).cookie(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sourceDocumentId").value(Matchers.nullValue()));
     }
 
     @Test

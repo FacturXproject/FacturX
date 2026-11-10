@@ -236,6 +236,9 @@ export function GenerationList({ generations, onDownload }) {
         return (
           <li key={g.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', padding: '5px 0', borderTop: '1px solid #f3f4f6' }}>
             <span style={{ color: style.color, fontWeight: 600, minWidth: '90px' }}>{style.label}</span>
+            {g.generatedDocumentId && (
+              <Link to={`/documents/${g.generatedDocumentId}`} style={{ color: '#2563eb' }}>{g.filename}</Link>
+            )}
             <span style={{ color: '#6b7280' }}>{g.profile} · {formatDate(g.createdAt)}</span>
             {g.generatedDocumentId && (
               <span style={{ marginLeft: 'auto', display: 'flex', gap: '10px' }}>

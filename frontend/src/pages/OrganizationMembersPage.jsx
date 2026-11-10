@@ -179,6 +179,12 @@ const totalPages = Math.ceil(documents.length / documentsPerPage);
       if (event.type !== 'document.status.changed') return;
       if (String(event.organizationId) !== String(id)) return;
 
+      // Nouveau document (ex. facture Factur-X generee) : on recharge la liste.
+      if (!documents.some(document => document.id === event.documentId)) {
+        fetchDocuments();
+        return;
+      }
+
       setDocuments(current =>
         current.map(document =>
           document.id === event.documentId

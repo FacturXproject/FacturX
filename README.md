@@ -331,7 +331,7 @@ organization_members ◀── n..1 ── organizations ── 1..n ──▶ i
 | F10 | Invoice XML reader | Displays the embedded XML as a readable invoice | sabenzar |
 | F11 | PDF extraction | Python service extracts invoice fields from a plain PDF | feturbin |
 | F12 | Correction form | The user checks and corrects extracted fields | iso-brie |
-| F13 | Factur-X generation | Python generates the Factur-X, Java validates it independently | yseddiki, feturbin |
+| F13 | Factur-X generation | Python generates the Factur-X, Java validates it independently; the generated invoice links back to its source document | yseddiki, feturbin |
 | F14 | Queue and async processing | Background jobs with statuses, limited retries, one active job per document | sabenzar |
 | F15 | Real-time | Live document statuses over WebSocket, per organization and role | avalent2 |
 | F16 | Advanced search | Filters, sorting and pagination of documents | yseddiki |
@@ -456,6 +456,9 @@ An authenticated session is required. Allowed origins are defined by
 `status` is the new status of the document:
 `UPLOADED`, `QUEUED`, `PROCESSING`, `VALID`, `INVALID` or `FAILED`.
 `ownerId` stays internal to the server and is not sent.
+
+When an event concerns a document that is not yet in the list (for example a newly
+generated Factur-X invoice), the dashboard and the organization page reload their list.
 
 #### Visibility
 

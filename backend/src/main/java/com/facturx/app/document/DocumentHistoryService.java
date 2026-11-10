@@ -1,5 +1,7 @@
 package com.facturx.app.document;
 
+import com.facturx.app.generation.GeneratedInvoice;
+import com.facturx.app.generation.GeneratedInvoiceRepository;
 import com.facturx.app.permission.Permission;
 import com.facturx.app.permission.PermissionService;
 
@@ -12,13 +14,16 @@ public class DocumentHistoryService {
 
     private final DocumentRepository documentRepository;
     private final PermissionService permissionService;
+    private final GeneratedInvoiceRepository generatedInvoiceRepository;
 
     public DocumentHistoryService(
             DocumentRepository documentRepository,
-            PermissionService permissionService) {
+            PermissionService permissionService,
+            GeneratedInvoiceRepository generatedInvoiceRepository) {
 
         this.documentRepository = documentRepository;
         this.permissionService = permissionService;
+        this.generatedInvoiceRepository = generatedInvoiceRepository;
     }
 public Page <DocumentHistoryResponse> getDocuments(Long organizationId, Long userId, Pageable pageable)
 {
@@ -50,14 +55,23 @@ public DocumentHistoryResponse detail(Long documentId, Long userId)
 
     if (permissionService.hasPermission(userId, organizationId, Permission.VIEW_ALL_DOCUMENTS))
     {
-        return DocumentHistoryResponse.from(document);
+        return DocumentHistoryResponse.from(document, sourceDocumentId(documentId));
     }
     else if (permissionService.hasPermission(userId, organizationId, Permission.VIEW_OWN_DOCUMENTS) && document.getOwner().getId().equals(userId))
     {
-        return DocumentHistoryResponse.from(document);        
+        return DocumentHistoryResponse.from(document, sourceDocumentId(documentId));
     }
 
     throw new RuntimeException("No permission");
+}
+
+// F13 : document d'origine d'une facture generee, s'il existe encore.
+private Long sourceDocumentId(Long documentId)
+{
+    return generatedInvoiceRepository.findFirstByGeneratedDocumentId(documentId)
+        .map(GeneratedInvoice::getSourceDocumentId)
+        .filter(documentRepository::existsById)
+        .orElse(null);
 }
 
 }
