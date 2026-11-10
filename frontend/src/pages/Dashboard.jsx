@@ -130,6 +130,12 @@ export default function Dashboard({ onFileSelect }) {
 
     if (event.type !== 'document.status.changed') return;
 
+    // Nouveau document (ex. facture Factur-X generee) : on recharge la liste.
+    if (!documents.some(document => document.id === event.documentId)) {
+      loadRecentDocuments();
+      return;
+    }
+
     setDocuments(current =>
       current.map(document =>
         document.id === event.documentId

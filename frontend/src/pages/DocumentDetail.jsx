@@ -1,6 +1,6 @@
 import api from '../services/api';
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import ValidationReportCard from '../components/ValidationReportCard';
 import { GenerationList } from '../components/FacturXGenerationPanel';
@@ -342,6 +342,20 @@ export default function DocumentDetail() {
                 <span style={{ fontWeight: 500 }}>
                   {document.organizationName}
                 </span>
+
+                {document.sourceDocumentId && (
+                  <>
+                    <span style={{ color: '#6b7280' }}>
+                      Document d&apos;origine
+                    </span>
+                    <Link
+                      to={`/documents/${document.sourceDocumentId}`}
+                      style={{ fontWeight: 500, color: '#2563eb' }}
+                    >
+                      Voir le document d&apos;origine
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
 

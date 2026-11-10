@@ -82,8 +82,9 @@ describe('Dashboard - WebSocket', () => {
     expect(api.get).toHaveBeenCalledTimes(callsBefore);
   });
 
-  it('ignores events for another document or organization', async () => {
+  it('ignores events for another organization', async () => {
     await renderDashboard();
+    const callsBefore = api.get.mock.calls.length;
 
     act(() => {
       onEvent({
@@ -92,7 +93,23 @@ describe('Dashboard - WebSocket', () => {
         organizationId: 2,
         status: 'INVALID',
       });
+    });
 
+    expect(screen.getByText('PROCESSING')).toBeInTheDocument();
+    expect(screen.queryByText('INVALID')).not.toBeInTheDocument();
+    expect(api.get).toHaveBeenCalledTimes(callsBefore);
+  });
+
+  it('reloads the list when an event is about a new document', async () => {
+    await renderDashboard();
+
+    documents = [
+      { ...documents[0], id: 99, filename: 'Factur-X_FACT-1.pdf', status: 'VALID' },
+      documents[0],
+    ];
+    api.get.mockClear();
+
+    await act(async () => {
       onEvent({
         type: 'document.status.changed',
         documentId: 99,
@@ -101,9 +118,10 @@ describe('Dashboard - WebSocket', () => {
       });
     });
 
-    expect(screen.getByText('PROCESSING')).toBeInTheDocument();
-    expect(screen.queryByText('VALID')).not.toBeInTheDocument();
-    expect(screen.queryByText('INVALID')).not.toBeInTheDocument();
+    expect(await screen.findByText('Factur-X_FACT-1.pdf')).toBeInTheDocument();
+    expect(api.get).toHaveBeenCalledWith(
+      '/documents?organizationId=1&sort=uploadedAt,desc&size=5'
+    );
   });
 
   it('reloads current document statuses after reconnection', async () => {

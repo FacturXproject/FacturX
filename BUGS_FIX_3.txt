@@ -1,0 +1,91 @@
+BUGS FIX #3
+===========
+
+FOR THE TEAM
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+GET /api/auth/me no longer returns 401 without a session: it now returns
+204 No Content. If your code or test expects 401 from /me, update it.
+
+
+
+
+PROBLEMS FOUND
+
+1. 401 errors in the browser console
+   Opening the home page as a guest showed
+   "GET https://localhost:8443/api/auth/me 401 (Unauthorized)" twice.
+   AuthContext calls /me on start to restore the session; with no session the
+   backend answered 401, and the browser logs every failed request in red.
+   (Twice = React StrictMode in dev mode, not a bug.)
+
+2. README: no "Tech Lead" role
+   feturbin was listed only as Architect.
+
+3. README: Modules table did not say why each module earns its points.
+
+4. README: technology choices not in their own section
+   Only a short bold paragraph inside Technical Stack.
+
+5. Generated Factur-X invoice not linked to its source, not shown live
+   After a generation, the new invoice appeared in the lists as a plain
+   document: nothing showed which document it came from. Other users did not
+   see it without reloading the page: the WebSocket events were sent, but the
+   dashboard and the organization page only updated documents already in
+   their list and ignored new ones.
+
+
+
+
+FIXES
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+1. GET /api/auth/me is public (SecurityConfig) and returns 204 No Content
+   when there is no session or the user no longer exists (AuthController).
+   AuthContext.jsx: an empty response sets user to null. All other routes
+   still return 401 without a session. backend/README.md updated.
+
+2. README: feturbin is "Architect / Tech Lead" in Team Information and in
+   Individual Contributions.
+
+3. README: new "Why" column in the Modules table, one sentence per module
+   (wording based on roadmap.md, checked against the code).
+
+4. README: new subsection "Why have we chosen these technologies?" under
+   Technical Stack: Spring Boot, Mustangproject, Python, PostgreSQL,
+   React + Vite + Tailwind, Nginx, Docker Compose.
+
+5. GET /api/documents/{id} returns sourceDocumentId (source of a generated
+   invoice, read from generated_invoices; null otherwise or if the source was
+   deleted). No database change.
+   Generated document page: "Document d'origine" link to the source.
+   Source document page: the generated file name links to the generated
+   document.
+   Dashboard and organization page: an event about a document not in the
+   list reloads the list.
+   README: F13 description and real-time section updated.
+
+
+
+
+
+TESTS
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+Updated backend tests:
+- AuthFlowTest.meWithoutASessionReturnsNoContent (renamed), /me after logout:
+  401 -> 204
+- GdprFlowTest: /me after account deletion / anonymization: 401 -> 204
+- GenerationFlowTest: generated document has sourceDocumentId, source has none
+Updated frontend test:
+- Dashboard.test: event from another organization is ignored; event about a
+  new document reloads the list
+
+Results:
+- Backend (mvn test): 218/218 passed.
+- Frontend (vitest): 109/109 passed; no lint error in changed files; build OK.
+- Team E2E script F13: 34/34.
+- Manual check in the browser (fresh stack, ./start.sh):
+  guest on home page: /me 204, no error in the console;
+  register + reload: /me 200, /dashboard opens;
+  logout + reload: /me 204, /dashboard redirects to /.
+- Manual check with two users (A generates, B watches): the generated invoice
+  appears on B's dashboard and organization page without reload; links
+  source <-> generated work both ways.

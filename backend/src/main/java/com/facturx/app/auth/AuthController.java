@@ -51,11 +51,15 @@ public class AuthController {
 
     @GetMapping("/me")
     public ResponseEntity<UserResponse> me(Authentication authentication) {
-        AppUserPrincipal principal = (AppUserPrincipal) authentication.getPrincipal();
+        // Pas de session : 204 au lieu de 401, pour ne pas polluer la console du navigateur
+        // a chaque visite anonyme (le SPA appelle /me au demarrage).
+        if (authentication == null || !(authentication.getPrincipal() instanceof AppUserPrincipal principal)) {
+            return ResponseEntity.noContent().build();
+        }
         // L'utilisateur stocke en session est fige au login : on relit la base pour que
         // le SPA voie un profil modifie (PUT /api/me) apres un rechargement.
         return userRepository.findById(principal.getUser().getId())
                 .map(user -> ResponseEntity.ok(UserResponse.from(user)))
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 }

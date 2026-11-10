@@ -527,7 +527,7 @@ class GdprFlowTest extends AbstractIntegrationTest {
 											get("/api/auth/me")
 															.cookie(user.session())
 							)
-							.andExpect(status().isUnauthorized());
+							.andExpect(status().isNoContent());
 
 			mockMvc.perform(
 											post("/api/auth/login")
@@ -611,7 +611,7 @@ class GdprFlowTest extends AbstractIntegrationTest {
 											get("/api/auth/me")
 															.cookie(user.session())
 							)
-							.andExpect(status().isUnauthorized());
+							.andExpect(status().isNoContent());
 
 			mockMvc.perform(
 											post("/api/auth/login")
@@ -677,13 +677,13 @@ class GdprFlowTest extends AbstractIntegrationTest {
 											get("/api/auth/me")
 															.cookie(user.session())
 							)
-							.andExpect(status().isUnauthorized());
+							.andExpect(status().isNoContent());
 
 			mockMvc.perform(
 											get("/api/auth/me")
 															.cookie(secondSession)
 							)
-							.andExpect(status().isUnauthorized());
+							.andExpect(status().isNoContent());
 
 			mockMvc.perform(
 											put("/api/me")

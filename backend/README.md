@@ -874,7 +874,7 @@ GET /api/auth/me
 
 Returns the currently authenticated user.
 
-Authentication is required.
+Public endpoint: returns `204 No Content` when there is no active session.
 
 ---
 

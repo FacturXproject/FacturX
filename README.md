@@ -151,7 +151,7 @@ End-to-end scripts run against a started stack:
 | Login | Role | Responsibilities |
 |---|---|---|
 | **sabenzar** | Project Manager (PM), Developer | Planning, meetings, progress tracking; infrastructure and platform features |
-| **feturbin** | Architect, Developer | Overall architecture and technical decisions; Factur-X engine and public API |
+| **feturbin** | Architect / Tech Lead, Developer | Overall architecture and technical decisions; Factur-X engine and public API |
 | **avalent2** | Product Owner (PO), Developer | Product vision and feature priorities; collaboration and data features |
 | **yseddiki** | Developer | Organizations, documents and search |
 | **iso-brie** | Developer | Legal pages, profile and correction form |
@@ -187,20 +187,22 @@ All five team members are developers.
 | Infrastructure | Nginx (HTTPS reverse proxy), Docker Compose, Mailpit, GitHub Actions |
 | API documentation | springdoc-openapi (OpenAPI 3, Swagger UI) |
 
-**Why these choices**
+### Why have we chosen these technologies?
 
-- **Spring Boot** — a mature framework for security (sessions, CSRF, BCrypt password
-  hashing), transactions and WebSocket, and the Java ecosystem has the reference
-  Factur-X library, Mustangproject.
-- **Python microservice** — the best libraries for PDF text extraction (pdfplumber) and
-  Factur-X generation (factur-x) are in Python. The service is internal only, and is
-  reached by the backend alone.
-- **PostgreSQL** — a relational model fits organizations, members, documents and
-  validation results; it also stores HTTP sessions (Spring Session JDBC).
-- **React + Vite** — a fast development loop and a component model that suits a
-  dashboard-style application.
-- **Nginx** — the single public entry point: TLS termination, routing and upload size
-  limits.
+- **Spring Boot (Java)** — security out of the box (sessions, CSRF, BCrypt),
+  transactions and WebSocket in one mature framework.
+- **Mustangproject** — the reference open-source Factur-X validator, written in Java:
+  it checks PDF/A-3, XSD and Schematron in one call.
+- **Python (FastAPI)** — the best libraries for PDF text extraction (pdfplumber) and
+  Factur-X generation (factur-x) are in Python. The service is internal and reached by
+  the backend alone.
+- **PostgreSQL** — organizations, members, documents and validation results are
+  relational data; it also stores HTTP sessions (Spring Session JDBC).
+- **React + Vite + Tailwind** — a component model that suits a dashboard-style
+  application, with a fast development loop.
+- **Nginx** — the single public entry point: HTTPS, routing and upload size limits.
+- **Docker Compose** — the whole stack starts with one command, in the same environment
+  for every team member.
 
 ---
 
@@ -329,7 +331,7 @@ organization_members ◀── n..1 ── organizations ── 1..n ──▶ i
 | F10 | Invoice XML reader | Displays the embedded XML as a readable invoice | sabenzar |
 | F11 | PDF extraction | Python service extracts invoice fields from a plain PDF | feturbin |
 | F12 | Correction form | The user checks and corrects extracted fields | iso-brie |
-| F13 | Factur-X generation | Python generates the Factur-X, Java validates it independently | yseddiki, feturbin |
+| F13 | Factur-X generation | Python generates the Factur-X, Java validates it independently; the generated invoice links back to its source document | yseddiki, feturbin |
 | F14 | Queue and async processing | Background jobs with statuses, limited retries, one active job per document | sabenzar |
 | F15 | Real-time | Live document statuses over WebSocket, per organization and role | avalent2 |
 | F16 | Advanced search | Filters, sorting and pagination of documents | yseddiki |
@@ -341,22 +343,22 @@ organization_members ◀── n..1 ── organizations ── 1..n ──▶ i
 
 ## Modules
 
-| Module | Type | Pts | Features | Owner(s) |
-|---|---|---|---|---|
-| Frontend + backend frameworks (React, Spring Boot) | Major | 2 | F00 | sabenzar |
-| ORM (Spring Data JPA / Hibernate) | Minor | 1 | F00 | sabenzar |
-| Backend as microservices (internal Python service) | Major | 2 | F00, F11, F13 | sabenzar, feturbin, yseddiki |
-| Organization system | Major | 2 | F02, F03 | yseddiki, avalent2 |
-| Advanced permissions | Major | 2 | F04 | sabenzar |
-| File upload and management | Minor | 1 | F06 | yseddiki |
-| **Custom module: Factur-X compliance engine** | Major | 2 | F08, F09 | feturbin |
-| Real-time features (WebSocket) | Major | 2 | F15 | avalent2 |
-| **Subtotal (minimum required: 14)** | | **14** | | |
-| Public API | Major | 2 | F17 | feturbin |
-| Advanced search | Minor | 1 | F16 | yseddiki |
-| Data export / import | Minor | 1 | F20 | avalent2 |
-| GDPR compliance | Minor | 1 | F21 | sabenzar |
-| **Total** | | **19** | | |
+| Module | Type | Pts | Features | Owner(s) | Why |
+|---|---|---|---|---|---|
+| Frontend + backend frameworks (React, Spring Boot) | Major | 2 | F00 | sabenzar | The frontend is built with React and the backend with Spring Boot. |
+| ORM (Spring Data JPA / Hibernate) | Minor | 1 | F00 | sabenzar | All database access goes through JPA entities and Spring Data repositories, with no raw SQL. |
+| Backend as microservices (internal Python service) | Major | 2 | F00, F11, F13 | sabenzar, feturbin, yseddiki | The Python service has real responsibilities (PDF extraction, Factur-X generation) and is reached only by the backend. |
+| Organization system | Major | 2 | F02, F03 | yseddiki, avalent2 | Multi-tenant model: each accounting firm has its own members, clients and documents, and members join by invitation. |
+| Advanced permissions | Major | 2 | F04 | sabenzar | Every action is checked against the user's role in the organization: admin, accountant or client. |
+| File upload and management | Minor | 1 | F06 | yseddiki | Authorized members upload PDF, XML or Factur-X invoices, then preview and delete them. |
+| **Custom module: Factur-X compliance engine** | Major | 2 | F08, F09 | feturbin | Validates Factur-X invoices on every layer and explains each error in plain French (see below). |
+| Real-time features (WebSocket) | Major | 2 | F15 | avalent2 | Connected users see document status changes live, without reloading the page. |
+| **Subtotal (minimum required: 14)** | | **14** | | | |
+| Public API | Major | 2 | F17 | feturbin | Accounting software can work with documents through an API key, with rate limiting, 5+ endpoints and documentation. |
+| Advanced search | Minor | 1 | F16 | yseddiki | Documents can be filtered, sorted and paginated. |
+| Data export / import | Minor | 1 | F20 | avalent2 | Documents and members are exported to CSV / JSON / PDF, and invitations are imported from CSV. |
+| GDPR compliance | Minor | 1 | F21 | sabenzar | Users can export all their personal data and delete their account. |
+| **Total** | | **19** | | | |
 
 ### Custom module (Major): Factur-X compliance engine
 
@@ -400,7 +402,7 @@ API (F17).
 
 - **sabenzar** (PM) — technical baseline (Docker, CI, health check), HTTPS / Nginx / TLS,
   roles and permissions, invoice XML reader, queue and asynchronous processing, GDPR.
-- **feturbin** (Architect) — authentication, Factur-X validation engine and readable
+- **feturbin** (Architect / Tech Lead) — authentication, Factur-X validation engine and readable
   report, "Verify" page, PDF extraction in Python, Factur-X generation (with yseddiki),
   public API, bug fixes (BUGS_FIX_1, BUGS_FIX_2).
 - **avalent2** (PO) — invitations and members, document list and statuses, real-time
@@ -454,6 +456,9 @@ An authenticated session is required. Allowed origins are defined by
 `status` is the new status of the document:
 `UPLOADED`, `QUEUED`, `PROCESSING`, `VALID`, `INVALID` or `FAILED`.
 `ownerId` stays internal to the server and is not sent.
+
+When an event concerns a document that is not yet in the list (for example a newly
+generated Factur-X invoice), the dashboard and the organization page reload their list.
 
 #### Visibility
 
