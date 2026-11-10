@@ -48,4 +48,30 @@ public class EmailService {
 
         mailSender.send(message);
     }
+
+    // F21 : confirmation d'un export des donnees personnelles
+    public void sendGdprExportConfirmation(String email) {
+        send(email,
+            "Your personal data export",
+            "A copy of your personal data was exported from your FacturX account.\n\n"
+            + "If you did not request this export, change your password:\n"
+            + appBaseUrl + "/profile");
+    }
+
+    // F21 : confirmation de la suppression / anonymisation du compte
+    public void sendAccountDeletionConfirmation(String email) {
+        send(email,
+            "Your account has been deleted",
+            "Your FacturX account has been deleted. Your personal data was removed "
+            + "or anonymized, and all your sessions were closed.");
+    }
+
+    private void send(String email, String subject, String text) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(mailFrom);
+        message.setTo(email);
+        message.setSubject(subject);
+        message.setText(text);
+        mailSender.send(message);
+    }
 }

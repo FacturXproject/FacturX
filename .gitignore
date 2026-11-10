@@ -28,3 +28,7 @@ __pycache__/
 *.njsproj
 *.sln
 *.sw?
+
+# Local configuration and secrets (see .env.example, ./start.sh)
+.env
+nginx/certs/

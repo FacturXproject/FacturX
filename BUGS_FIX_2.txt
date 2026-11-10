@@ -1,0 +1,84 @@
+BUGS FIX #2
+===========
+
+PROBLEMS FOUND
+
+1. Credentials in git
+   .env and the TLS private key (nginx/certs/localhost.key) were versioned.
+   .env.example had 3 of the 7 variables: with it alone, sending an invitation
+   returned 500 (empty MAIL_FROM).
+
+2. No one-command deployment
+   A fresh clone needed several manual steps (.env, certificates, compose).
+
+3. Not responsive
+   Fixed 240px sidebar with no breakpoint: on a phone (375px) the content kept
+   135px.
+
+4. Organization name not validated by the backend
+   Empty name or spaces accepted (200), 300 characters returned 500.
+
+5. Public API without PUT / DELETE
+   Only GET and POST, the module requires GET, POST, PUT and DELETE.
+
+6. GDPR without confirmation emails
+   Export and account deletion sent no email.
+
+7. README incomplete
+   No 42 header line, team and roles, individual contributions, modules and
+   points, custom module justification, resources and AI usage.
+
+
+
+
+FIXES
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+1. .env and nginx/certs/ removed from git and added to .gitignore.
+   .env.example complete; docker-compose.yml has defaults for MAIL_* and
+   APP_BASE_URL. CI creates .env and the certificates before starting.
+
+2. ./start.sh: creates .env from .env.example and the certificates if missing,
+   then runs docker compose up --build.
+
+3. Layout.jsx: under 900px the sidebar becomes a drawer (menu button, closes on
+   navigation). Wide tables scroll inside their block; stat cards and the
+   Invitations toolbar wrap.
+
+4. OrganizationService: name trimmed, spaces collapsed, 1-100 characters on
+   create and rename, otherwise 400 INVALID_ORGANIZATION_NAME. Frontend
+   maxLength=100.
+
+5. PUT /api/public/v1/documents/{id} (rename, owner or admin) and
+   DELETE /api/public/v1/documents/{id} (same rules as the app), scope
+   DOCUMENTS_WRITE. Invalid JSON body returns 400.
+
+6. Confirmation email after a data export and after an account deletion
+   (sent to the original address). A failed email does not cancel the
+   operation.
+
+7. README: all the sections above added (in French). Quick Start, environment
+   variables and F17 endpoints updated.
+
+
+
+
+
+TESTS
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+New / updated backend tests:
+- OrganizationFlowTest.organizationNameIsValidatedOnCreateAndRename
+- PublicApiFlowTest.writeScopeCanRenameAndDeleteADocument
+- PublicApiFlowTest.headAndUnknownMethodsCannotBypassScopes (PUT -> PATCH, scopes
+  for PUT / DELETE)
+- GdprFlowTest: confirmation emails on export and deletion, none on a refused
+  deletion
+
+Results:
+- Backend (mvn test): 218/218 passed (216 before + 2 new).
+- Frontend (vitest): 108/108 passed; no new lint warning; build OK.
+- Team E2E scripts on a fresh stack: F13 34/34, F16 33/33, F17 30/30,
+  F20 43/43.
+- Manual checks on a copy without .env or certificates, started with
+  ./start.sh: stack up without warnings; invalid names 400; public API
+  PUT 200 / DELETE 204 / then 404; invitation, export and deletion emails
+  received in Mailpit; no horizontal page scroll at 375px and 1280px.

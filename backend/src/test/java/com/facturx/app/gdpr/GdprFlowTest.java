@@ -1,6 +1,9 @@
 package com.facturx.app.gdpr;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -16,6 +19,7 @@ import com.facturx.app.apikey.ApiKeyScope;
 import com.facturx.app.document.Document;
 import com.facturx.app.document.DocumentRepository;
 import com.facturx.app.document.DocumentStatus;
+import com.facturx.app.organization.EmailService;
 import com.facturx.app.organization.Invitation;
 import com.facturx.app.organization.InvitationRepository;
 import com.facturx.app.organization.InvitationStatus;
@@ -39,6 +43,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -68,6 +73,9 @@ class GdprFlowTest extends AbstractIntegrationTest {
 
 	@Autowired
 	private InvitationRepository invitationRepository;
+
+	@MockitoBean
+	private EmailService emailService;
 
 	private static String uniqueEmail(String label) {
 			return label + "-" + UUID.randomUUID() + "@x.fr";
@@ -319,6 +327,8 @@ class GdprFlowTest extends AbstractIntegrationTest {
 											jsonPath("$.invitations[0].token")
 															.doesNotExist()
 							);
+
+			verify(emailService).sendGdprExportConfirmation(user.email());
 	}
 
 	@Test
@@ -354,6 +364,8 @@ class GdprFlowTest extends AbstractIntegrationTest {
 
 			assertThat(storedUser.getEmail())
 							.isEqualTo(user.email());
+
+			verify(emailService, never()).sendAccountDeletionConfirmation(anyString());
 	}
 
 	@Test
@@ -588,6 +600,8 @@ class GdprFlowTest extends AbstractIntegrationTest {
 			assertThat(
 							userRepository.findById(user.id())
 			).isEmpty();
+
+			verify(emailService).sendAccountDeletionConfirmation(user.email());
 
 			assertThat(
 							memberRepository.findByUserId(user.id())

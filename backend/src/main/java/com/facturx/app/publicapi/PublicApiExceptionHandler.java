@@ -13,6 +13,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -71,6 +72,11 @@ public class PublicApiExceptionHandler {
     @ExceptionHandler(MissingServletRequestPartException.class)
     public ResponseEntity<Map<String, String>> handleMissingFile() {
         return error(HttpStatus.BAD_REQUEST, "FILE_MISSING", "Envoyez le fichier dans le champ multipart \"file\".");
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, String>> handleUnreadableBody() {
+        return error(HttpStatus.BAD_REQUEST, "INVALID_BODY", "Corps JSON manquant ou invalide.");
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)

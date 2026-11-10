@@ -56,10 +56,10 @@ services:
       - DB_HOST=postgres
       - DB_USER=${POSTGRES_USER}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
-      - MAIL_HOST=${MAIL_HOST}
-      - MAIL_PORT=${MAIL_PORT}
-      - MAIL_FROM=${MAIL_FROM}
-      - APP_BASE_URL=${APP_BASE_URL}
+      - MAIL_HOST=${MAIL_HOST:-mailpit}
+      - MAIL_PORT=${MAIL_PORT:-1025}
+      - MAIL_FROM=${MAIL_FROM:-noreply@facturx.local}
+      - APP_BASE_URL=${APP_BASE_URL:-https://localhost:8443}
       - EXTRACTOR_URL=http://extractor:8000
 
     volumes:

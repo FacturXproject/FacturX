@@ -157,6 +157,50 @@ class OrganizationFlowTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void organizationNameIsValidatedOnCreateAndRename() throws Exception {
+        RegisteredUser admin = register("organization-name-check");
+
+        for (String invalid : List.of("", "   ", "A".repeat(101))) {
+            mockMvc.perform(
+                    post("/api/organizations")
+                        .with(csrf())
+                        .cookie(admin.session())
+                        .param("name", invalid)
+                )
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("INVALID_ORGANIZATION_NAME"));
+        }
+
+        assertThat(memberRepository.findByUserId(admin.user().getId())).isEmpty();
+
+        String name = uniqueOrganizationName("Trimmed");
+        mockMvc.perform(
+                post("/api/organizations")
+                    .with(csrf())
+                    .cookie(admin.session())
+                    .param("name", "  " + name + "  ")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.name").value(name));
+
+        Organization organization = memberRepository.findByUserId(admin.user().getId())
+            .get(0)
+            .getOrganization();
+
+        mockMvc.perform(
+                put("/api/organizations/" + organization.getId())
+                    .with(csrf())
+                    .cookie(admin.session())
+                    .param("name", " ")
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error").value("INVALID_ORGANIZATION_NAME"));
+
+        assertThat(organizationRepository.findById(organization.getId()).orElseThrow().getName())
+            .isEqualTo(name);
+    }
+
+    @Test
     void userWithNoOrganizationGetsAnEmptyList() throws Exception {
         RegisteredUser user = register("organization-empty");
 

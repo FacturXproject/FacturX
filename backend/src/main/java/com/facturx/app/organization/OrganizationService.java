@@ -14,6 +14,8 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class OrganizationService {
 
+    public static final int MAX_NAME_LENGTH = 100;
+
     private final OrganizationRepository organizationRepository;
     private final OrganizationMemberRepository memberRepository;
     private final UserRepository userRepository;
@@ -33,14 +35,26 @@ public class OrganizationService {
         this.documentRepository = documentRepository;
     }
 
+    // Nom nettoye (espaces de bord, espaces multiples), non vide, 100 caracteres max
+    static String normalizeName(String name) {
+        String clean = name == null ? "" : name.strip().replaceAll("\\s+", " ");
+
+        if (clean.isEmpty() || clean.length() > MAX_NAME_LENGTH) {
+            throw new InvalidOrganizationNameException();
+        }
+        return clean;
+    }
+
     // Creer une organisation et ajouter son createur comme ADMIN
     @Transactional
     public Organization createOrganization(String name, Long creatorUserId) {
+        String cleanName = normalizeName(name);
+
         User creator = userRepository.findById(creatorUserId)
             .orElseThrow(MemberNotFoundException::new);
 
         Organization organization = new Organization();
-        organization.setName(name);
+        organization.setName(cleanName);
         organizationRepository.save(organization);
 
         OrganizationMember member = new OrganizationMember();
@@ -105,7 +119,7 @@ public class OrganizationService {
         Organization organization = organizationRepository.findById(organizationId)
             .orElseThrow(OrganizationNotFoundException::new);
 
-        organization.setName(newName);
+        organization.setName(normalizeName(newName));
 
         return organizationRepository.save(organization);
     }

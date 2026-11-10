@@ -1,4 +1,5 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   ShieldCheck,
   Building2,
@@ -10,6 +11,8 @@ import {
   User,
   Search,
   KeyRound,
+  Menu,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Footer from './Footer';
@@ -26,9 +29,34 @@ const navItems = [
   { to: '/profile', icon: User, label: 'Profil' },
 ];
 
+// Sous cette largeur (mobile, tablette portrait) la sidebar devient un tiroir
+const MOBILE_QUERY = '(max-width: 900px)';
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && !!window.matchMedia?.(MOBILE_QUERY).matches
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia?.(MOBILE_QUERY);
+    if (!media) return undefined;
+    const onChange = (e) => setIsMobile(e.matches);
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
+  }, []);
+
+  return isMobile;
+}
+
 export default function Layout({ children }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuth();
+  const isMobile = useIsMobile();
+  // Le tiroir est ouvert pour une page donnee : changer de page le referme
+  const [menuOpenOn, setMenuOpenOn] = useState(null);
+  const menuOpen = menuOpenOn === location.pathname;
+  const setMenuOpen = (open) => setMenuOpenOn(open ? location.pathname : null);
 
   const handleLogout = async () => {
     try {
@@ -39,7 +67,46 @@ export default function Layout({ children }) {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#f8f9fa' }}>
+    <div style={{
+      display: 'flex',
+      flexDirection: isMobile ? 'column' : 'row',
+      minHeight: '100vh',
+      background: '#f8f9fa',
+    }}>
+      {/* Barre du haut (mobile / tablette) */}
+      {isMobile && (
+        <header style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 30,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: '10px 16px',
+          background: '#ffffff',
+          borderBottom: '1px solid #e5e7eb',
+        }}>
+          <button
+            type="button"
+            onClick={() => setMenuOpen(true)}
+            aria-label="Ouvrir le menu"
+            style={{ display: 'flex', background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#1a2744' }}
+          >
+            <Menu size={22} />
+          </button>
+          <ShieldCheck size={22} color="#1a2744" strokeWidth={2.2} />
+          <span style={{ color: '#111827', fontWeight: 700, fontSize: '16px' }}>Factur-X</span>
+        </header>
+      )}
+
+      {/* Fond assombri derriere le tiroir */}
+      {isMobile && menuOpen && (
+        <div
+          onClick={() => setMenuOpen(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 40 }}
+        />
+      )}
+
       {/* Sidebar */}
       <aside style={{
         width: '240px',
@@ -48,15 +115,36 @@ export default function Layout({ children }) {
         display: 'flex',
         flexDirection: 'column',
         borderRight: '1px solid #e5e7eb',
+        ...(isMobile && {
+          position: 'fixed',
+          top: 0,
+          bottom: 0,
+          left: 0,
+          zIndex: 50,
+          overflowY: 'auto',
+          transform: menuOpen ? 'translateX(0)' : 'translateX(-100%)',
+          transition: 'transform 0.2s ease',
+          visibility: menuOpen ? 'visible' : 'hidden',
+        }),
       }}>
         {/* Logo */}
         <div style={{ padding: '22px 16px 18px', borderBottom: '1px solid #f3f4f6' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
             <ShieldCheck size={24} color="#1a2744" strokeWidth={2.2} />
-            <div>
+            <div style={{ flex: 1 }}>
               <div style={{ color: '#111827', fontWeight: 700, fontSize: '17px', letterSpacing: '-0.3px' }}>Factur-X</div>
               <div style={{ color: '#6b7280', fontSize: '12px' }}>Conformité & Conversion</div>
             </div>
+            {isMobile && (
+              <button
+                type="button"
+                onClick={() => setMenuOpen(false)}
+                aria-label="Fermer le menu"
+                style={{ display: 'flex', background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#6b7280' }}
+              >
+                <X size={20} />
+              </button>
+            )}
           </div>
         </div>
 	  	{/* User profile */}
@@ -167,6 +255,7 @@ export default function Layout({ children }) {
       <main
 		style={{
 			flex: 1,
+			minWidth: 0,
 			overflow: 'auto',
 			display: 'flex',
 			flexDirection: 'column',

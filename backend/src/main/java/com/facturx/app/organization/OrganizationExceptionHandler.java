@@ -17,6 +17,14 @@ public class OrganizationExceptionHandler {
         ));
     }
 
+    @ExceptionHandler(InvalidOrganizationNameException.class)
+    public ResponseEntity<Map<String, String>> handleInvalidOrganizationName() {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                "error", "INVALID_ORGANIZATION_NAME",
+                "message", "Le nom de l'organisation est obligatoire (100 caractères maximum)."
+        ));
+    }
+
     @ExceptionHandler(UserAlreadyMemberException.class)
     public ResponseEntity<Map<String, String>> handleUserAlreadyMember() {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(

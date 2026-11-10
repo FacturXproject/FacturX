@@ -1,8 +1,167 @@
+*This project has been created as part of the 42 curriculum by sabenzar, feturbin, avalent2, iso-brie, yseddiki.*
+
 # FacturX App
 
 FacturX is a full-stack web application built with a React frontend, a Spring Boot backend, PostgreSQL, Nginx, Docker Compose, and GitHub Actions.
 
 The application follows an incremental architecture. Spring Boot is the main API exposed to the frontend, while specialized Python processing can later be delegated internally to a FastAPI service when required.
+
+---
+
+# Équipe et rôles
+
+| Login | Rôle |
+|---|---|
+| **sabenzar** | Project Manager (PM) |
+| **feturbin** | Architecte |
+| **avalent2** | Product Owner (PO) |
+
+**Développeurs :** tous les membres de l'équipe — sabenzar, feturbin, avalent2, iso-brie, yseddiki.
+
+---
+
+# Organisation du travail
+
+- Nous avons d'abord défini l'architecture du projet, puis découpé le produit en
+  fonctionnalités (F00 à F21, voir la liste plus bas), réalisées étape par étape :
+  **une fonctionnalité par personne**.
+- Chaque fonctionnalité est développée dans **sa propre branche**. Une pull request ne
+  peut être fusionnée dans `main` qu'après **deux relectures indépendantes**.
+- Réunions régulières (une fois par semaine ou toutes les deux semaines).
+- Le travail est organisé dans une **organisation GitHub** (dépôt, branches, pull
+  requests, revues), complétée par un outil de suivi des fonctionnalités développé par
+  l'équipe : <https://42dashboard-three.vercel.app>.
+
+---
+
+# Répartition des fonctionnalités et contributions individuelles
+
+| ID | Fonctionnalité | Module | Pts | Responsable |
+|---|---|---|---|---|
+| F00 | Baseline technique | Frameworks + ORM + microservices | 5 | sabenzar |
+| F00+ | HTTPS / Nginx / TLS | *exigence du sujet* | 0 | sabenzar |
+| F01 | Authentification | *exigence du sujet* | 0 | feturbin |
+| F02 | Organisations / cabinets | Organisation system | 2 | yseddiki |
+| F03 | Invitations et membres | partie de F02 | — | avalent2 |
+| F04 | Rôles et permissions | Advanced permissions | 2 | sabenzar |
+| F05 | Pages légales et profil | *exigence du sujet* | 0 | iso-brie |
+| F06 | Dépôt de documents | File upload and management | 1 | yseddiki |
+| F07 | Liste des documents et statuts | *produit* | 0 | avalent2 |
+| F08 | Validation Factur-X (Java) | Module personnalisé, partie 1 | 2 | feturbin |
+| F09 | Rapport d'erreurs lisible | Module personnalisé, partie 2 | — | feturbin |
+| F09+ | Page « Vérifier » | *produit* | 0 | feturbin |
+| F10 | Lecteur XML de facture | *produit* | 0 | sabenzar |
+| F11 | Extraction PDF (Python) | *produit* | 0 | feturbin |
+| F12 | Formulaire de correction | *produit* | 0 | iso-brie |
+| F13 | Génération Factur-X | *produit* | 0 | yseddiki, feturbin |
+| F14 | File d'attente et traitement asynchrone | *exigence du sujet* | 0 | sabenzar |
+| F15 | Temps réel (WebSocket) | Real-time features | 2 | avalent2 |
+| F17 | API publique sécurisée | Public API | 2 | feturbin |
+| F16 | Recherche avancée | Advanced search | 1 | yseddiki |
+| F20 | Export / import | Export / import | 1 | avalent2 |
+| F21 | RGPD | GDPR compliance | 1 | sabenzar |
+| — | BUGS_FIX_1 (5 correctifs) | — | 0 | feturbin |
+
+**Contributions individuelles**
+
+- **sabenzar** (PM) — baseline technique (Docker, CI, healthcheck), HTTPS / Nginx / TLS,
+  rôles et permissions, lecteur XML, file d'attente et traitement asynchrone, RGPD.
+- **feturbin** (Architecte) — authentification, moteur de validation Factur-X et
+  rapport lisible, page « Vérifier », extraction PDF en Python, génération Factur-X
+  (avec yseddiki), API publique, correctifs BUGS_FIX_1.
+- **avalent2** (PO) — invitations et membres, liste des documents et statuts, temps
+  réel WebSocket, export / import.
+- **yseddiki** — organisations / cabinets, dépôt de documents, génération Factur-X
+  (avec feturbin), recherche avancée.
+- **iso-brie** — pages légales et profil, formulaire de correction humaine.
+
+---
+
+# Modules choisis et calcul des points
+
+| Module | Type | Pts | Fonctionnalité |
+|---|---|---|---|
+| Frameworks frontend + backend (React, Spring Boot) | Major | 2 | F00 |
+| ORM (Spring Data JPA / Hibernate) | Minor | 1 | F00 |
+| Backend en microservices (service Python interne) | Major | 2 | F00, F11, F13 |
+| Système d'organisations | Major | 2 | F02, F03 |
+| Permissions avancées | Major | 2 | F04 |
+| Upload et gestion de fichiers | Minor | 1 | F06 |
+| Module personnalisé : moteur de conformité Factur-X | Major | 2 | F08, F09 |
+| Fonctionnalités temps réel (WebSocket) | Major | 2 | F15 |
+| **Sous-total (minimum requis : 14)** | | **14** | |
+| API publique | Major | 2 | F17 |
+| Recherche avancée | Minor | 1 | F16 |
+| Export / import de données | Minor | 1 | F20 |
+| Conformité RGPD | Minor | 1 | F21 |
+| **Total** | | **19** | |
+
+---
+
+# Module personnalisé (Major) : moteur de conformité Factur-X
+
+**Pourquoi ce module.** La réforme française de la facturation électronique impose aux
+entreprises de recevoir puis d'émettre des factures électroniques structurées, et
+Factur-X (un PDF lisible qui embarque une facture XML) est l'un des formats retenus.
+Notre utilisateur cible, le cabinet comptable, doit savoir *si* une facture est
+conforme et surtout *pourquoi* elle ne l'est pas. Ce besoin n'est couvert par aucun
+module standard du sujet : c'est le cœur métier de l'application.
+
+**Ce que fait le module (F08 + F09).**
+
+- **Validation déterministe en plusieurs couches**, via la bibliothèque Mustangproject
+  (qui s'appuie sur veraPDF pour PDF/A) : structure PDF/A-3 et XML embarqué, schéma
+  XSD CII, règles métier Schematron EN 16931 et contraintes du profil Factur-X. La
+  couche atteinte est enregistrée avec chaque exécution.
+- **Rapport lisible** : chaque code de règle technique (`BR-02`, …) est traduit en
+  titre, explication et conseil de correction en français. Ces textes sont des données
+  (table `rule_catalog`), pas du code.
+- **Persistance** de chaque exécution et de ses erreurs (`validation_runs`,
+  `validation_errors`), consultables depuis la page du document et la page
+  « Vérifier ».
+
+**Difficultés techniques.**
+
+- Interpréter le rapport XML brut de Mustang (blocs PDF et XML distincts) et le ramener
+  à un modèle unique : couche atteinte, sévérité, règle, champ, valeur.
+- Éviter le bruit : toutes les erreurs sont conservées en base, mais les règles hors
+  périmètre pour notre public (extensions `BR-DE-*`, notices `PEPPOL-*`) sont écartées
+  du rapport lisible.
+- Tester des règles précises : des factures volontairement cassées sur un seul point
+  vérifient que le moteur lève exactement la règle attendue (`RuleCatalogCoverageTest`).
+- Garantir l'indépendance générateur / validateur : les factures produites par le
+  service Python (F13) sont revalidées par le moteur Java, et la CI échoue si une
+  facture générée n'est pas conforme.
+
+**Pourquoi un Major.** Le module est comparable en volume et en complexité aux modules
+Major du sujet : un service backend complet, trois tables dédiées, une API REST, des
+pages frontend, une couverture de tests propre, et il est intégré à presque tout le
+reste du projet — dépôt de documents (F06), file d'attente (F14), temps réel (F15),
+génération (F13) et API publique (F17).
+
+---
+
+# Ressources
+
+**Documentation**
+
+1. MDN Web Docs — <https://developer.mozilla.org>
+2. DevDocs — <https://devdocs.io>
+3. W3Schools — <https://www.w3schools.com>
+4. Documentation Java (Oracle) — <https://docs.oracle.com/en/java/>
+5. Documentation Python — <https://docs.python.org/3/>
+6. JavaScript.info — <https://javascript.info>
+7. Mustangproject (bibliothèque Factur-X / ZUGFeRD utilisée par le moteur de
+   validation) — <https://github.com/ZUGFeRD/mustangproject>
+
+**Utilisation de l'IA**
+
+L'IA a été utilisée comme assistant pour :
+
+- l'écriture de tests ;
+- la recherche de bugs ;
+- l'apprentissage des langages du projet (Java, JavaScript, Python) ;
+- la préparation de la documentation.
 
 ---
 
@@ -178,7 +337,8 @@ FacturX/
 │
 ├── README.md
 ├── docker-compose.yml
-├── .env
+├── start.sh               → one-command start
+├── .env                   → local only, not versioned
 ├── .env.example
 ├── .gitignore
 │
@@ -190,7 +350,7 @@ FacturX/
 │   ├── Dockerfile
 │   ├── conf/
 │   │   └── nginx.conf
-│   └── certs/
+│   └── certs/             → generated locally, not versioned
 │       ├── localhost.crt
 │       └── localhost.key
 │
@@ -221,21 +381,22 @@ For detailed backend architecture and development instructions, see:
 
 # Quick Start With Docker
 
-From the project root, create the local environment file if needed:
+From the project root, one command prepares the local configuration and starts the
+full stack:
+
+```bash
+./start.sh
+```
+
+It creates `.env` from `.env.example` if it is missing, generates the local TLS
+certificates if they are missing, then runs `docker compose up --build`. Extra
+arguments are passed to `docker compose up` (for example `./start.sh -d`).
+
+The same steps by hand:
 
 ```bash
 cp .env.example .env
-```
-
-Generate the local TLS certificates if they are not already present:
-
-```bash
 ./scripts/generate-certs.sh
-```
-
-Start the full stack:
-
-```bash
 docker compose up --build
 ```
 
@@ -341,22 +502,20 @@ Each Docker container has its own network namespace, so services communicate thr
 
 The project uses `.env` for local values and `.env.example` as the reference template.
 
-Example:
-
-```env
-POSTGRES_DB=facturx
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-```
-
-For the current development branch, `.env` is kept available to simplify development across team machines.
-
-Before the final project submission:
+| Variable | Purpose | Default in `.env.example` |
+|---|---|---|
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` | Database credentials | placeholders, change them |
+| `POSTGRES_DB` | Database name (must stay `facturx`) | `facturx` |
+| `MAIL_HOST` / `MAIL_PORT` | SMTP server | `mailpit` / `1025` |
+| `MAIL_FROM` | Sender of application emails | `noreply@facturx.local` |
+| `APP_BASE_URL` | Public URL used in email links | `https://localhost:8443` |
 
 ```text
-.env          → ignored
-.env.example  → versioned
+.env          → ignored, never committed (it holds credentials)
+.env.example  → versioned, no real secret
 ```
+
+The TLS certificates in `nginx/certs/` are also generated locally and never committed.
 
 ---
 
@@ -1700,7 +1859,7 @@ Une clé se crée depuis la page **Clés API** de l'application (`/cles-api`).
 | Scope | Autorise |
 | --- | --- |
 | `DOCUMENTS_READ` | lister, statut, rapport, téléchargement |
-| `DOCUMENTS_WRITE` | dépôt |
+| `DOCUMENTS_WRITE` | dépôt, renommage, suppression |
 | `DOCUMENTS_VALIDATE` | lancer une validation Factur-X |
 
 Gestion (session + CSRF, utilisée par le frontend) :
@@ -1728,6 +1887,8 @@ clé, aucun `organizationId` à fournir.
 | `GET` | `/documents?page=0&size=20` | READ | page de documents (`size` ≤ 100) |
 | `POST` | `/documents` (multipart `file`) | WRITE | `201` document créé |
 | `GET` | `/documents/{id}` | READ | métadonnées et statut |
+| `PUT` | `/documents/{id}` (JSON `{"filename": "..."}`) | WRITE | document renommé (propriétaire ou admin) |
+| `DELETE` | `/documents/{id}` | WRITE | `204` document supprimé (mêmes règles que l'application) |
 | `GET` | `/documents/{id}/report` | READ | rapport F09 de la dernière validation |
 | `GET` | `/documents/{id}/download` | READ | le fichier |
 | `POST` | `/documents/{id}/validate` | VALIDATE | `202` job de validation (F14) |
