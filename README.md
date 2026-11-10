@@ -1,1632 +1,446 @@
-# FacturX App
+*This project has been created as part of the 42 curriculum by sabenzar, feturbin, avalent2, iso-brie, yseddiki.*
 
-FacturX is a full-stack web application built with a React frontend, a Spring Boot backend, PostgreSQL, Nginx, Docker Compose, and GitHub Actions.
+# FacturX
 
-The application follows an incremental architecture. Spring Boot is the main API exposed to the frontend, while specialized Python processing can later be delegated internally to a FastAPI service when required.
-
----
-
-# Tech Stack
-
-## Frontend
-
-- React
-- Vite
-- JavaScript
-- Tailwind CSS
-
-## Backend
-
-- Java 21
-- Spring Boot
-- Spring Web
-- Spring Data JPA
-- Hibernate
-- Spring Security
-- Spring Session JDBC
-- Maven
-
-## Database
-
-- PostgreSQL
-
-## Infrastructure
-
-- Nginx
-- Docker
-- Docker Compose
-- GitHub Actions
-
-## Internal Python Service
-
-A FastAPI service can be introduced for features requiring specialized Python processing, such as:
-
-- PDF extraction
-- Factur-X generation
-
-FastAPI remains internal. The frontend communicates only with Spring Boot.
+**A Factur-X compliance platform for accounting firms: upload invoices, validate them,
+understand every error, and generate compliant Factur-X files.**
 
 ---
 
-# Architecture
+## Table of Contents
 
-Nginx is the single public entry point of the Docker stack and terminates HTTPS.
-
-The browser does not communicate directly with Vite, Spring Boot, PostgreSQL, or the internal FastAPI service.
-
-```text
-Browser
-   ↓
-HTTP :8080
-   ↓
-Nginx
-   ↓
-301 redirect
-   ↓
-HTTPS :8443
-   ↓
-Nginx
-   ├── /      ─────────────→ Frontend
-   │                         React + Vite
-   │                         Port 5173
-   │
-   └── /api/* ─────────────→ Backend
-                             Spring Boot
-                             Port 8080
-                                ↓
-                                ├── PostgreSQL
-                                │   Port 5432
-                                │
-                                └── FastAPI
-                                    Internal service
-```
-
-Only Nginx publishes ports to the host.
-
-The host-to-container mappings are:
-
-```text
-Host :8080 → Nginx container :80
-Host :8443 → Nginx container :443
-```
-
-The frontend, backend, PostgreSQL, and FastAPI remain on the internal Docker network.
+1. [Description](#description)
+2. [Instructions](#instructions)
+3. [Team Information](#team-information)
+4. [Project Management](#project-management)
+5. [Technical Stack](#technical-stack)
+6. [Architecture](#architecture)
+7. [Database Schema](#database-schema)
+8. [Features List](#features-list)
+9. [Modules](#modules)
+10. [Individual Contributions](#individual-contributions)
+11. [API Reference](#api-reference)
+12. [Resources](#resources)
+13. [Known Limitations](#known-limitations)
 
 ---
 
-# Communication Flow
+## Description
 
-For standard application features:
+The French e-invoicing reform requires companies to exchange structured electronic
+invoices. **Factur-X** is one of the accepted formats: a human-readable PDF/A-3 that
+embeds a machine-readable XML invoice (CII, EN 16931).
 
-```text
-React
-   ↓
-Nginx
-   ↓
-Spring Boot
-   ↓
-Service
-   ↓
-Repository
-   ↓
-JPA / Hibernate
-   ↓
-PostgreSQL
-```
+FacturX helps accounting firms and their clients handle this format. A firm creates an
+organization, invites its accountants and clients, and every member works on the
+documents of that organization according to their role.
 
-For features requiring Python processing:
+### Key features
 
-```text
-React
-   ↓
-Nginx
-   ↓
-Spring Boot
-   ↓
-FastAPI
-   ↓
-Spring Boot
-   ↓
-PostgreSQL if persistence is required
-   ↓
-Response to React
-```
-
-Spring Boot is responsible for:
-
-- the public API;
-- authentication;
-- authorization;
-- business logic;
-- database access;
-- orchestration of internal services.
+- **Factur-X validation** — PDF/A-3, XSD and EN 16931 Schematron checks, with a
+  readable report in French that explains each error and how to fix it.
+- **Factur-X generation** — fields are extracted from a plain PDF invoice, checked and
+  corrected by a human, then turned into a Factur-X file that is validated again.
+- **Multi-tenant organizations** — invitations by email and three roles (admin,
+  accountant, client) with fine-grained permissions.
+- **Asynchronous processing** — validation and generation run as background jobs, and
+  status changes reach every connected user in real time over WebSocket.
+- **Secure public API** — API keys with scopes, rate limiting and OpenAPI documentation,
+  so accounting software can integrate with the platform.
+- **Data tools** — advanced document search, CSV / JSON / PDF export, CSV invitation
+  import, and GDPR data export and account deletion.
 
 ---
 
-# Incremental Architecture
+## Instructions
 
-The initial baseline is:
+### Prerequisites
 
-```text
-React
-   ↓
-Spring Boot
-   ↓
-PostgreSQL
+- Docker and Docker Compose
+- OpenSSL (to generate the local TLS certificate)
+- A POSIX shell (Linux or macOS)
+
+### Quick start
+
+From the project root:
+
+```bash
+./start.sh
 ```
 
-When Python-specific features are required, the architecture becomes:
+This single command:
 
-```text
-React
-   ↓
-Spring Boot
-   ↓
-   ├── PostgreSQL
-   │
-   └── FastAPI
-```
+1. creates `.env` from `.env.example` if it is missing;
+2. generates a self-signed TLS certificate in `nginx/certs/` if it is missing;
+3. builds and starts the whole stack with `docker compose up --build`.
 
----
+Extra arguments are passed to Docker Compose, for example `./start.sh -d` to run in the
+background.
 
-# Project Structure
-
-Current baseline:
-
-```text
-FacturX/
-│
-├── README.md
-├── docker-compose.yml
-├── .env
-├── .env.example
-├── .gitignore
-│
-├── .github/
-│   └── workflows/
-│       └── ci.yml
-│
-├── nginx/
-│   ├── Dockerfile
-│   ├── conf/
-│   │   └── nginx.conf
-│   └── certs/
-│       ├── localhost.crt
-│       └── localhost.key
-│
-├── scripts/
-│   └── generate-certs.sh
-│
-├── frontend/
-│   ├── Dockerfile
-│   ├── package.json
-│   ├── vite.config.js
-│   └── src/
-│
-├── backend/
-│   ├── README.md
-│   ├── Dockerfile
-│   ├── pom.xml
-│   ├── mvnw
-│   └── src/
-│
-└── database/
-```
-
-For detailed backend architecture and development instructions, see:
-
-[Backend README](./backend/README.md)
-
----
-
-# Quick Start With Docker
-
-From the project root, create the local environment file if needed:
+The same steps by hand:
 
 ```bash
 cp .env.example .env
-```
-
-Generate the local TLS certificates if they are not already present:
-
-```bash
 ./scripts/generate-certs.sh
-```
-
-Start the full stack:
-
-```bash
 docker compose up --build
 ```
 
-The current baseline starts:
+### Access
 
-```text
-nginx
-frontend
-backend
-postgres
-```
+| Service | URL |
+|---|---|
+| Application | <https://localhost:8443> |
+| HTTP (redirects to HTTPS) | <http://localhost:8080> |
+| Mailpit (emails sent by the app) | <https://localhost:8443/mailpit/> |
+| Public API documentation (Swagger UI) | <https://localhost:8443/api/docs/swagger-ui/index.html> |
+| Health check | <https://localhost:8443/api/healthcheck> |
 
-The HTTPS application entry point is:
+The certificate is self-signed: the browser shows a warning on the first visit.
 
-```text
-https://localhost:8443
-```
+### Configuration
 
-The HTTP entry point is:
+All configuration comes from `.env`. The file is ignored by git;
+`.env.example` is the versioned template and contains no real secret.
 
-```text
-http://localhost:8080
-```
+| Variable | Purpose | Default in `.env.example` |
+|---|---|---|
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` | Database credentials | placeholders, change them |
+| `POSTGRES_DB` | Database name (must stay `facturx`) | `facturx` |
+| `MAIL_HOST` / `MAIL_PORT` | SMTP server | `mailpit` / `1025` |
+| `MAIL_FROM` | Sender of application emails | `noreply@facturx.local` |
+| `APP_BASE_URL` | Public URL used in email links | `https://localhost:8443` |
 
-HTTP redirects to HTTPS:
+The TLS certificates in `nginx/certs/` are also generated locally and never committed.
 
-```text
-http://localhost:8080
-        ↓
-https://localhost:8443
-```
-
----
-
-# Health Check
-
-The backend health endpoint is:
-
-```http
-GET /api/healthcheck
-```
-
-Through the full Docker stack:
+### Stop and reset
 
 ```bash
-curl -k https://localhost:8443/api/healthcheck
+docker compose down        # stop the stack, keep the data
+docker compose down -v     # stop the stack and delete the database and uploaded files
 ```
 
-Current response:
-
-```text
-Yess i'm working
-```
-
----
-
-# PostgreSQL Healthcheck
-
-Docker Compose checks PostgreSQL availability using:
-
-```text
-pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}
-```
-
-The healthcheck uses the PostgreSQL user and database defined in the environment configuration.
-
----
-
-# Docker Network
-
-The current Docker network is:
-
-```text
-facturx-network
-│
-├── nginx
-│   ├── host :8080 → container :80
-│   └── host :8443 → container :443
-│
-├── frontend
-│   └── internal port 5173
-│
-├── backend
-│   └── internal port 8080
-│
-└── postgres
-    └── internal port 5432
-```
-
-Only Nginx is published to the host.
-
-The backend reaches PostgreSQL using the Docker service name:
-
-```text
-postgres
-```
-
-Each Docker container has its own network namespace, so services communicate through Docker service names.
-
----
-
-# Environment Variables
-
-The project uses `.env` for local values and `.env.example` as the reference template.
-
-Example:
-
-```env
-POSTGRES_DB=facturx
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-```
-
-For the current development branch, `.env` is kept available to simplify development across team machines.
-
-Before the final project submission:
-
-```text
-.env          → ignored
-.env.example  → versioned
-```
-
----
-
-# Local Development
-
-The frontend and backend can also be developed independently without running the full Docker Compose stack.
-
-## Frontend
-
-From:
+### Running the tests
 
 ```bash
-cd frontend
+cd backend && ./mvnw test                                # backend (needs Docker for Testcontainers)
+cd frontend && npm ci && npx vitest run                  # frontend
+cd extractor && pip install -r requirements-dev.txt && pytest   # Python service
 ```
 
-Install dependencies:
+End-to-end scripts run against a started stack:
 
 ```bash
-npm ci
+./scripts/test-f13-generation.sh
+./scripts/test-f16-search.sh
+./scripts/test-f17-public-api.sh
+./scripts/test-f20-export-import.sh
 ```
 
-Start Vite:
+### Local development without Docker
 
-```bash
-npm run dev
-```
-
-The standalone frontend runs on:
-
-```text
-http://localhost:5173
-```
-
-In standalone development, Vite proxies `/api/*` requests to the local Spring Boot backend:
-
-```text
-http://localhost:8080
-```
-
-The frontend uses relative API paths such as:
-
-```text
-/api/organizations
-/api/healthcheck
-/api/auth/login
-```
-
-## Backend
-
-From:
-
-```bash
-cd backend
-```
-
-Start Spring Boot:
-
-```bash
-./mvnw spring-boot:run
-```
-
-The standalone backend runs on:
-
-```text
-http://localhost:8080
-```
-
-Test it directly:
-
-```bash
-curl http://localhost:8080/api/healthcheck
-```
-
-Expected response:
-
-```text
-Yess i'm working
-```
+- **Frontend:** `cd frontend && npm ci && npm run dev` — Vite on <http://localhost:5173>,
+  proxying `/api` and `/ws` to the backend on `localhost:8080`.
+- **Backend:** `cd backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev` —
+  needs a reachable PostgreSQL. The `dev` profile allows the Vite origin and HTTP
+  session cookies.
 
 ---
 
-# Current API
+## Team Information
 
-## Health Check
+| Login | Role | Responsibilities |
+|---|---|---|
+| **sabenzar** | Project Manager (PM), Developer | Planning, meetings, progress tracking; infrastructure and platform features |
+| **feturbin** | Architect, Developer | Overall architecture and technical decisions; Factur-X engine and public API |
+| **avalent2** | Product Owner (PO), Developer | Product vision and feature priorities; collaboration and data features |
+| **yseddiki** | Developer | Organizations, documents and search |
+| **iso-brie** | Developer | Legal pages, profile and correction form |
 
-```http
-GET /api/healthcheck
-```
-
-Public endpoint.
-
-Docker stack:
-
-```bash
-curl -k https://localhost:8443/api/healthcheck
-```
-
-Standalone backend:
-
-```bash
-curl http://localhost:8080/api/healthcheck
-```
-
-Current response:
-
-```text
-Yess i'm working
-```
+All five team members are developers.
 
 ---
 
-## Register User
+## Project Management
 
-```http
-POST /api/auth/register
-```
-
-Public endpoint.
-
-Example request body:
-
-```json
-{
-  "email": "john@test.com",
-  "password": "strongpassword",
-  "firstName": "John",
-  "lastName": "Doe"
-}
-```
+- **Architecture first.** We defined the architecture of the project, then split the
+  product into features (F00 to F21) and built them step by step, **one feature per
+  person**. The full plan is in [roadmap.md](./roadmap.md).
+- **One branch per feature.** Each feature was developed in its own branch. A pull
+  request could be merged into `main` only after **two independent reviews** and a
+  green CI.
+- **Regular meetings.** The team met once a week or once every two weeks.
+- **Tools.** Work was organized in a **GitHub Organization** (repository, branches,
+  pull requests, reviews), together with a custom feature-tracking tool built by the
+  team: <https://42dashboard-three.vercel.app>.
 
 ---
 
-## Login
+## Technical Stack
 
-```http
-POST /api/auth/login
-```
+| Layer | Technologies |
+|---|---|
+| Frontend | React 19, React Router, Vite, Tailwind CSS, Vitest |
+| Backend | Java 21, Spring Boot 4 (Web MVC, Security, Data JPA / Hibernate, Session JDBC, WebSocket, Mail, Validation), Maven |
+| Factur-X | Mustangproject (validation), Apache PDFBox, Apache Commons CSV |
+| Python service | Python 3.12, FastAPI, pdfplumber (extraction), factur-x and ReportLab (generation) |
+| Database | PostgreSQL 17 |
+| Infrastructure | Nginx (HTTPS reverse proxy), Docker Compose, Mailpit, GitHub Actions |
+| API documentation | springdoc-openapi (OpenAPI 3, Swagger UI) |
 
-Public endpoint.
+**Why these choices**
 
-A successful login creates a server-side session.
-
----
-
-## Current User
-
-```http
-GET /api/auth/me
-```
-
-Returns the currently authenticated user.
-
-Authentication is required.
-
----
-
-## Logout
-
-```http
-POST /api/auth/logout
-```
-
-Invalidates the current authenticated session.
+- **Spring Boot** — a mature framework for security (sessions, CSRF, BCrypt password
+  hashing), transactions and WebSocket, and the Java ecosystem has the reference
+  Factur-X library, Mustangproject.
+- **Python microservice** — the best libraries for PDF text extraction (pdfplumber) and
+  Factur-X generation (factur-x) are in Python. The service is internal only, and is
+  reached by the backend alone.
+- **PostgreSQL** — a relational model fits organizations, members, documents and
+  validation results; it also stores HTTP sessions (Spring Session JDBC).
+- **React + Vite** — a fast development loop and a component model that suits a
+  dashboard-style application.
+- **Nginx** — the single public entry point: TLS termination, routing and upload size
+  limits.
 
 ---
 
-## Organization Members
+## Architecture
 
-```http
-GET /api/organizations/{id}/members
-```
-
-Authentication is required, and the caller must be a member of the organization.
-
-The former global `GET /api/users` endpoint has been removed: it let any user list every account of every organization.
-
----
-
-# Authentication
-
-Authentication is based on server-side sessions.
-
-The general flow is:
+Nginx is the only service published on the host. Every other service stays on the
+internal Docker network `facturx-network`.
 
 ```text
 Browser
-   ↓
-POST /api/auth/login
-   ↓
-Nginx
-   ↓
-Spring Security
-   ↓
-AuthService
-   ↓
-UserRepository
-   ↓
-PostgreSQL
-   ↓
-Server-side session
-   ↓
-Session cookie returned to browser
+   │  HTTP :8080 ──301──▶ HTTPS :8443
+   ▼
+Nginx (TLS)
+   ├── /           ──▶ frontend    React + Vite        :5173
+   ├── /api/       ──▶ backend     Spring Boot         :8080
+   ├── /ws         ──▶ backend     WebSocket
+   └── /mailpit/   ──▶ mailpit     email catcher UI    :8025
+
+backend ──▶ postgres    PostgreSQL 17           :5432
+        ──▶ extractor   FastAPI (internal)      :8000   /extract, /generate
+        ──▶ mailpit     SMTP                    :1025
 ```
 
-Spring Session JDBC stores session data in PostgreSQL.
+- The frontend talks only to the backend, through Nginx.
+- The backend owns authentication, authorization, business logic, database access and
+  the orchestration of the Python service.
+- Validation and generation run as **jobs** (table `jobs`): the API answers immediately,
+  a background worker processes the job, and status changes are pushed to clients over
+  WebSocket.
 
-The application also uses CSRF protection for state-changing requests.
+### Project structure
 
-The frontend API client sends credentials and the CSRF token automatically.
+```text
+.
+├── start.sh                one-command start
+├── docker-compose.yml
+├── .env.example            configuration template (.env is local only)
+├── .github/workflows/      CI
+├── nginx/                  reverse proxy configuration (certs/ generated locally)
+├── frontend/               React application
+├── backend/                Spring Boot application, organized by domain
+│   └── src/main/java/com/facturx/app/
+│       ├── auth/  user/  organization/  permission/
+│       ├── document/  validation/  extraction/  generation/  invoice/
+│       ├── job/  websocket/  apikey/  publicapi/  exportimport/  gdpr/
+│       └── config/
+├── extractor/              Python FastAPI service (extraction and generation)
+└── scripts/                certificate generation and end-to-end tests
+```
+
+Backend code follows the same flow in every domain:
+`Controller → Service → Repository → JPA / Hibernate → PostgreSQL`.
+
+### Continuous integration
+
+Every push and pull request runs the CI pipeline (`.github/workflows/ci.yml`):
+backend tests, Python service tests, Docker Compose validation, image build, stack
+startup, HTTPS health check, and the end-to-end Factur-X generation and public API
+scripts.
 
 ---
 
-# Current Backend Structure
+## Database Schema
 
-Backend features are organized by domain.
-
-Example:
-
-```text
-auth/
-├── AuthController
-├── AuthService
-└── ...
-
-user/
-├── User
-├── UserController
-├── UserService
-└── UserRepository
-```
-
-The typical backend flow is:
+PostgreSQL 17, managed through JPA / Hibernate. HTTP sessions are stored in the
+`spring_session` tables created by Spring Session JDBC.
 
 ```text
-Client Request
-      ↓
-Controller
-      ↓
-Service
-      ↓
-Repository
-      ↓
-JPA / Hibernate
-      ↓
-PostgreSQL
+users ─────────────┐
+  │                │
+  │ 1..n           │ 1..n
+  ▼                ▼
+organization_members ◀── n..1 ── organizations ── 1..n ──▶ invitations
+                                     │
+                                     ├── 1..n ──▶ api_keys (owner_id → users)
+                                     │
+                                     └── 1..n ──▶ documents (owner_id → users)
+                                                     │
+                     ┌───────────────┬───────────────┼────────────────────┐
+                     ▼               ▼               ▼                    ▼
+                   jobs        validation_runs   draft_invoices    generated_invoices
+                                     │               │
+                                     ▼               ├──▶ extracted_fields
+                             validation_errors       ├──▶ draft_lines
+                                     │               └──▶ draft_taxes
+                                     ▼
+                              rule_catalog (by rule_code)
 ```
 
-Business logic belongs in services, while data access belongs in repositories.
+| Table | Main columns | Purpose |
+|---|---|---|
+| `users` | id, email, password_hash, first_name, last_name, status, created_at, updated_at | Accounts; passwords hashed with BCrypt; status `active` or `anonymized` |
+| `organizations` | id, name, created_at | Accounting firms (tenants) |
+| `organization_members` | id, user_id, organization_id, role, joined_at | Membership with role `ADMIN`, `ACCOUNTANT` or `CLIENT` |
+| `invitations` | id, organization_id, email, role, status, token, expires_at, created_at | Email invitations into an organization |
+| `documents` | id, organization_id, owner_id, filename, type, size, status, storage_path, uploaded_at | Uploaded and generated files; status `UPLOADED` → `QUEUED` → `PROCESSING` → `VALID` / `INVALID` / `FAILED` |
+| `jobs` | id, type, document_id, status, attempts, requested_by, profile, error, started_at, finished_at | Background jobs (`VALIDATION`, `GENERATION`) |
+| `validation_runs` | id, document_id, requested_by, filename, valid, layer_reached, started_at, finished_at | One Factur-X validation |
+| `validation_errors` | id, run_id, layer, severity, rule_code, message, field, actual_value, expected_value | Errors found by a validation run |
+| `rule_catalog` | code, layer, raw_text, title_fr, description_fr, correction_hint_fr | French explanation of each validation rule |
+| `draft_invoices` | id, document_id, organization_id, source, created_at, updated_at | Invoice data extracted from a PDF, before generation |
+| `extracted_fields` | id, draft_invoice_id, field_name, value, confidence, source | Header fields of a draft (number, dates, parties, totals) |
+| `draft_lines` | id, draft_invoice_id, position, description, quantity, unit_price, total, vat_rate | Invoice lines of a draft |
+| `draft_taxes` | id, draft_invoice_id, position, rate, taxable_amount, tax_amount | VAT breakdown of a draft |
+| `generated_invoices` | id, source_document_id, generated_document_id, draft_invoice_id, organization_id, profile, status, validation_run_id, created_by | Result of a Factur-X generation |
+| `api_keys` | id, organization_id, owner_id, name, prefix, key_hash, scopes, created_at, last_used_at, revoked_at | Public API keys; only the SHA-256 hash is stored |
 
 ---
 
-# Continuous Integration
+## Features List
 
-Every change goes through a Pull Request.
-
-The workflow is:
-
-```text
-Feature branch
-      ↓
-Pull Request
-      ↓
-CI
-      ↓
-Review
-      ↓
-Merge
-      ↓
-main
-```
-
-The CI pipeline validates:
-
-```text
-backend tests
-frontend dependencies
-frontend lint
-frontend build
-Docker Compose configuration
-Docker image build
-container startup
-HTTPS backend healthcheck
-```
-
-The HTTPS healthcheck uses:
-
-```text
-https://localhost:8443/api/healthcheck
-```
+| ID | Feature | Description | Owner |
+|---|---|---|---|
+| F00 | Technical baseline | Docker Compose stack, CI, health check end to end | sabenzar |
+| F00+ | HTTPS / Nginx / TLS | Single HTTPS entry point, HTTP redirect, environment configuration | sabenzar |
+| F01 | Authentication | Registration, login, server-side sessions, hashed passwords, login rate limit | feturbin |
+| F02 | Organizations | Create, rename and delete organizations; data isolated per organization | yseddiki |
+| F03 | Invitations and members | Invite by email, accept, resend, revoke; member management | avalent2 |
+| F04 | Roles and permissions | Admin, accountant and client roles enforced on every action | sabenzar |
+| F05 | Legal pages and profile | Privacy policy, terms of service, profile page | iso-brie |
+| F06 | Document upload | PDF / XML / Factur-X upload, type and size checks (10 MB) | yseddiki |
+| F07 | Document list and statuses | Document history, statuses and details | avalent2 |
+| F08 | Factur-X validation | Multi-layer validation engine (Java, Mustangproject) | feturbin |
+| F09 | Readable error report | Each rule explained in French, with a correction hint | feturbin |
+| F09+ | "Verify" page | Validate a file directly from a dedicated page | feturbin |
+| F10 | Invoice XML reader | Displays the embedded XML as a readable invoice | sabenzar |
+| F11 | PDF extraction | Python service extracts invoice fields from a plain PDF | feturbin |
+| F12 | Correction form | The user checks and corrects extracted fields | iso-brie |
+| F13 | Factur-X generation | Python generates the Factur-X, Java validates it independently | yseddiki, feturbin |
+| F14 | Queue and async processing | Background jobs with statuses, limited retries, one active job per document | sabenzar |
+| F15 | Real-time | Live document statuses over WebSocket, per organization and role | avalent2 |
+| F16 | Advanced search | Filters, sorting and pagination of documents | yseddiki |
+| F17 | Secure public API | API keys, scopes, rate limiting, OpenAPI documentation | feturbin |
+| F20 | Export / import | Documents and members export (CSV / JSON / PDF), CSV invitation import | avalent2 |
+| F21 | GDPR | Personal data export, account deletion or anonymization, confirmation emails | sabenzar |
 
 ---
 
-# Development Principle
+## Modules
 
-When adding a new feature, start from the use case and define the complete data flow.
+| Module | Type | Pts | Features | Owner(s) |
+|---|---|---|---|---|
+| Frontend + backend frameworks (React, Spring Boot) | Major | 2 | F00 | sabenzar |
+| ORM (Spring Data JPA / Hibernate) | Minor | 1 | F00 | sabenzar |
+| Backend as microservices (internal Python service) | Major | 2 | F00, F11, F13 | sabenzar, feturbin, yseddiki |
+| Organization system | Major | 2 | F02, F03 | yseddiki, avalent2 |
+| Advanced permissions | Major | 2 | F04 | sabenzar |
+| File upload and management | Minor | 1 | F06 | yseddiki |
+| **Custom module: Factur-X compliance engine** | Major | 2 | F08, F09 | feturbin |
+| Real-time features (WebSocket) | Major | 2 | F15 | avalent2 |
+| **Subtotal (minimum required: 14)** | | **14** | | |
+| Public API | Major | 2 | F17 | feturbin |
+| Advanced search | Minor | 1 | F16 | yseddiki |
+| Data export / import | Minor | 1 | F20 | avalent2 |
+| GDPR compliance | Minor | 1 | F21 | sabenzar |
+| **Total** | | **19** | | |
 
-For a standard backend feature:
+### Custom module (Major): Factur-X compliance engine
 
-```text
-Client Request
-      ↓
-Controller
-      ↓
-Service
-      ↓
-Repository
-      ↓
-Database
-```
+**Why this module.** Accounting firms must now know *whether* an invoice is a compliant
+Factur-X and, above all, *why* it is not. No standard module of the subject covers this
+need: it is the business core of the application.
 
-For a feature requiring Python:
+**What it does (F08 + F09).**
 
-```text
-Client Request
-      ↓
-Spring Boot Controller
-      ↓
-Spring Boot Service
-      ↓
-FastAPI
-      ↓
-Spring Boot
-      ↓
-Repository / Database
-      ↓
-Client Response
-```
+- **Deterministic multi-layer validation** with the Mustangproject library (which
+  relies on veraPDF for PDF/A): PDF/A-3 structure and embedded XML, CII XSD schema,
+  EN 16931 Schematron business rules and Factur-X profile constraints. The layer
+  reached is stored with each run.
+- **Readable report**: each technical rule code (`BR-02`, …) is translated into a
+  title, an explanation and a correction hint in French, the language of our users.
+  These texts are data (table `rule_catalog`), not code.
+- **Persistence** of every run and its errors (`validation_runs`, `validation_errors`),
+  available from the document page and the "Verify" page.
 
-The frontend communicates with Spring Boot only.
+**Technical challenges.**
+
+- Interpreting Mustang's raw XML report (separate PDF and XML blocks) and mapping it to
+  a single model: layer reached, severity, rule, field, value.
+- Avoiding noise: every error is kept in the database, but rules outside our users'
+  scope (`BR-DE-*` extensions, `PEPPOL-*` notices) are left out of the readable report.
+- Testing precise rules: invoices deliberately broken on a single point check that the
+  engine raises exactly the expected rule (`RuleCatalogCoverageTest`).
+- Keeping the generator and the validator independent: invoices produced by the Python
+  service (F13) are validated again by the Java engine, and CI fails if a generated
+  invoice is not compliant.
+
+**Why a Major.** The module is comparable in size and complexity to the subject's Major
+modules: a complete backend service, three dedicated tables, a REST API, frontend pages,
+its own test coverage, and integration with almost every other part of the project —
+document upload (F06), queue (F14), real-time (F15), generation (F13) and the public
+API (F17).
 
 ---
 
-# Stop the Docker Environment
+## Individual Contributions
 
-Stop the stack:
+- **sabenzar** (PM) — technical baseline (Docker, CI, health check), HTTPS / Nginx / TLS,
+  roles and permissions, invoice XML reader, queue and asynchronous processing, GDPR.
+- **feturbin** (Architect) — authentication, Factur-X validation engine and readable
+  report, "Verify" page, PDF extraction in Python, Factur-X generation (with yseddiki),
+  public API, bug fixes (BUGS_FIX_1, BUGS_FIX_2).
+- **avalent2** (PO) — invitations and members, document list and statuses, real-time
+  WebSocket, export / import.
+- **yseddiki** — organizations, document upload, Factur-X generation (with feturbin),
+  advanced search.
+- **iso-brie** — legal pages and profile, human correction form.
 
-```bash
-docker compose down
-```
+---
 
-Rebuild after changing Docker configuration or dependencies:
+## API Reference
 
-```bash
-docker compose up --build
-```
+The frontend uses session routes under `/api/` (session cookie + CSRF token). External
+software uses the public API under `/api/public/v1` (API key). The main session routes:
 
-
-
-
-
----------------------------------------------------------------------------------------------------------
-
-
-
-
-
-FEATURES LIST
-
-**Priorities**
-
-| | Meaning |
+| Area | Routes |
 |---|---|
-| **P0** | Required for the mandatory 14 points, or required by the subject. Non-negotiable. |
-| **P1** | Bonus points. Droppable without breaking anything. Build in the listed order. |
-| **Reserve** | Do not start. Listed only so nobody re-proposes them as new ideas. |
-
----
-
-
-
-## Overview
-
-### P0 — the mandatory core (17 features → 14 points)
-
-| ID | Feature | Scope | Module earned | Pts |
-|---|---|---|---|---|
-| **F00** | Baseline technique | Repo, Docker, CI, health end-to-end | Frameworks + ORM + microservices | 5 |
-| **F00+** | HTTPS / Nginx / TLS | Single public entry point, TLS, `.env` | *subject requirement* | 0 |
-| **F01** | Authentification | Register, login, session, hashed passwords | *subject requirement* | 0 |
-| **F02** | Organisations / cabinets | Multi-tenant model | Organisation system | 2 |
-| **F03** | Invitations et membres | Invite client or colleague | part of F02 | ↑ |
-| **F04** | Rôles et permissions | Admin, comptable, client | Advanced permissions | 2 |
-| **F05** | Pages légales et profil | Privacy Policy, Terms, profile | *subject requirement* | 0 |
-| **F06** | Dépôt de documents | Upload PDF / XML / Factur-X | File upload and management | 1 |
-| **F07** | Liste documents et statuts | History, status, details | *product* | 0 |
-| **F08** | Validation Factur-X Java | PDF/A-3, XSD, Schematron, profiles | Module of choice, part 1 | 2 |
-| **F09** | Rapport lisible | Errors a human understands | Module of choice, part 2 | ↑ |
-| **F10** | Lecteur XML facture | XML → readable invoice | *product* | 0 |
-| **F11** | Extraction PDF Python | Extract fields from a plain PDF | *product* | 0 |
-| **F12** | Formulaire de correction | Human checks and fixes fields | *product* | 0 |
-| **F13** | Génération Factur-X | Python generates, Java validates | *product* | 0 |
-| **F14** | Queue et traitement async | Jobs, statuses, retries, locking | *our solution to the concurrency requirement* | 0 |
-| **F15** | Temps réel WebSocket | Live statuses, multi-user | Real-time features | 2 |
-| | | | **Total** | **14** |
-
-
-
-### P1 — bonus (4 features → 5 points), in this order
-
-| ID | Feature | Scope | Module earned | Pts |
-|---|---|---|---|---|
-| **F17** | API publique sécurisée | API key, rate limit, docs, 5+ endpoints | Public API | 2 |
-| **F16** | Recherche avancée | Filters, sort, pagination | Advanced search | 1 |
-| **F20** | Export / import | CSV / JSON / PDF | Export / import | 1 |
-| **F21** | RGPD | Data export and deletion | GDPR compliance | 1 |
-| | | | **Total** | **5** |
-
-**Ceiling: 19 points.** Bonus is capped at 5 by the subject. Anything beyond that is
-wasted effort.
-
-
-
-### Reserve — do not start
-
-| ID | Feature | Why not |
-|---|---|---|
-| **F18** | Assistant IA RAG | The subject requires "a large dataset of information". A few hundred rules is arguable, and a module that fails its demo scores zero. Also an LLM inside a compliance tool, where determinism is the whole point. |
-| **F19** | Journal d'audit | Earns **no module**. Good B2B practice, real cost, zero points. |
-| **F22** | 2FA | We chose other bonus modules. Only if week 5 finishes early. |
-| **F23** | Dashboard analytics | Worth 2 points we cannot use — we are already at the 19 ceiling. For *team* tracking we use GitHub Projects and Issues, not a dashboard inside the application. |
-
----
-
-
-
-## Two things to understand before assigning work
-
-**Six P0 features earn zero points** — F07, F10, F11, F12, F13, F14. That is fine:
-they *are* the product. Without them the conformity engine has nothing to demonstrate,
-and a Major module with nothing to show scores zero.
-
-**F11 to F13 carry 2 points indirectly.** They are not mandatory features in the
-subject. They are P0 because the Python service needs a real responsibility for
-*Backend as microservices* to be demonstrable — a service that only answers `/health`
-is not a microservice, and a module that cannot be demonstrated scores zero. Drop
-extraction and generation and the module collapses with them.
-
----
-
-# P0 — detailed
-
-## F00 — Baseline technique
-
-**Priority** P0, first sprint · **Owner** whole team · **Depends on** nothing
-
-**Goal.** A common base that starts end to end — Frontend → Backend → Database — with
-Docker and a green CI.
-
-> HTTPS, Nginx and `.env` handling are **F00+**, a separate feature that runs in
-> parallel. F00 does not wait for it.
-
-**Mini-tasks**
-
-*Frontend*
-- Minimal page displaying backend and database status
-- Call `GET /api/health`
-- Clear message on error
-- Tailwind CSS installed and configured ← **added; the subject requires a CSS framework**
-
-*Backend*
-- `GET /api/health`
-- Minimal DB connection with `SELECT 1`
-- JSON response: `{ "backend": "ok", "database": "ok" }`
-
-*Extractor (Python)* ← **added, skeleton only — see the note below**
-- FastAPI container answering `/health` and nothing else
-- On the internal Docker network, not exposed
-- Included in the aggregate health response
-
-*Database*
-- PostgreSQL container
-- Minimal `init.sql`
-- `pg_isready` healthcheck
-
-*Tests / CI*
-- Build frontend and backend
-- `docker compose up` in CI
-- Automated health check
-- A PR does not merge if the health check fails
-
-*Docs*
-- README with the launch command
-- Simple architecture diagram
-
-**Definition of Done**
-- `docker compose up --build` works
-- The frontend page shows Backend OK and Database OK
-- CI is green on `main`
-
-> **Open point — when the Python container first appears.** Still undecided.
->
-> *For including a skeleton now:* thirty lines proves the Docker network path, a third
-> image in CI and the compose orchestration — the parts that cost a day when discovered
-> in week four with several branches open. The HTTP call itself is trivial; the
-> plumbing is not.
->
-> *For waiting until F11:* the baseline stays smaller and we do not pay for complexity
-> before a feature needs it.
->
-> Salma's position is that F00+ should land before we attack FastAPI and the
-> microservices part, which sequences HTTPS first either way.
->
-> **This is a scheduling question, not an architectural one** — the architecture is
-> settled. If the team prefers F11, delete the *Extractor* block above and move it
-> into F11.
-
----
-
-## F00+ — HTTPS / Nginx / TLS
-
-**Priority** P0 · **Owner** 1 person — **must be assigned this week** ·
-**Depends on** F00 containers existing · **Runs in parallel with** F02, F03, F04
-
-**Goal.** Put the whole stack behind HTTPS with a single public entry point.
-
-> **Why this is its own feature.** HTTPS is explicitly mandatory in the subject's
-> technical requirements — its absence causes rejection, not a lower mark. **Nginx is
-> not required by the subject**; it is our chosen way of providing TLS termination and
-> a single entry point. Kept inside F00 it had no owner and could be forgotten before
-> the later features; as its own feature it is tracked and does not block the team.
-
-**Mini-tasks**
-
-*Nginx*
-- Reverse proxy as the single public entry point
-- TLS termination, self-signed certificate for development
-- Route `/` to the frontend, `/api/*` to Spring Boot
-- WebSocket upgrade passthrough for F15 ← easy to forget, painful to debug later
-- The **only** container published to the host
-
-*Docker*
-- Remove the direct host port mappings for backend and frontend
-- Keep PostgreSQL on the internal network only
-- Everything else reachable by service name inside the Docker network
-
-*Environment*
-- `.env` in `.gitignore`
-- `.env.example` committed, same keys with placeholder values
-- Check `git log --all -- .env` — if a real `.env` was ever committed, the credentials
-  must be rotated, not just the file deleted
-
-*Frontend*
-- Axios `baseURL` pointing at the same origin
-- `withCredentials: true` — our auth is cookie-based
-
-*Tests / CI*
-- CI starts the stack and hits `https://localhost/api/health`
-- Assert `:8080` is **not** reachable from outside
-
-*Docs*
-- One command, one address in the README
-- How to trust the self-signed certificate in development
-
-**Definition of Done**
-- The app is reachable at `https://localhost`
-- `:8080` and `:5173` are **not** reachable from the host
-- `.env.example` is committed and `.env` is ignored
-- CI proves it
-
----
-
-## F01 — Authentification
-
-**Priority** P0 · **Owner** 1 person · **Depends on** F00
-
-**Goal.** Let a user create an account and sign in securely.
-
-**Mini-tasks**
-
-*Frontend*
-- Register and Login pages
-- Form validation on email and password
-- API error handling
-- Redirect after login
-
-*Backend*
-- `POST /api/auth/register`, `POST /api/auth/login`
-- `POST /api/auth/logout`, `GET /api/auth/me` ← **added**
-- Password hashing with salt (BCrypt — the salt lives inside the hash, no separate column)
-- **Session cookie, not JWT** ← see the note below
-- Auth middleware protecting routes
-- CSRF enabled — do **not** call `.csrf().disable()`
-
-*Database*
-- Table `users`: id, email, password_hash, first_name, last_name, created_at, status
-- Unique index on email, **stored lowercased and trimmed**
-
-*Tests / CI*
-- Register and login success
-- Wrong password, email already used
-- **Unknown email and wrong password return byte-identical responses** ← otherwise
-  anyone can probe which emails are registered
-- Password is never stored in clear, never returned in a response
-
-*Docs*
-- Auth routes and error format
-
-**Definition of Done**
-- A user can register and sign in
-- A protected route refuses an unauthenticated user
-- No clear-text password anywhere in the database
-- `GET /me` drives the SPA boot; no token stored in the frontend
-
-> **Why sessions and not JWT.** Logout must actually work, and a JWT cannot be revoked
-> without a server-side blocklist — which reintroduces state anyway. An `HttpOnly`
-> cookie is unreachable from JavaScript, unlike a token in `localStorage`. And the
-> WebSocket handshake in F15 sends the cookie automatically.
-
----
-
-## F02 — Organisations / cabinets
-
-**Priority** P0 · **Owner** 1 person · **Depends on** F01
-
-**Goal.** The multi-tenant model: an accounting firm has its own members, clients and
-documents.
-
-**Mini-tasks**
-
-*Frontend*
-- Organisation creation page
-- Organisation selection page
-- Display name, role, main members
-
-*Backend*
-- Minimal organisation CRUD
-- Creator becomes owner/admin
-- Middleware loading the current organisation
-- **Replace `GET /api/users` with `GET /api/organizations/{id}/members`** ← the global
-  endpoint would let one firm list another firm's clients
-
-*Database*
-- Tables `organizations`, `organization_members`
-- Relations user_id, organization_id, role
-- Index on organization_id
-
-*Tests / CI*
-- A user can create an organisation
-- A user does not see other organisations
-- Multi-tenant isolation tests
-
-*Docs*
-- Organisation and member schema
-
-**Definition of Done**
-- Data is always tied to an organisation
-- A user cannot access an organisation they do not belong to
-
----
-
-## F03 — Invitations et membres
-
-**Priority** P0 · **Owner** 1 person · **Depends on** F01, F02
-
-**Goal.** Let a firm invite clients or colleagues into its organisation.
-
-**Mini-tasks**
-
-*Frontend*
-- Invite-by-email interface
-- Pending invitations list
-- Accept / decline action
-
-*Backend*
-- `POST /organizations/{id}/invitations`
-- Invitation token
-- Acceptance by a signed-in user
-- Expiry and status
-
-*Database*
-- Table `invitations`: email, organization_id, role, token, status, expires_at
-- Members table updated on acceptance
-
-*Tests / CI*
-- Only an admin can create an invitation
-- Acceptance adds the member
-- Expired invitation refused
-
-*Docs*
-- Invitation flow in the README
-
-**Definition of Done**
-- An admin invites a client, the client joins, the role is correct
-
----
-
-## F04 — Rôles et permissions
-
-**Priority** P0 · **Owner** 1 person · **Depends on** F02, F03
-
-**Goal.** Control actions by role: admin, comptable, client.
-
-**Mini-tasks**
-
-*Frontend*
-- Show or hide actions by role
-- Role management page for admins
-- Access-denied messages
-
-*Backend*
-- Permission middleware
-- Policies: `can_upload`, `can_validate`, `can_invite`, `can_manage_users`, `can_delete`
-- **Every sensitive route checked server-side** — hiding a button is not access control
-- Every query touching tenant data filters by `organization_id`
-
-*Database*
-- Role in `organization_members`
-- Optional `permissions` table if the model grows
-
-*Tests / CI*
-- A client cannot invite
-- An accountant sees client documents
-- An admin can change a role
-- 403 tests
-
-*Docs*
-- Permission matrix
-
-**Definition of Done**
-- Every sensitive action has a backend check
-- Roles are visible in the interface
-
----
-
-## F05 — Pages légales et profil utilisateur
-
-**Priority** P0 · **Owner** 1 person · **Depends on** F01
-
-**Goal.** Cover the subject's basic obligations and add a simple profile page.
-
-**Mini-tasks**
-
-*Frontend*
-- **Privacy Policy and Terms of Service pages, linked in the footer, with real content**
-  — placeholder pages cause rejection
-- Profile page: email, name, active organisation
-- Edit first and last name
-
-*Backend*
-- `GET` / `PUT /me`
-- Validation of editable fields
-
-*Database*
-- Profile columns: first_name, last_name, created_at, updated_at
-
-*Tests / CI*
-- Footer contains the legal links
-- Pages are reachable and not empty
-- Profile update validated
-
-*Docs*
-- Legal content adapted to this project — invoices contain commercial data, say what
-  we store and for how long
-
-**Definition of Done**
-- Privacy Policy and Terms are visible and not empty
-- The user profile works
-
----
-
-## F06 — Dépôt de documents
-
-**Priority** P0 · **Owner** 1 person · **Depends on** F01–F04
-
-**Goal.** Let an authorised member upload an invoice: PDF, XML or Factur-X.
-
-**Mini-tasks**
-
-*Frontend*
-- Drag-and-drop upload zone
-- Client-side extension and size checks
-- Upload progress
-- Success and failure messages
-- File preview and delete ← required by the module description
-
-*Backend*
-- Secure upload endpoint
-- Server-side MIME, extension and size checks
-- File storage on a volume
-- Document record creation
-
-*Database*
-- Table `documents`: id, organization_id, owner_id, filename, type, size, status,
-  storage_path
-- Statuses: uploaded, queued, processing, valid, invalid, failed
-
-*Tests / CI*
-- PDF and XML accepted
-- Oversized file refused
-- User without permission refused
-
-*Docs*
-- Accepted types and limits
-
-**Definition of Done**
-- An authorised user uploads a file
-- The document appears in the database and in the document list
-
----
-
-## F07 — Liste documents et statuts
-
-**Priority** P0 · **Owner** 1 person · **Depends on** F06
-
-**Goal.** Show the document history with processing status.
-
-**Mini-tasks**
-
-*Frontend*
-- Documents page
-- Table: name, type, date, user, status
-- Document detail page
-- Readable status badges
-
-*Backend*
-- `GET /documents` with pagination
-- `GET /documents/{id}`
-- Filtered by organisation
-
-*Database*
-- Indexes on organization_id, created_at, status
-- Relations to users and reports
-
-*Tests / CI*
-- A user sees only their organisation's documents
-- Pagination works
-- Unknown document → 404
-
-*Docs*
-- Status descriptions
-
-**Definition of Done**
-- The user sees their documents, statuses are clear and persistent
-
----
-
-## F08 — Validation Factur-X (Java)
-
-**Priority** P0 — core domain · **Owner** 1 backend person · **Depends on** F06
-
-**Goal.** Build the deterministic validation engine that checks invoices and produces
-usable results.
-
-**Mini-tasks**
-
-*Frontend*
-- Validate button, or automatic validation after upload
-- Loading and status display
-
-*Backend (Java)*
-- Validation service, four chained layers:
-  1. PDF/A-3 structure — is the XML embedded, is the XMP metadata correct (veraPDF)
-  2. XSD — is the XML schema-valid CII
-  3. Schematron EN 16931 — the CEN business rules
-  4. Factur-X profile constraints
-- Stop reporting downstream noise once an upstream layer fails hard
-
-*Database*
-- Tables `validation_runs`, `validation_errors`, `rule_catalog`
-- Link document → run → errors
-
-*Tests / CI*
-- Corpus of valid and invalid invoices from FNFE-MPE
-- **Mutation tests**: take a valid invoice, break exactly one thing, assert the
-  validator catches *that specific rule*
-- CI fails if a generated invoice is invalid
-
-*Docs*
-- Explain the four validation layers
-- **`LICENSES` section** for Mustangproject, veraPDF, Saxon ← check before merging
-
-**Definition of Done**
-- A document can be validated, the result is stored
-- At least one valid case and one invalid case can be demonstrated
-
----
-
-## F09 — Rapport d'erreurs lisible
-
-**Priority** P0 — core domain · **Owner** 1 person · **Depends on** F08
-
-**Goal.** Turn technical errors into clear explanations for a non-expert. **This is our
-differentiator** — validators exist, readable diagnostics do not.
-
-**Mini-tasks**
-
-*Frontend*
-- Report page with a summary: valid / invalid
-- Error list with severity, message, field, value
-- Never a bare rule code with no explanation
-
-*Backend*
-- Mapping rule code → French message
-- Include actual and expected values wherever possible
-- `GET /documents/{id}/report`
-
-*Database*
-- `rule_catalog`: code, title_fr, description_fr, correction_hint_fr
-- Enriched `validation_errors`
-- **French text lives in the table, not in the code** — it is data, not logic
-
-*Tests / CI*
-- A known BR error produces a readable message
-- Empty report when the invoice is valid
-- Snapshot tests of the JSON format
-
-*Docs*
-- Error examples
-- Rule coverage: how many rules have a French explanation, out of the total
-
-**Definition of Done**
-- The user understands why an invoice was refused
-- The report is reachable from the document page
-
----
-
-## F10 — Lecteur XML facture
-
-**Priority** P0 · **Owner** 1 person · **Depends on** F06
-
-**Goal.** Display a raw XML as a readable invoice.
-
-**Mini-tasks**
-
-*Frontend*
-- Invoice view: seller, buyer, dates, lines, VAT, totals
-- Responsive layout
-- Message when a field is missing
-
-*Backend*
-- CII XML parser
-- `GET /documents/{id}/invoice-view`
-- Amount and date normalisation
-
-*Database*
-- Not required to store everything; on-demand read is fine
-- Optional `invoice_views` cache
-
-*Tests / CI*
-- Simple XML → readable view
-- Malformed XML → clean error
-- Totals and lines tests
-
-*Docs*
-- Supported formats and limits
-
-**Definition of Done**
-- An uploaded XML becomes readable as a normal invoice
-
----
-
-## F11 — Extraction PDF (Python)
-
-**Priority** P0 · **Owner** 1 Python person · **Depends on** F06
-
-**Goal.** Automatically extract the important fields from a plain PDF.
-
-**Mini-tasks**
-
-*Frontend*
-- "Convertir en Factur-X" button
-- Extraction progress
-
-*Backend (Python)*
-- `POST /extract` on the internal service
-- Extract seller, buyer, date, number, lines, VAT, totals
-- **Confidence score per field**
-- **No database access, no auth** — receives a file, returns JSON
-
-*Backend (Java)*
-- Checks user, organisation, permissions and document **before** delegating
-- Validates the shape of the returned JSON, persists the draft
-
-*Database*
-- Table `extracted_fields` or `draft_invoices`
-- Keep source, value, confidence
-
-*Tests / CI*
-- Sample PDF → expected fields
-- Difficult PDF → missing fields but a clean error
-- **Measure and publish extraction accuracy per field**
-
-*Docs*
-- State plainly that extraction must be checked by a human
-
-**Definition of Done**
-- A PDF produces a structured draft invoice
-- Low-confidence fields are visibly flagged
-
----
-
-## F12 — Formulaire de correction humaine
-
-**Priority** P0 · **Owner** 1 person · **Depends on** F11
-
-**Goal.** Let the user check and correct extracted fields before generation. We do not
-promise perfect extraction — we guarantee a conformant result.
-
-**Mini-tasks**
-
-*Frontend*
-- Invoice form: header, parties, lines, taxes, totals
-- Add and remove a line
-- Required-field validation
-- **Visible confidence indicator per field**
-
-*Backend*
-- Draft save API
-- Server-side validation of amounts and types
-- Total recalculation
-
-*Database*
-- Tables `draft_invoices`, `draft_lines`, `draft_taxes`
-- Version or updated_at
-
-*Tests / CI*
-- Missing required field refused
-- Line sums consistent with totals
-- Draft save and reload
-
-*Docs*
-- Form validation rules
-
-**Definition of Done**
-- A user corrects the fields and saves a valid draft
-
----
-
-## F13 — Génération Factur-X
-
-**Priority** P0 · **Owner** 1 Python person + Java integration · **Depends on** F12, F08
-
-**Goal.** Generate a Factur-X from a valid draft, then have Java validate it.
-
-**Mini-tasks**
-
-*Frontend*
-- Generate button
-- Result and download link
-- Validation report shown after generation
-
-*Backend (Python)*
-- `POST /generate`
-- CII XML generation
-- Embed the XML in a PDF/A-3
-- **Profiles BASIC and EN 16931 only**
-
-*Backend (Java)*
-- **Independent validation of the generated file**
-- Return errors if generation is non-conformant
-
-*Database*
-- Generated document linked to the source document
-- Store generation status and report
-
-*Tests / CI*
-- Golden sample: PDF → draft → Factur-X → validation OK
-- **CI fails if a generated sample is non-conformant**
-
-*Docs*
-- Limits: supported profiles, excluded formats
-
-**Definition of Done**
-- A generated invoice can be downloaded
-- It is validated by the Java engine after generation
-
-> **This is the elegant part of the architecture.** Python generates, Java validates,
-> and the two share no code. The generator can never mark its own homework.
-
----
-
-## F14 — Queue et traitement asynchrone
-
-**Priority** P0 · **Owner** 1 backend person · **Depends on** F06, F08, F13
-
-**Goal.** Stop the user waiting during long validations and conversions, and handle
-concurrent actions correctly.
-
-> **What the subject actually requires:** multiple users active simultaneously,
-> concurrent actions handled properly, real-time updates propagated, and no race
-> conditions or data corruption. **It does not require a queue.** The queue is *our*
-> architectural answer to that requirement — worth stating precisely, because at the
-> defence we will be asked why we built it this way, not told that we had to.
-
-**Mini-tasks**
-
-*Frontend*
-- Show queued / processing / done
-- Retry button on failure
-
-*Backend*
-- Job model
-- Validation and conversion worker
-- Limited retries
-- Error handling
-- **Locking so two accountants cannot process the same document concurrently** ←
-  this is the part that answers the no-race-conditions requirement
-
-*Database*
-- Table `jobs`: type, document_id, status, attempts, error, started_at, finished_at
-- Index on status
-
-*Tests / CI*
-- A job moves from queued to done
-- Failure stores the error
-- Retry works or is capped
-- **Concurrent processing of the same document does not corrupt data**
-
-*Docs*
-- Job lifecycle
-
-**Definition of Done**
-- Validation and generation run in the background
-- Statuses stay persistent
-
----
-
-## F15 — Temps réel WebSocket
-
-**Priority** P0 · **Owner** 1 fullstack person · **Depends on** F14, F07
-
-**Goal.** Notify connected users when a document changes status.
-
-**Mini-tasks**
-
-*Frontend*
-- WebSocket connection
-- Automatic document table update
-- Reconnection handling
-
-*Backend*
-- WebSocket endpoint
-- **Broadcast scoped by organisation**
-- `document.status.changed` events
-
-*Database*
-- Not required
-
-*Tests / CI*
-- Two clients receive the update
-- **A client from another organisation receives nothing**
-- Clean disconnection
-
-*Docs*
-- Real-time event format
-
-**Definition of Done**
-- The accountant sees the status change without refreshing
-- Organisation isolation respected
-
----
-
-# P1 — bonus, in this order
-
-## F17 — API publique sécurisée
-
-**Priority** P1, take first · **Owner** 1 backend person · **Depends on** F01–F09
-
-**Goal.** Let a technical client interact with documents via API. Coherent for a B2B
-tool — accounting software vendors are the natural users.
-
-**Mini-tasks**
-
-*Frontend* — API keys page, create and revoke, link to documentation
-*Backend* — API key auth, rate limiting, at least 5 endpoints (list, upload, status,
-report, download), OpenAPI/Swagger
-*Database* — `api_keys`: key hash, owner, scopes, revoked_at
-*Tests* — valid key accepted, invalid refused, rate limit tested, scopes respected
-*Docs* — endpoint documentation with curl examples
-
-**Definition of Done** — an API key gives access to at least 5 documented, rate-limited
-endpoints
-
----
-
-## F16 — Recherche avancée
-
-**Priority** P1 · **Owner** 1 person · **Depends on** F07, F09
-
-**Mini-tasks**
-
-*Frontend* — search bar, filters (status, date, type, user, error), sort, pagination
-*Backend* — `GET /documents/search`, filter validation, efficient pagination
-*Database* — indexes on status, date, type, filename
-*Tests* — filters combine, pagination stable, **organisation isolation**
-*Docs* — supported filters
-
-**Definition of Done** — the user finds an invoice by name, status or error
-
----
-
-## F20 — Export / import
-
-**Priority** P1 · **Owner** 1 person · **Depends on** F07, F09
-
-**Mini-tasks**
-
-*Frontend* — export CSV/JSON/PDF button, import page with validation preview
-*Backend* — export endpoints, CSV/JSON generation, import with error report
-*Database* — optional `imports` table with status and errors
-*Tests* — export has the right columns, invalid import refused without corruption
-*Docs* — export and import formats
-
-**Definition of Done** — an admin exports their data and imports a valid file
-
----
-
-## F21 — RGPD
-
-**Priority** P1 · **Owner** 1 person · **Depends on** F01, F02
-
-**Mini-tasks**
-
-*Frontend* — "mes données" page, request export, request deletion with confirmation
-*Backend* — user data export, deletion or anonymisation by role, strong confirmation
-*Database* — `anonymized` status. No `deletion_requested` status: deletion is processed
-immediately after confirmation, so an intermediate status would never be visible
-*Tests* — export contains the user's data, deletion respects organisations and documents
-*Docs* — simplified retention policy
-
-**Definition of Done** — a user can export their data and request deletion or
-anonymisation, with mandatory confirmation
-
----
-
-# Milestones
-
-| Week | Milestone | Features |
-|---|---|---|
-| 1 | **M0** Baseline | F00, F00+ + Factur-X research spike |
-| 2 | **M1** Auth and tenancy | F01, F02, F03, F04, F05 |
-| 3 | **M2** Documents and validation | F06, F07, F08 |
-| 4 | **M3** Reports and reading | F09, F10, F11 |
-| 5 | **M4** Conversion and real-time | F12, F13, F14, F15 — **the mandatory 14 are complete here** |
-| 6 | **M5** Freeze Monday | Bonus only if already started (F17, F16, F20, F21). Then tests, final README, deployment, defence rehearsal |
-
-
-
-
----
-
-
-
-
-
----
-
-# Numbers to collect as we go
-
-Do not leave these to week 6; they are much easier to gather while building.
-
-- Extraction accuracy per field, over N invoices (F11)
-- Round-trip: N generated invoices, 100% pass independent validation (F13)
-- Validation latency p50 / p95 (F08)
-- Rule coverage: rules with a French explanation, out of the total (F09)
-- Number of mutation tests passing (F08)
-
----
-
-
-## F15 — Real-time events
-
-### Connexion et authentification
-
-Endpoint : `/ws` (`wss://localhost:8443/ws` en HTTPS).
-Le handshake utilise le cookie de session `EFACTURE_SESSION`.
-Une session authentifiée est requise. Les origines autorisées sont
-définies par `app.allowed-origins`, partagé entre CORS et WebSocket.
-
-### Format de l'événement
+| Authentication | `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` |
+| Organizations | `GET`, `POST /api/organizations` · `GET`, `PUT`, `DELETE /api/organizations/{id}` · `GET /api/organizations/{id}/members` · `PATCH /api/organizations/{id}/members/{userId}/role` · `DELETE /api/organizations/{id}/members/{userId}` |
+| Invitations | `GET`, `POST /api/organizations/{orgId}/invitations` · `PATCH .../{invitationId}/revoke`, `.../resend` · `GET /api/invitations/{token}` · `POST /api/invitations/accept` |
+| Documents | `POST /api/documents` · `GET /api/documents`, `/api/documents/{id}`, `/api/documents/search` · `GET /api/documents/{id}/download` · `DELETE /api/documents/{id}` |
+| Validation | `POST /api/documents/{id}/validate` · `GET /api/documents/{id}/report` · `POST /api/validate` · `GET /api/validate/runs/{runId}/report` |
+| Extraction and generation | `POST /api/documents/{id}/extract` · `GET`, `PUT /api/documents/{id}/draft` · `POST /api/documents/{id}/generate` · `GET /api/documents/{id}/generations` |
+| Invoice view | `GET /api/documents/{id}/invoice-view`, `/api/documents/{id}/xml` |
+| Jobs | `POST /api/jobs/validation`, `/api/jobs/generation` · `GET /api/jobs/{id}` · `POST /api/jobs/{id}/retry` |
+| API keys | `GET`, `POST /api/api-keys` · `DELETE /api/api-keys/{id}` |
+| Export / import | `GET /api/organizations/{orgId}/export/documents`, `.../export/members` · `POST /api/organizations/{orgId}/import/invitations` |
+| GDPR | `GET /api/gdpr/export` · `POST /api/gdpr/delete` |
+| Health | `GET /api/healthcheck` |
+
+### Real-time events (F15)
+
+#### Connection and authentication
+
+Endpoint: `/ws` (`wss://localhost:8443/ws` over HTTPS).
+The handshake uses the `EFACTURE_SESSION` session cookie.
+An authenticated session is required. Allowed origins are defined by
+`app.allowed-origins`, shared between CORS and WebSocket.
+
+#### Event format
 
 ```json
 {
@@ -1637,251 +451,309 @@ définies par `app.allowed-origins`, partagé entre CORS et WebSocket.
 }
 ```
 
-`status` correspond au nouveau statut du document :
-`UPLOADED`, `QUEUED`, `PROCESSING`, `VALID`, `INVALID` ou `FAILED`.
-`ownerId` reste interne au serveur et n'est pas transmis.
+`status` is the new status of the document:
+`UPLOADED`, `QUEUED`, `PROCESSING`, `VALID`, `INVALID` or `FAILED`.
+`ownerId` stays internal to the server and is not sent.
 
-### Visibilité
+#### Visibility
 
-Les permissions sont vérifiées côté serveur à chaque événement,
-pour l'organisation du document.
+Permissions are checked on the server for every event, for the document's
+organization.
 
-| Permission | Événements reçus |
+| Permission | Events received |
 | --- | --- |
-| VIEW_ALL_DOCUMENTS | Tous les documents de l'organisation |
-| VIEW_OWN_DOCUMENTS uniquement | Documents appartenant à l'utilisateur |
-| Aucune de ces permissions | Aucun |
+| VIEW_ALL_DOCUMENTS | All documents of the organization |
+| VIEW_OWN_DOCUMENTS only | Documents owned by the user |
+| None of these permissions | None |
 
-Les rôles ADMIN, ACCOUNTANT et CLIENT suivent les permissions qui
-leur sont attribuées. Aucun événement d'une autre organisation
-n'est envoyé sans les droits correspondants.
+The ADMIN, ACCOUNTANT and CLIENT roles follow the permissions assigned to them.
+No event from another organization is sent without the matching rights.
 
-### Déconnexion et reconnexion
+#### Logout and reconnection
 
-Au logout, le serveur ferme tous les WebSockets de l'utilisateur,
-y compris sur ses autres appareils, avec le code 1008.
-Le client ferme aussi sa connexion et annule les tentatives de
-reconnexion lorsque l'utilisateur n'est plus authentifié.
+On logout, the server closes all of the user's WebSockets, including on their other
+devices, with code 1008. The client also closes its connection and cancels
+reconnection attempts once the user is no longer authenticated.
 
-Après une coupure, le client réessaie après 2 secondes.
-Il ne réessaie pas après le code 1008.
-Une connexion rétablie émet localement `websocket.reconnected`,
-utilisé pour recharger les données actuelles.
-Un nouveau login ouvre une nouvelle connexion sans refresh.
+After a connection drop, the client retries after 2 seconds.
+It does not retry after code 1008.
+A restored connection emits `websocket.reconnected` locally, used to reload the
+current data.
+A new login opens a new connection without a page refresh.
 
-### Développement Vite
+#### Vite development
 
-Le profil Spring `dev` autorise `http://localhost:5173` et désactive
-le flag Secure du cookie de session pour le développement HTTP.
-Vite transmet `/api` et `/ws` au backend sur `localhost:8080`,
-avec `ws: true` pour `/ws`.
-Le backend doit pouvoir accéder à PostgreSQL.
+The Spring `dev` profile allows `http://localhost:5173` and disables the Secure flag of
+the session cookie for HTTP development.
+Vite forwards `/api` and `/ws` to the backend on `localhost:8080`, with `ws: true` for
+`/ws`.
+The backend must be able to reach PostgreSQL.
 
----
+### Public API (F17)
 
+REST API for accounting software: upload invoices, track their status, start
+validation, read the report and download the files.
 
-## F17 — API publique
+#### API keys
 
-API REST pour les logiciels comptables : déposer des factures, suivre leur
-statut, lancer la validation, lire le rapport et télécharger les fichiers.
+A key is created from the **API keys** page of the application ("Clés API",
+`/cles-api`).
 
-### Clés API
+- A key belongs to a user and acts in **one** organization the user is a member of. It
+  never has more rights than the user: the permissions of the user's role (F04) apply,
+  restricted by the key's scopes.
+- The secret (`fxk_` + 43 characters) is shown **only once**, at creation. Only its
+  SHA-256 hash is stored (`api_keys.key_hash`).
+- A revoked key, or a key whose owner has left the organization or has been
+  deactivated, is rejected immediately (401).
 
-Une clé se crée depuis la page **Clés API** de l'application (`/cles-api`).
-
-- Une clé appartient à un utilisateur et agit dans **une** organisation dont
-  il est membre. Elle n'a jamais plus de droits que lui : les permissions de
-  son rôle (F04) s'appliquent, limitées par les scopes de la clé.
-- Le secret (`fxk_` + 43 caractères) n'est affiché **qu'une fois**, à la
-  création. Seule son empreinte SHA-256 est stockée (`api_keys.key_hash`).
-- Une clé révoquée, ou dont le propriétaire a quitté l'organisation ou a été
-  désactivé, est refusée immédiatement (401).
-
-| Scope | Autorise |
+| Scope | Allows |
 | --- | --- |
-| `DOCUMENTS_READ` | lister, statut, rapport, téléchargement |
-| `DOCUMENTS_WRITE` | dépôt |
-| `DOCUMENTS_VALIDATE` | lancer une validation Factur-X |
+| `DOCUMENTS_READ` | list, status, report, download |
+| `DOCUMENTS_WRITE` | upload, rename, delete |
+| `DOCUMENTS_VALIDATE` | start a Factur-X validation |
 
-Gestion (session + CSRF, utilisée par le frontend) :
-`GET /api/api-keys`, `POST /api/api-keys`, `DELETE /api/api-keys/{id}` (révocation).
+Management (session + CSRF, used by the frontend):
+`GET /api/api-keys`, `POST /api/api-keys`, `DELETE /api/api-keys/{id}` (revocation).
 
-### Authentification et limite de débit
+#### Authentication and rate limiting
 
-La clé s'envoie dans l'en-tête `X-API-Key` (ou `Authorization: Bearer <clé>`).
-Le cookie de session n'est **pas** accepté sur `/api/public/**` : l'API est
-sans état, d'où l'absence de CSRF sur cette chaîne de sécurité.
+The key is sent in the `X-API-Key` header (or `Authorization: Bearer <key>`).
+The session cookie is **not** accepted on `/api/public/**`: the API is stateless,
+hence no CSRF on this security chain.
 
-Limite : **60 requêtes par minute et par clé** (`app.public-api.rate-limit.*`,
-surchargeable par `PUBLIC_API_RATE_LIMIT`). Chaque réponse porte
-`X-RateLimit-Limit`, `X-RateLimit-Remaining` et `X-RateLimit-Reset` ; au-delà,
-HTTP `429` avec `Retry-After`. Le compteur est en mémoire, comme la limite de
-connexion F01 (une seule instance du backend).
+Limit: **60 requests per minute per key** (`app.public-api.rate-limit.*`, can be
+overridden with `PUBLIC_API_RATE_LIMIT`). Every response carries `X-RateLimit-Limit`,
+`X-RateLimit-Remaining` and `X-RateLimit-Reset`; beyond the limit, HTTP `429` with
+`Retry-After`. The counter is in memory, like the F01 login limit (a single backend
+instance).
 
-### Endpoints
+#### Endpoints
 
-Base : `https://localhost:8443/api/public/v1`. L'organisation est celle de la
-clé, aucun `organizationId` à fournir.
+Base: `https://localhost:8443/api/public/v1`. The organization is the key's
+organization; no `organizationId` is needed.
 
-| Méthode | Route | Scope | Réponse |
+| Method | Route | Scope | Response |
 | --- | --- | --- | --- |
-| `GET` | `/documents?page=0&size=20` | READ | page de documents (`size` ≤ 100) |
-| `POST` | `/documents` (multipart `file`) | WRITE | `201` document créé |
-| `GET` | `/documents/{id}` | READ | métadonnées et statut |
-| `GET` | `/documents/{id}/report` | READ | rapport F09 de la dernière validation |
-| `GET` | `/documents/{id}/download` | READ | le fichier |
-| `POST` | `/documents/{id}/validate` | VALIDATE | `202` job de validation (F14) |
+| `GET` | `/documents?page=0&size=20` | READ | page of documents (`size` ≤ 100) |
+| `POST` | `/documents` (multipart `file`) | WRITE | `201` document created |
+| `GET` | `/documents/{id}` | READ | metadata and status |
+| `PUT` | `/documents/{id}` (JSON `{"filename": "..."}`) | WRITE | document renamed (owner or admin) |
+| `DELETE` | `/documents/{id}` | WRITE | `204` document deleted (same rules as the application) |
+| `GET` | `/documents/{id}/report` | READ | F09 report of the latest validation |
+| `GET` | `/documents/{id}/download` | READ | the file |
+| `POST` | `/documents/{id}/validate` | VALIDATE | `202` validation job (F14) |
 
-Un document d'une autre organisation répond `404`, comme un document inconnu.
+A document from another organization returns `404`, like an unknown document.
 
-### Exemples curl
+#### curl examples
 
 ```bash
-KEY=fxk_...                                  # copiée depuis la page Clés API
+KEY=fxk_...                                  # copied from the API keys page
 API=https://localhost:8443/api/public/v1
 
-# Déposer une facture
-curl -k -H "X-API-Key: $KEY" -F "file=@facture.pdf" $API/documents
+# Upload an invoice
+curl -k -H "X-API-Key: $KEY" -F "file=@invoice.pdf" $API/documents
 
-# Lister les documents
+# List documents
 curl -k -H "X-API-Key: $KEY" "$API/documents?page=0&size=20"
 
-# Lancer la validation, puis suivre le statut
+# Start validation, then follow the status
 curl -k -X POST -H "X-API-Key: $KEY" $API/documents/42/validate
 curl -k -H "X-API-Key: $KEY" $API/documents/42
 
-# Lire le rapport de conformité
+# Read the compliance report
 curl -k -H "X-API-Key: $KEY" $API/documents/42/report
 
-# Télécharger le fichier
+# Download the file
 curl -k -H "X-API-Key: $KEY" -OJ $API/documents/42/download
 ```
 
-### Erreurs
+#### Errors
 
-Toujours au format `{"error": "CODE", "message": "..."}`.
+Always in the format `{"error": "CODE", "message": "..."}`.
 
 | HTTP | `error` |
 | --- | --- |
 | 401 | `API_KEY_MISSING`, `INVALID_API_KEY` |
-| 403 | `INSUFFICIENT_SCOPE` (scope), `ACCESS_DENIED` (rôle du propriétaire) |
-| 404 | `DOCUMENT_NOT_FOUND`, `NOT_FOUND` (aucune validation encore) |
-| 409 | `JOB_CONFLICT` (traitement déjà en cours) |
+| 403 | `INSUFFICIENT_SCOPE` (scope), `ACCESS_DENIED` (owner's role) |
+| 404 | `DOCUMENT_NOT_FOUND`, `NOT_FOUND` (no validation yet) |
+| 409 | `JOB_CONFLICT` (processing already in progress) |
 | 413 / 415 | `FILE_TOO_LARGE` / `INVALID_FILE_TYPE` |
 | 429 | `RATE_LIMITED` |
 
-### Documentation OpenAPI
+#### OpenAPI documentation
 
-- Swagger UI : `https://localhost:8443/api/docs/swagger-ui/index.html`
-- Spécification OpenAPI 3 : `https://localhost:8443/api/docs/openapi`
+- Swagger UI: `https://localhost:8443/api/docs/swagger-ui/index.html`
+- OpenAPI 3 specification: `https://localhost:8443/api/docs/openapi`
 
-Publiques, en lecture seule ; seules les routes `/api/public/**` y figurent.
-Bouton **Authorize** : coller la clé pour essayer les endpoints.
+Public and read-only; only the `/api/public/**` routes are listed.
+**Authorize** button: paste the key to try the endpoints.
 
-## F20 — Export / import
+### Export / import (F20)
 
-Page **Export / import** d'une organisation (`/organisations/{id}/export-import`),
-accessible depuis la page de l'organisation (bouton « Export / import »).
-Routes de session (cookie + CSRF), comme le reste de l'application.
+**Export / import** page of an organization (`/organisations/{id}/export-import`),
+reachable from the organization page ("Export / import" button).
+Session routes (cookie + CSRF), like the rest of the application.
 
-### Droits
+#### Rights
 
-| Action | Admin | Comptable | Client |
+| Action | Admin | Accountant | Client |
 | --- | --- | --- | --- |
-| Exporter les documents (CSV, JSON, PDF) | oui | oui | non |
-| Exporter les membres (CSV, JSON) | oui | non | non |
-| Importer des invitations (CSV) | oui | non | non |
+| Export documents (CSV, JSON, PDF) | yes | yes | no |
+| Export members (CSV, JSON) | yes | no | no |
+| Import invitations (CSV) | yes | no | no |
 
-Un utilisateur qui n'est pas membre de l'organisation reçoit `403`, comme un client.
-Un export ne contient jamais de données d'une autre organisation.
+A user who is not a member of the organization gets `403`, like a client.
+An export never contains data from another organization.
 
-### Export
+#### Export
 
-| Méthode | Route | Formats |
+| Method | Route | Formats |
 | --- | --- | --- |
-| `GET` | `/api/organizations/{orgId}/export/documents?format=csv` | `csv`, `json` (défaut), `pdf` |
-| `GET` | `/api/organizations/{orgId}/export/members?format=csv` | `csv`, `json` (défaut) |
+| `GET` | `/api/organizations/{orgId}/export/documents?format=csv` | `csv`, `json` (default), `pdf` |
+| `GET` | `/api/organizations/{orgId}/export/members?format=csv` | `csv`, `json` (default) |
 
-Le fichier est envoyé en pièce jointe (`documents.csv`, `members.json`, ...).
+The file is sent as an attachment (`documents.csv`, `members.json`, ...).
 
-**Documents** : une ligne par document, du plus récent au plus ancien. Les colonnes
-conformité, erreurs et règles viennent de la dernière validation (F08 / F09).
+**Documents**: one row per document, newest first. The compliance, errors and rules
+columns come from the latest validation (F08 / F09).
 
-| Colonne CSV | Champ JSON | Contenu |
+The CSV headers are in French, the language of the application; the English meaning is
+given in the last column.
+
+| CSV column | JSON field | Content |
 | --- | --- | --- |
-| Identifiant | `id` | identifiant du document |
-| Organisation | `organizationName` | nom de l'organisation |
-| Déposé par | `uploadedBy` | prénom et nom |
-| Nom du fichier | `filename` | |
-| Type | `type` | `PDF` ou `XML` |
-| Taille (MB) | `sizeMb` | arrondie à 2 décimales |
-| Statut | `status` | `UPLOADED`, `QUEUED`, `PROCESSING`, `VALID`, `INVALID`, `FAILED` |
-| Date de dépôt | `uploadedAt` | `jj/mm/aaaa hh:mm`, heure de Paris |
-| Adresse e-mail | `email` | e-mail de la personne qui a déposé |
-| Conforme | `valid` | `Oui`, `Non` ou `Non validé` |
-| Nombre d’erreurs | `errorCount` | vide si jamais validé |
-| Codes des règles | `ruleCodes` | CSV : codes séparés par `;`, JSON : liste |
+| `Identifiant` | `id` | document ID |
+| `Organisation` | `organizationName` | organization name |
+| `Déposé par` | `uploadedBy` | first and last name of the uploader |
+| `Nom du fichier` | `filename` | file name |
+| `Type` | `type` | `PDF` or `XML` |
+| `Taille (MB)` | `sizeMb` | size, rounded to 2 decimals |
+| `Statut` | `status` | `UPLOADED`, `QUEUED`, `PROCESSING`, `VALID`, `INVALID`, `FAILED` |
+| `Date de dépôt` | `uploadedAt` | upload date, `dd/mm/yyyy hh:mm`, Paris time |
+| `Adresse e-mail` | `email` | email of the uploader |
+| `Conforme` | `valid` | compliant: `Oui` (yes), `Non` (no) or `Non validé` (not validated) |
+| `Nombre d’erreurs` | `errorCount` | number of errors, empty if never validated |
+| `Codes des règles` | `ruleCodes` | rule codes; CSV: separated by `;`, JSON: list |
 
-**Membres** : `Nom complet`, `Adresse e-mail`, `Rôle` (JSON : `name`, `email`, `role`).
+**Members**: `Nom complet` (full name), `Adresse e-mail` (email), `Rôle` (role)
+(JSON: `name`, `email`, `role`).
 
-CSV : UTF-8 avec BOM (Excel affiche correctement les accents), séparateur `,`, toutes
-les valeurs entre guillemets. Une valeur qui commence par `=`, `+`, `-` ou `@` est
-préfixée par `'` pour qu'un tableur ne l'exécute pas comme une formule.
+CSV: UTF-8 with BOM (Excel displays accents correctly), `,` separator, every value in
+quotes. A value starting with `=`, `+`, `-` or `@` is prefixed with `'` so that a
+spreadsheet does not execute it as a formula.
 
-PDF : tableau A4 paysage, paginé, avec les mêmes informations (sans l'identifiant,
-l'organisation et l'e-mail), à imprimer ou archiver. Les caractères hors de l'alphabet
-latin (cyrillique, emoji, ...) y apparaissent sous la forme `?`. Le CSV et le JSON les
-conservent.
+PDF: A4 landscape table, paginated, with the same information (without the ID, the
+organization and the email), for printing or archiving. Characters outside the Latin
+alphabet (Cyrillic, emoji, ...) appear as `?` in it. The CSV and JSON keep them.
 
-### Import d'invitations
+#### Invitation import
 
-`POST /api/organizations/{orgId}/import/invitations?dryRun=true`, multipart, champ `file`.
+`POST /api/organizations/{orgId}/import/invitations?dryRun=true`, multipart, field
+`file`.
 
-Format du fichier :
+File format:
 
 ```csv
 email,role
-prenom.nom@exemple.fr,CLIENT
-comptable@exemple.fr,ACCOUNTANT
+firstname.lastname@example.com,CLIENT
+accountant@example.com,ACCOUNTANT
 ```
 
-- Colonnes obligatoires `email` et `role` (majuscules ou minuscules), dans n'importe
-  quel ordre, colonnes supplémentaires ignorées. Les en-têtes de l'export des membres
-  (`Adresse e-mail`, `Rôle`) sont aussi acceptés : un export peut être réimporté
-  dans une autre organisation.
-- Rôles : `ADMIN`, `ACCOUNTANT`, `CLIENT`, ou les libellés `Administrateur`,
+- Required columns `email` and `role` (upper or lower case), in any order; extra
+  columns are ignored. The member export headers (`Adresse e-mail`, `Rôle`) are also
+  accepted: an export can be imported again into another organization.
+- Roles: `ADMIN`, `ACCOUNTANT`, `CLIENT`, or the French labels `Administrateur`,
   `Comptable`, `Client`.
-- Séparateur `,` ou `;` (détecté sur la première ligne), UTF-8, avec ou sans BOM.
-- 500 lignes de données au maximum, 10 Mo au maximum.
+- Separator `,` or `;` (detected on the first line), UTF-8, with or without BOM.
+- At most 500 data rows and 10 MB.
 
-Chaque ligne est vérifiée comme une invitation manuelle (F03) : e-mail valide, pas de
-doublon dans le fichier, pas déjà membre, pas d'invitation déjà en attente.
+Each row is checked like a manual invitation (F03): valid email, no duplicate in the
+file, not already a member, no invitation already pending.
 
-Le traitement se fait en deux temps :
+Processing happens in two steps:
 
-1. `dryRun=true` (défaut) : **aperçu**, rien n'est créé. La réponse liste chaque ligne :
-   `{"lineNumber": 2, "email": "...", "role": "CLIENT", "valid": true, "error": null}`.
-2. `dryRun=false` : **import**, tout ou rien. Si une seule ligne est en erreur, la
-   réponse est `400` avec la même liste et **aucune** invitation n'est créée. Sinon
-   les invitations sont créées dans une seule transaction (`200`) et les e-mails ne
-   partent qu'une fois cette transaction validée. Un import annulé n'envoie donc
-   jamais de lien vers une invitation qui n'existe pas.
+1. `dryRun=true` (default): **preview**, nothing is created. The response lists each
+   row: `{"lineNumber": 2, "email": "...", "role": "CLIENT", "valid": true, "error": null}`.
+2. `dryRun=false`: **import**, all or nothing. If a single row has an error, the
+   response is `400` with the same list and **no** invitation is created. Otherwise the
+   invitations are created in a single transaction (`200`) and the emails are sent only
+   once this transaction is committed. A cancelled import therefore never sends a link
+   to an invitation that does not exist.
 
-La page de l'application fait l'aperçu dès que le fichier est choisi. Elle n'active le
-bouton d'envoi que si toutes les lignes sont valides.
+The application page runs the preview as soon as the file is selected. It enables the
+send button only if every row is valid.
 
-### Erreurs
+#### Errors
 
 Format `{"error": "CODE", "message": "..."}`.
 
-| HTTP | `error` | Cas |
+| HTTP | `error` | Case |
 | --- | --- | --- |
-| 400 | `INVALID_EXPORT_FORMAT` | format inconnu (`xlsx`, `pdf` pour les membres, ...) |
-| 400 | `INVALID_IMPORT_FILE` | fichier absent ou vide, colonnes manquantes ou en double, CSV mal formé, plus de 500 lignes |
-| 400 | *(liste des lignes)* | import avec au moins une ligne en erreur |
-| 403 | `ACCESS_DENIED` | rôle insuffisant ou non-membre |
-| 409 | `INVITATION_ALREADY_PENDING`, `USER_ALREADY_MEMBER` | conflit apparu entre l'aperçu et l'import ; rien n'est créé |
-| 413 | `FILE_TOO_LARGE` | fichier de plus de 10 Mo |
+| 400 | `INVALID_EXPORT_FORMAT` | unknown format (`xlsx`, `pdf` for members, ...) |
+| 400 | `INVALID_IMPORT_FILE` | missing or empty file, missing or duplicate columns, malformed CSV, more than 500 rows |
+| 400 | *(list of rows)* | import with at least one invalid row |
+| 403 | `ACCESS_DENIED` | insufficient role or not a member |
+| 409 | `INVITATION_ALREADY_PENDING`, `USER_ALREADY_MEMBER` | conflict that appeared between the preview and the import; nothing is created |
+| 413 | `FILE_TOO_LARGE` | file larger than 10 MB |
 
-Tests : `backend/.../exportimport/ExportImportFlowTest.java` (colonnes, isolation,
-droits, import invalide refusé sans rien créer), `frontend/.../ExportImportPage.test.jsx`.
+Tests: `backend/.../exportimport/ExportImportFlowTest.java` (columns, isolation, rights,
+invalid import rejected without creating anything), `frontend/.../ExportImportPage.test.jsx`.
+
+### GDPR (F21)
+
+The **My data** page ("Mes données", `/my-data`, linked from the profile) lets users export their personal data
+(`GET /api/gdpr/export`) and delete their account (`POST /api/gdpr/delete`).
+
+- The JSON export contains the profile, organization memberships with roles, owned
+  documents (metadata only), API keys (never the secret) and invitations sent to the
+  user's email.
+- Deletion requires typing `SUPPRIMER` ("DELETE"); the backend checks the same word
+  (`400 INVALID_CONFIRMATION` otherwise). The last admin of an organization cannot
+  delete their account (`409 LAST_ADMIN_REQUIRED`).
+- A user without documents is deleted. A user with documents is **anonymized** (email,
+  name and password replaced, status `anonymized`) so that documents keep their owner
+  reference. Memberships and invitations are removed in both cases, and every session
+  of the user is invalidated.
+- Both operations send a confirmation email.
+
+Details: [backend/.../gdpr/README.md](./backend/src/main/java/com/facturx/app/gdpr/README.md).
+
+---
+
+## Resources
+
+### Documentation
+
+1. MDN Web Docs — <https://developer.mozilla.org>
+2. DevDocs — <https://devdocs.io>
+3. W3Schools — <https://www.w3schools.com>
+4. Oracle Java Documentation — <https://docs.oracle.com/en/java/>
+5. Python Documentation — <https://docs.python.org/3/>
+6. JavaScript.info — <https://javascript.info>
+7. Mustangproject (Factur-X / ZUGFeRD library used by the validation engine) —
+   <https://github.com/ZUGFeRD/mustangproject>
+
+### AI usage
+
+AI was used as an assistant for:
+
+- writing tests;
+- finding bugs;
+- learning the project languages (Java, JavaScript, Python);
+- preparing documentation.
+
+---
+
+## Known Limitations
+
+- The user interface and the validation explanations are in French, the language of
+  the target users.
+- The rate limiters (login, public API) keep their counters in memory: they assume a
+  single backend instance.
+- The PDF export shows characters outside the Latin alphabet as `?`; CSV and JSON
+  keep them.
+- After a physical account deletion, `generated_invoices.created_by` can point to a
+  user ID that no longer exists (plain number, no foreign key).
+- The TLS certificate is self-signed and meant for local use only.

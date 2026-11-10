@@ -147,8 +147,9 @@ public class GdprService {
 				);
 		}
 
+		/** Retourne l'adresse email d'origine, pour l'email de confirmation. */
 		@Transactional
-		public void deleteOrAnonymizeUser(
+		public String deleteOrAnonymizeUser(
 						Long userId,
 						String confirmation
 		) {
@@ -180,6 +181,8 @@ public class GdprService {
 						}
 				}
 
+				String originalEmail = user.getEmail();
+
 				boolean hasDocuments =
 								documentRepository.existsByOwnerId(userId);
 
@@ -209,9 +212,11 @@ public class GdprService {
 
 						userRepository.save(user);
 
-						return;
+						return originalEmail;
 				}
 
 				userRepository.delete(user);
+
+				return originalEmail;
 		}
 }

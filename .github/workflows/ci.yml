@@ -37,6 +37,12 @@ jobs:
           pip install -r requirements-dev.txt
           pytest
 
+      # .env and the TLS certificates are not versioned: create them like ./start.sh does
+      - name: Prepare local configuration
+        run: |
+          [ -f .env ] || cp .env.example .env
+          [ -f nginx/certs/localhost.crt ] && [ -f nginx/certs/localhost.key ] || ./scripts/generate-certs.sh
+
       - name: Validate Docker Compose
         run: docker compose config -q
 

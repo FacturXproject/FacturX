@@ -17,3 +17,11 @@ body {
 .mono {
   font-family: 'SF Mono', 'Fira Code', Consolas, 'Courier New', monospace;
 }
+
+/* Mobile / tablette : les tableaux larges defilent horizontalement dans leur bloc */
+@media (max-width: 900px) {
+  main table {
+    display: block;
+    overflow-x: auto;
+  }
+}

@@ -7,7 +7,7 @@ package com.facturx.app.apikey;
 public enum ApiKeyScope {
     /** Lister les documents, lire leur statut, leur rapport, les telecharger. */
     DOCUMENTS_READ,
-    /** Deposer un document. */
+    /** Deposer, renommer ou supprimer un document. */
     DOCUMENTS_WRITE,
     /** Lancer une validation Factur-X (job asynchrone F14). */
     DOCUMENTS_VALIDATE;

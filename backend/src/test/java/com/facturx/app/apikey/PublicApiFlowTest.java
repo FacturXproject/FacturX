@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -371,10 +372,52 @@ class PublicApiFlowTest extends AbstractIntegrationTest {
         mockMvc.perform(head(API + "/" + documentId).header("X-API-Key", readOnly))
                 .andExpect(status().isOk());
 
-        // Aucune regle de scope pour PUT : refuse, meme avec tous les scopes
+        // Aucune regle de scope pour PATCH : refuse, meme avec tous les scopes
         String full = createKey(session, orgId, "DOCUMENTS_READ", "DOCUMENTS_WRITE", "DOCUMENTS_VALIDATE");
-        mockMvc.perform(put(API + "/" + documentId).header("X-API-Key", full))
+        mockMvc.perform(patch(API + "/" + documentId).header("X-API-Key", full))
                 .andExpect(status().isForbidden());
+
+        // PUT et DELETE exigent DOCUMENTS_WRITE
+        mockMvc.perform(put(API + "/" + documentId).header("X-API-Key", readOnly)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"filename\":\"x.pdf\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("INSUFFICIENT_SCOPE"));
+        mockMvc.perform(delete(API + "/" + documentId).header("X-API-Key", readOnly))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("INSUFFICIENT_SCOPE"));
+    }
+
+    @Test
+    void writeScopeCanRenameAndDeleteADocument() throws Exception {
+        Cookie session = registerAndLogin("api-put-delete");
+        long orgId = createOrganization(session);
+        String key = createKey(session, orgId, "DOCUMENTS_READ", "DOCUMENTS_WRITE");
+        long documentId = uploadWithKey(key, "old-name.pdf");
+
+        mockMvc.perform(put(API + "/" + documentId).header("X-API-Key", key)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"filename\":\"  new-name.pdf  \"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(documentId))
+                .andExpect(jsonPath("$.filename").value("new-name.pdf"));
+
+        mockMvc.perform(get(API + "/" + documentId).header("X-API-Key", key))
+                .andExpect(jsonPath("$.filename").value("new-name.pdf"));
+
+        mockMvc.perform(put(API + "/" + documentId).header("X-API-Key", key)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"filename\":\"   \"}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(put(API + "/" + documentId).header("X-API-Key", key)
+                        .contentType(MediaType.APPLICATION_JSON).content("not json"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("INVALID_BODY"));
+
+        mockMvc.perform(delete(API + "/" + documentId).header("X-API-Key", key))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get(API + "/" + documentId).header("X-API-Key", key))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(delete(API + "/" + documentId).header("X-API-Key", key))
+                .andExpect(status().isNotFound());
     }
 
     @Test

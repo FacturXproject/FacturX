@@ -7,7 +7,7 @@ export const API_DOCS_URL = '/api/docs/swagger-ui/index.html';
 
 const SCOPES = [
   { value: 'DOCUMENTS_READ', label: 'Lecture', description: 'Lister les documents, lire leur statut et leur rapport, les télécharger' },
-  { value: 'DOCUMENTS_WRITE', label: 'Dépôt', description: 'Déposer des documents' },
+  { value: 'DOCUMENTS_WRITE', label: 'Dépôt', description: 'Déposer, renommer et supprimer des documents' },
   { value: 'DOCUMENTS_VALIDATE', label: 'Validation', description: 'Lancer la validation Factur-X' },
 ];
 

@@ -9,6 +9,9 @@ Users can also delete their account (`POST /api/gdpr/delete`). The user must typ
 `SUPPRIMER` to confirm; the backend checks the same word and rejects anything else
 (`400 INVALID_CONFIRMATION`).
 
+Both operations send a confirmation email to the user (to the original address for a
+deletion). A failed email is logged and does not cancel the operation.
+
 ### Deletion rule
 
 Deletion is processed immediately, in a single transaction. There is no intermediate

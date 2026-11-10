@@ -111,6 +111,34 @@ public class PublicApiController {
                 .body(new ByteArrayResource(bytes));
     }
 
+    @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Renommer un document",
+            description = "Modifie le nom du fichier, corps JSON {\"filename\": \"...\"}. Réservé au propriétaire du document "
+                    + "ou à un administrateur. Scope DOCUMENTS_WRITE.")
+    @ApiResponse(responseCode = "400", description = "Nom de fichier vide ou trop long.")
+    @ApiResponse(responseCode = "404", description = "Document inconnu ou hors de l'organisation de la clé.")
+    public DocumentResponse update(
+            @AuthenticationPrincipal ApiKeyPrincipal key,
+            @PathVariable Long id,
+            @RequestBody DocumentUpdateRequest request) {
+
+        return DocumentResponse.from(publicApiService.rename(key, id, request.filename()));
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Supprimer un document",
+            description = "Mêmes règles que dans l'application : un administrateur supprime tout document, "
+                    + "un autre membre seulement ses propres documents encore au statut UPLOADED. Scope DOCUMENTS_WRITE.")
+    @ApiResponse(responseCode = "204", description = "Document supprimé.")
+    @ApiResponse(responseCode = "404", description = "Document inconnu ou hors de l'organisation de la clé.")
+    public void delete(
+            @AuthenticationPrincipal ApiKeyPrincipal key,
+            @PathVariable Long id) {
+
+        publicApiService.delete(key, id);
+    }
+
     @PostMapping("/{id}/validate")
     @ResponseStatus(HttpStatus.ACCEPTED)
     @Operation(summary = "Lancer la validation Factur-X",

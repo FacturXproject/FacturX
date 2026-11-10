@@ -15,6 +15,8 @@ import com.facturx.app.validation.ValidationReport;
 import com.facturx.app.validation.ValidationReportService;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -33,6 +35,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class PublicApiService {
 
     static final int MAX_PAGE_SIZE = 100;
+    static final int MAX_FILENAME_LENGTH = 255;
 
     private final DocumentRepository documentRepository;
     private final DocumentService documentService;
@@ -105,5 +108,35 @@ public class PublicApiService {
         Document document = getDocument(key, documentId);
         permissionService.requirePermission(key.userId(), key.organizationId(), Permission.VALIDATE_DOCUMENT);
         return jobService.createValidationJob(document.getId());
+    }
+
+    /** Renommer : le proprietaire du document, ou un administrateur (DELETE_ANY_DOCUMENT). */
+    public Document rename(ApiKeyPrincipal key, Long documentId, String filename) {
+        Document document = getDocument(key, documentId);
+
+        boolean isOwner = document.getOwner() != null
+                && document.getOwner().getId().equals(key.userId());
+        if (!isOwner && !permissionService.hasPermission(
+                key.userId(), key.organizationId(), Permission.DELETE_ANY_DOCUMENT)) {
+            throw new AccessDeniedException();
+        }
+
+        // Nom seul : pas de chemin, pas de caracteres de controle
+        String clean = filename == null ? "" : filename
+                .replaceAll("[\\p{Cntrl}/\\\\]", "")
+                .strip();
+        if (clean.isEmpty() || clean.length() > MAX_FILENAME_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Le nom du fichier est obligatoire (255 caractères maximum).");
+        }
+
+        document.setFilename(clean);
+        return documentRepository.save(document);
+    }
+
+    /** Supprimer : memes regles que l'application (DocumentService.deleteDocument). */
+    public void delete(ApiKeyPrincipal key, Long documentId) {
+        getDocument(key, documentId);
+        documentService.deleteDocument(documentId, key.userId());
     }
 }

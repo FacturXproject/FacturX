@@ -66,6 +66,7 @@ function CreateOrganizationModal({ onClose, onCreated }) {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            maxLength={100}
             placeholder="Cabinet Dupont"
             autoFocus
             style={{
@@ -149,6 +150,7 @@ function RenameOrganizationModal({ currentName, onClose, onRenamed }) {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            maxLength={100}
             autoFocus
             style={{
               width: '100%', padding: '9px 12px', border: '1px solid #d1d5db',
@@ -378,7 +380,7 @@ export default function OrganizationsPage() {
       </div>
 
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px', marginBottom: '20px' }}>
         {statCards.map(({ icon: Icon, iconBg, iconColor, value, label, sub }) => (
           <div
             key={label}

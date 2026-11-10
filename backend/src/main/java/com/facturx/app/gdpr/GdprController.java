@@ -10,6 +10,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
 import com.facturx.app.auth.AuthService;
+import com.facturx.app.organization.EmailService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -17,15 +20,20 @@ import jakarta.servlet.http.HttpServletResponse;
 @RequestMapping("/api/gdpr")
 public class GdprController {
 
+	private static final Logger log = LoggerFactory.getLogger(GdprController.class);
+
 	private final GdprService gdprService;
 	private final AuthService authService;
+	private final EmailService emailService;
 
 	public GdprController(
 			GdprService gdprService,
-			AuthService authService) {
+			AuthService authService,
+			EmailService emailService) {
 
 		this.gdprService = gdprService;
 		this.authService = authService;
+		this.emailService = emailService;
 	}
 
 	@GetMapping("/export")
@@ -37,9 +45,12 @@ public class GdprController {
 
 		Long userId = principal.getUser().getId();
 
-		return ResponseEntity.ok(
-				gdprService.exportUserData(userId)
-		);
+		GdprExportResponse export = gdprService.exportUserData(userId);
+
+		sendConfirmation(() ->
+				emailService.sendGdprExportConfirmation(export.user().email()));
+
+		return ResponseEntity.ok(export);
 	}
 
 	@PostMapping("/delete")
@@ -60,10 +71,13 @@ public class GdprController {
 		String currentSessionId =
 				session != null ? session.getId() : null;
 
-		gdprService.deleteOrAnonymizeUser(
+		String email = gdprService.deleteOrAnonymizeUser(
 				userId,
 				request.confirmation()
 		);
+
+		sendConfirmation(() ->
+				emailService.sendAccountDeletionConfirmation(email));
 
 		authService.logoutOtherSessions(
 			principalName,
@@ -76,5 +90,14 @@ public class GdprController {
 		);
 
 		return ResponseEntity.noContent().build();
+	}
+
+	// Un echec d'envoi ne doit pas annuler une operation deja effectuee
+	private void sendConfirmation(Runnable send) {
+		try {
+			send.run();
+		} catch (RuntimeException e) {
+			log.warn("GDPR confirmation email could not be sent", e);
+		}
 	}
 }

@@ -322,7 +322,7 @@ const fetchAllInvitations = async () => {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
           gap: '20px',
           marginTop: '28px'
         }}
@@ -524,6 +524,7 @@ const fetchAllInvitations = async () => {
           style={{
             minHeight: '52px',
             display: 'flex',
+            flexWrap: 'wrap',
             alignItems: 'center',
             borderBottom: '1px solid #e5e7eb',
             gap: '24px'
@@ -566,6 +567,8 @@ const fetchAllInvitations = async () => {
             style={{
               marginLeft: 'auto',
               display: 'flex',
+              flexWrap: 'wrap',
+              maxWidth: '100%',
               gap: '8px'
             }}
           >
@@ -573,6 +576,7 @@ const fetchAllInvitations = async () => {
             <div
               style={{
                 width: '270px',
+                maxWidth: '100%',
                 height: '34px',
                 display: 'flex',
                 alignItems: 'center',

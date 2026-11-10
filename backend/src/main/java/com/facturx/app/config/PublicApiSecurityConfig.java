@@ -77,6 +77,10 @@ public class PublicApiSecurityConfig {
                                 .hasAuthority(ApiKeyScope.DOCUMENTS_VALIDATE.authority())
                         .requestMatchers(HttpMethod.POST, DOCUMENTS)
                                 .hasAuthority(ApiKeyScope.DOCUMENTS_WRITE.authority())
+                        .requestMatchers(HttpMethod.PUT, DOCUMENTS + "/*")
+                                .hasAuthority(ApiKeyScope.DOCUMENTS_WRITE.authority())
+                        .requestMatchers(HttpMethod.DELETE, DOCUMENTS + "/*")
+                                .hasAuthority(ApiKeyScope.DOCUMENTS_WRITE.authority())
                         // HEAD est servi par les handlers @GetMapping : meme scope que GET.
                         .requestMatchers(HttpMethod.GET, DOCUMENTS, DOCUMENTS + "/**")
                                 .hasAuthority(ApiKeyScope.DOCUMENTS_READ.authority())
