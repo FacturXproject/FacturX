@@ -21,7 +21,7 @@ understand every error, and generate compliant Factur-X files.**
 10. [Individual Contributions](#individual-contributions)
 11. [API Reference](#api-reference)
 12. [Resources](#resources)
-13. [Known Limitations](#known-limitations)
+13. [Known Limitations](#known-limitations) 
 
 ---
 
