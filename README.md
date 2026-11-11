@@ -444,7 +444,7 @@ API (F17).
   around the next deadline, and I told the team early when something would take longer
   than planned.
 - **iso-brie** — legal pages and profile, human correction form.
-  *Challenges:* [Need to fill the answer]
+  *Challenges:* I didn't  really face any major challenges, maybe having to work on features when the previous ones weren't fully implemented yet, but the issue was resolved by communicating with the other team members. 
 
 ---
 
