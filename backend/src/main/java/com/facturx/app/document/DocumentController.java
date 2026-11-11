@@ -105,10 +105,13 @@ public class DocumentController {
     }
 
     // GET /api/documents/{id}/report - rapport de validation lisible (F09) pour le
-    // controle le plus recent de ce document.
+    // controle le plus recent de ce document. 204 si le document n'a jamais ete valide :
+    // la page du document l'appelle a chaque ouverture, un 404 polluerait la console.
     @GetMapping("/{id}/report")
-    public ValidationReport getValidationReport(@PathVariable Long id, Authentication authentication) {
+    public ResponseEntity<ValidationReport> getValidationReport(@PathVariable Long id, Authentication authentication) {
         documentService.requireViewPermission(documentService.getDocument(id), currentUserId(authentication));
-        return validationReportService.getReportForDocument(id);
+        return validationReportService.findReportForDocument(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 }

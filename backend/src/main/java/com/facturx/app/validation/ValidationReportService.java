@@ -4,6 +4,7 @@ import com.facturx.app.document.Document;
 import com.facturx.app.document.DocumentService;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
@@ -73,11 +74,15 @@ public class ValidationReportService {
      * one for its most recent {@link ValidationRun}.
      */
     public ValidationReport getReportForDocument(Long documentId) {
-        ValidationRun run = validationRunRepository.findTopByDocumentIdOrderByFinishedAtDesc(documentId)
+        return findReportForDocument(documentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Aucune validation n'a encore été effectuée pour ce document."));
+    }
 
-        return buildReport(run);
+    /** Same as {@link #getReportForDocument}, but empty when the document was never validated. */
+    public Optional<ValidationReport> findReportForDocument(Long documentId) {
+        return validationRunRepository.findTopByDocumentIdOrderByFinishedAtDesc(documentId)
+                .map(this::buildReport);
     }
 
     private ValidationReport buildReport(ValidationRun run) {

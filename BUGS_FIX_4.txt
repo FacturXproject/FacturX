@@ -1,0 +1,101 @@
+BUGS FIX #4
+===========
+
+FOR THE TEAM
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+- application.properties has no default DB credentials any more. Docker is not
+  affected (values come from .env). To run the backend without Docker, set
+  DB_USER and DB_PASSWORD yourself.
+- GET /api/documents/{id}/report now returns 204 (was 404) when the document
+  was never validated. The public API (/api/public/v1) still returns 404.
+- README, Individual Contributions: avalent2 and iso-brie, please fill in your
+  "Challenges" line (currently "[Need to fill the answer]").
+
+
+
+
+PROBLEMS FOUND
+
+1. Default credentials in the repository
+   application.properties had ${DB_USER:postgres} and ${DB_PASSWORD:postgres}.
+   The subject requires credentials to be stored only in .env.
+
+2. Red 404 error in the browser console on the document page
+   Opening a document that was never validated called /report, which answered
+   404. It happened after every upload.
+
+3. Tailwind barely used
+   Only 4 pages used Tailwind; Layout (visible on every page) and the Dashboard
+   used inline styles only.
+
+4. README incomplete (sections required by the subject)
+   No communication channel, no data types, no "how" for each module, no
+   versions in Prerequisites, no challenges per member, no project parts in
+   AI usage.
+
+5. New uploads not shown live to other members
+   An upload sent no WebSocket event: other members of the organization saw the
+   new document only after reloading the page. The README did not say clearly
+   that real-time covers documents only.
+
+
+
+
+FIXES
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+1. application.properties: ${DB_USER} and ${DB_PASSWORD} without defaults.
+   README "Local development without Docker" updated.
+
+2. DocumentController: /report returns 204 when there is no validation yet
+   (ValidationReportService.findReportForDocument). The "Rapport" page shows
+   "Aucune validation n'a encore été effectuée pour ce document." instead of an
+   empty page.
+
+3. Layout.jsx and Dashboard.jsx converted to Tailwind classes (no inline style
+   left). Same look: before/after screenshots compared pixel by pixel.
+
+4. README:
+   - Project Management: Slack
+   - Database Schema: key fields and data types (from the real database)
+   - Modules: new "How" column
+   - Prerequisites: Docker / Compose v2, OpenSSL versions
+   - Individual Contributions: challenges (sabenzar, feturbin, yseddiki;
+     avalent2 and iso-brie to fill in)
+   - AI usage: parts of the project (tests for F01, F08, F09, F11, F12, F17;
+     all bug-fix PRs)
+   - 204 responses of /me and /report documented
+
+5. DocumentService.upload sends a "document.status.changed" event with status
+   UPLOADED (same permission filter as the other events). The dashboard and the
+   organization page already reload their list for an unknown document
+   (BUGS_FIX_3), so the new document appears live. Uploads through the public
+   API send the event too.
+   README F15: real-time covers documents only (new uploads and status
+   changes), not organizations, members or invitations.
+
+
+
+
+
+TESTS
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+New / updated backend tests:
+- DocumentFlowTest.uploadingAValidPdfSucceeds: checks the UPLOADED WebSocket
+  event
+- DocumentValidationFlowTest.reportForADocumentNeverValidatedReturnsNoContent
+  (renamed, 404 -> 204)
+
+Results:
+- Backend (mvn test): 218/218 passed (also checked without default DB
+  credentials).
+- Frontend (vitest): 109/109 passed; no lint error in changed files; build OK.
+- Team E2E scripts: F13 34/34, F16 33/33, F17 30/30, F20 43/43.
+- Tailwind: before/after screenshots (dashboard, documents, profile, mobile
+  menu, hover; 1280px and 375px) identical, except 10 anti-aliasing pixels on a
+  rounded corner.
+- Manual checks in the browser:
+  backend starts with credentials from .env only;
+  two users, same organization: an upload appears live for the other user,
+  then its status changes live;
+  all pages walked at 1280px and 375px: no React warning, no 404 on the
+  document page, no horizontal page scroll.

@@ -17,7 +17,7 @@ import org.springframework.web.server.ResponseStatusException;
  * takes a raw file, no document/organisation/permission checks - once f06 lands this
  * ---
  * becomes {@code POST /documents/{id}/validate}, reading the file from storage and
- * checking permissions before delegating here, per CLAUDE.md's request  flow
+ * checking permissions before delegating here, per README.md's request  flow
  */
 @RestController
 @RequestMapping("/api/validate")

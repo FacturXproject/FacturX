@@ -150,12 +150,12 @@ class DocumentValidationFlowTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void reportForADocumentNeverValidatedReturns404() throws Exception {
+    void reportForADocumentNeverValidatedReturnsNoContent() throws Exception {
         Cookie session = registerAndLogin("doc-report-none");
         long orgId = createOrganization(session);
         long documentId = uploadSample(session, orgId, "EN16931_Einfach.pdf");
 
         mockMvc.perform(get("/api/documents/" + documentId + "/report").cookie(session))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNoContent());
     }
 }
