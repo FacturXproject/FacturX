@@ -9,4 +9,6 @@ public interface JobRepository extends JpaRepository<Job, Long> {
 	boolean existsByDocument_IdAndStatusIn(Long documentId, Collection<JobStatus> statuses);
 
 	List<Job> findByStatusIn(Collection<JobStatus> statuses);
+
+	void deleteByDocument_Id(Long documentId);
 }

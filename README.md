@@ -472,6 +472,14 @@ software uses the public API under `/api/public/v1` (API key). The main session 
 `GET /api/documents/{id}/report` returns `204 No Content` when the document was never
 validated (the public API keeps `404` for the same case).
 
+**Who can delete a document** (`DELETE /api/documents/{id}`; the public API applies the
+same rules):
+
+| Role | Can delete |
+|---|---|
+| Admin | Any document of the organization |
+| Accountant, client | Their own documents, in any status except while they are being processed (`QUEUED`, `PROCESSING`) |
+
 ### Real-time events (F15)
 
 Real-time covers **documents only**: a new upload and every status change

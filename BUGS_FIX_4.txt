@@ -8,8 +8,12 @@ FOR THE TEAM
   DB_USER and DB_PASSWORD yourself.
 - GET /api/documents/{id}/report now returns 204 (was 404) when the document
   was never validated. The public API (/api/public/v1) still returns 404.
-- README, Individual Contributions: avalent2 and iso-brie, please fill in your
-  "Challenges" line (currently "[Need to fill the answer]").
+- Document deletion rule changed: accountants and clients can now delete their
+  own documents in any status, except while they are processed (QUEUED,
+  PROCESSING). Admins still delete any document. Permission renamed
+  DELETE_OWN_PENDING_DOCUMENT -> DELETE_OWN_DOCUMENT.
+- README, Individual Contributions: avalent2, please fill in your "Challenges"
+  line (currently "[Need to fill the answer]").
 
 
 
@@ -37,6 +41,18 @@ PROBLEMS FOUND
    An upload sent no WebSocket event: other members of the organization saw the
    new document only after reloading the page. The README did not say clearly
    that real-time covers documents only.
+
+6. Documents could not be deleted
+   - An accountant (or client) could delete their own document only while it was
+     UPLOADED. "Vérifier" and "Convertir" validate right away, so the uploader
+     could never delete it.
+   - Deleting a document validated through the queue failed with 500 for every
+     role (foreign key from the jobs table).
+   - The file was deleted from disk before the database row: when the database
+     delete failed, the document stayed in the list without its file.
+   - "Lecture XML" showed "Supprimer" on every document, even when the user was
+     not allowed to delete it (click -> 403).
+   - No document described who can delete what.
 
 
 
@@ -73,6 +89,15 @@ FIXES
    README F15: real-time covers documents only (new uploads and status
    changes), not organizations, members or invitations.
 
+6. DocumentService.deleteDocument:
+   - new rule: admin deletes any document; accountant and client delete their
+     own documents except while QUEUED or PROCESSING;
+   - the document's jobs are deleted first, in the same transaction;
+   - the file is deleted from disk only after the database commit.
+   Frontend: one shared rule (utils/documentPermissions.js) used by the
+   organization page and "Lecture XML" (button hidden when not allowed).
+   README: "Who can delete a document" table in the API Reference.
+
 
 
 
@@ -84,11 +109,16 @@ New / updated backend tests:
   event
 - DocumentValidationFlowTest.reportForADocumentNeverValidatedReturnsNoContent
   (renamed, 404 -> 204)
+- PermissionIntegrationTest.documentDeletionFollowsOwnershipAndStatus: own
+  validated document with a job deleted; document being processed and another
+  member's document refused (403); admin deletes any
+New frontend test:
+- documentPermissions.test.js: delete rule for each role and status
 
 Results:
-- Backend (mvn test): 218/218 passed (also checked without default DB
+- Backend (mvn test): 219/219 passed (also checked without default DB
   credentials).
-- Frontend (vitest): 109/109 passed; no lint error in changed files; build OK.
+- Frontend (vitest): 113/113 passed; no lint error in changed files; build OK.
 - Team E2E scripts: F13 34/34, F16 33/33, F17 30/30, F20 43/43.
 - Tailwind: before/after screenshots (dashboard, documents, profile, mobile
   menu, hover; 1280px and 375px) identical, except 10 anti-aliasing pixels on a
@@ -98,4 +128,9 @@ Results:
   two users, same organization: an upload appears live for the other user,
   then its status changes live;
   all pages walked at 1280px and 375px: no React warning, no 404 on the
-  document page, no horizontal page scroll.
+  document page, no horizontal page scroll;
+  deletion, 3 roles: own document deleted from the organization page;
+  accountant deletes a document uploaded through "Vérifier" (was impossible);
+  admin deletes a document validated through the queue (was 500);
+  "Lecture XML": no "Supprimer" on another member's document;
+  no file left on disk without a document, no document left without a file.

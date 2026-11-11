@@ -61,7 +61,7 @@ class PermissionServiceTest {
             1L, 10L, Permission.DELETE_ANY_DOCUMENT));
 
         assertTrue(permissionService.hasPermission(
-            1L, 10L, Permission.DELETE_OWN_PENDING_DOCUMENT));
+            1L, 10L, Permission.DELETE_OWN_DOCUMENT));
     }
 
     @Test
@@ -85,7 +85,7 @@ class PermissionServiceTest {
             2L, 10L, Permission.VALIDATE_DOCUMENT));
 
         assertTrue(permissionService.hasPermission(
-            2L, 10L, Permission.DELETE_OWN_PENDING_DOCUMENT));
+            2L, 10L, Permission.DELETE_OWN_DOCUMENT));
 
         assertFalse(permissionService.hasPermission(
             2L, 10L, Permission.INVITE_MEMBER));
@@ -115,7 +115,7 @@ class PermissionServiceTest {
             3L, 10L, Permission.VIEW_OWN_DOCUMENTS));
 
         assertTrue(permissionService.hasPermission(
-            3L, 10L, Permission.DELETE_OWN_PENDING_DOCUMENT));
+            3L, 10L, Permission.DELETE_OWN_DOCUMENT));
 
         assertFalse(permissionService.hasPermission(
             3L, 10L, Permission.VIEW_ALL_DOCUMENTS));
