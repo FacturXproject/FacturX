@@ -67,35 +67,20 @@ export default function Layout({ children }) {
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: isMobile ? 'column' : 'row',
-      minHeight: '100vh',
-      background: '#f8f9fa',
-    }}>
+    <div className={`flex min-h-screen bg-[#f8f9fa] ${isMobile ? 'flex-col' : 'flex-row'}`}>
       {/* Barre du haut (mobile / tablette) */}
       {isMobile && (
-        <header style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 30,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          padding: '10px 16px',
-          background: '#ffffff',
-          borderBottom: '1px solid #e5e7eb',
-        }}>
+        <header className="sticky top-0 z-30 flex items-center gap-[10px] px-4 py-[10px] bg-white border-b border-[#e5e7eb]">
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
             aria-label="Ouvrir le menu"
-            style={{ display: 'flex', background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#1a2744' }}
+            className="flex bg-transparent border-0 cursor-pointer p-1 text-[#1a2744]"
           >
             <Menu size={22} />
           </button>
           <ShieldCheck size={22} color="#1a2744" strokeWidth={2.2} />
-          <span style={{ color: '#111827', fontWeight: 700, fontSize: '16px' }}>Factur-X</span>
+          <span className="text-[#111827] font-bold text-[16px]">Factur-X</span>
         </header>
       )}
 
@@ -103,123 +88,71 @@ export default function Layout({ children }) {
       {isMobile && menuOpen && (
         <div
           onClick={() => setMenuOpen(false)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 40 }}
+          className="fixed inset-0 bg-black/35 z-40"
         />
       )}
 
       {/* Sidebar */}
-      <aside style={{
-        width: '240px',
-        flexShrink: 0,
-        background: '#ffffff',
-        display: 'flex',
-        flexDirection: 'column',
-        borderRight: '1px solid #e5e7eb',
-        ...(isMobile && {
-          position: 'fixed',
-          top: 0,
-          bottom: 0,
-          left: 0,
-          zIndex: 50,
-          overflowY: 'auto',
-          transform: menuOpen ? 'translateX(0)' : 'translateX(-100%)',
-          transition: 'transform 0.2s ease',
-          visibility: menuOpen ? 'visible' : 'hidden',
-        }),
-      }}>
+      <aside
+        className={`w-[240px] shrink-0 bg-white flex flex-col border-r border-[#e5e7eb] ${
+          isMobile
+            ? `fixed top-0 bottom-0 left-0 z-50 overflow-y-auto transition-transform duration-200 ease-[ease] ${
+              menuOpen ? 'translate-x-0 visible' : '-translate-x-full invisible'
+            }`
+            : ''
+        }`}
+      >
         {/* Logo */}
-        <div style={{ padding: '22px 16px 18px', borderBottom: '1px solid #f3f4f6' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+        <div className="pt-[22px] px-4 pb-[18px] border-b border-[#f3f4f6]">
+          <div className="flex items-center gap-[9px]">
             <ShieldCheck size={24} color="#1a2744" strokeWidth={2.2} />
-            <div style={{ flex: 1 }}>
-              <div style={{ color: '#111827', fontWeight: 700, fontSize: '17px', letterSpacing: '-0.3px' }}>Factur-X</div>
-              <div style={{ color: '#6b7280', fontSize: '12px' }}>Conformité & Conversion</div>
+            <div className="flex-1">
+              <div className="text-[#111827] font-bold text-[17px] tracking-[-0.3px]">Factur-X</div>
+              <div className="text-[#6b7280] text-[12px]">Conformité & Conversion</div>
             </div>
             {isMobile && (
               <button
                 type="button"
                 onClick={() => setMenuOpen(false)}
                 aria-label="Fermer le menu"
-                style={{ display: 'flex', background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#6b7280' }}
+                className="flex bg-transparent border-0 cursor-pointer p-1 text-[#6b7280]"
               >
                 <X size={20} />
               </button>
             )}
           </div>
         </div>
-	  	{/* User profile */}
-		<div
-		onClick={() => navigate('/profile')}
-		style={{
-			display: 'flex',
-			alignItems: 'center',
-			gap: '10px',
-			padding: '14px 16px',
-			borderBottom: '1px solid #f3f4f6',
-			cursor: 'pointer',
-		}}
-		>
-		<div
-			style={{
-			width: '36px',
-			height: '36px',
-			borderRadius: '50%',
-			background: '#eff6ff',
-			display: 'flex',
-			alignItems: 'center',
-			justifyContent: 'center',
-			flexShrink: 0,
-			}}
-		>
-			<User size={19} color="#1a2744" />
-		</div>
 
-		<div style={{ minWidth: 0 }}>
-			<div
-			style={{
-				color: '#1a1a2e',
-				fontSize: '14px',
-				fontWeight: 600,
-				whiteSpace: 'nowrap',
-				overflow: 'hidden',
-				textOverflow: 'ellipsis',
-			}}
-			>
-			{user?.firstName} {user?.lastName}
-			</div>
+        {/* User profile */}
+        <div
+          onClick={() => navigate('/profile')}
+          className="flex items-center gap-[10px] px-4 py-[14px] border-b border-[#f3f4f6] cursor-pointer"
+        >
+          <div className="w-9 h-9 rounded-full bg-[#eff6ff] flex items-center justify-center shrink-0">
+            <User size={19} color="#1a2744" />
+          </div>
 
-			<div
-			style={{
-				color: '#6b7280',
-				fontSize: '11.5px',
-				whiteSpace: 'nowrap',
-				overflow: 'hidden',
-				textOverflow: 'ellipsis',
-			}}
-			>
-			{user?.email}
-			</div>
-		</div>
-</div>
+          <div className="min-w-0">
+            <div className="text-[#1a1a2e] text-[14px] font-semibold truncate">
+              {user?.firstName} {user?.lastName}
+            </div>
+            <div className="text-[#6b7280] text-[11.5px] truncate">
+              {user?.email}
+            </div>
+          </div>
+        </div>
+
         {/* Nav */}
-        <nav style={{ flex: 1, padding: '10px 0' }}>
+        <nav className="flex-1 py-[10px]">
           {navItems.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
               to={to}
-              style={({ isActive }) => ({
-                display: 'flex',
-                alignItems: 'center',
-                gap: '11px',
-                padding: '11px 16px',
-                textDecoration: 'none',
-                fontSize: '15.5px',
-                color: isActive ? '#1a2744' : '#6b7280',
-                background: isActive ? '#eff6ff' : 'transparent',
-                borderLeft: isActive ? '3px solid #4a9eff' : '3px solid transparent',
-                fontWeight: isActive ? 550 : 450,
-                transition: 'all 0.15s',
-              })}
+              className={({ isActive }) => `flex items-center gap-[11px] px-4 py-[11px] no-underline text-[15.5px] border-l-[3px] transition-all duration-150 ease-[ease] ${
+                isActive
+                  ? 'text-[#1a2744] bg-[#eff6ff] border-l-[#4a9eff] font-[550]'
+                  : 'text-[#6b7280] bg-transparent border-l-transparent font-[450]'
+              }`}
             >
               <Icon size={18} />
               {label}
@@ -228,22 +161,10 @@ export default function Layout({ children }) {
         </nav>
 
         {/* Logout */}
-        <div style={{ padding: '12px 0', borderTop: '1px solid #f3f4f6' }}>
+        <div className="py-3 border-t border-[#f3f4f6]">
           <button
             onClick={handleLogout}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '11px',
-              padding: '11px 16px',
-              width: '100%',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              color: '#6b7280',
-              fontSize: '15.5px',
-              textAlign: 'left',
-            }}
+            className="flex items-center gap-[11px] px-4 py-[11px] w-full bg-transparent border-0 cursor-pointer text-[#6b7280] text-[15.5px] text-left"
           >
             <LogOut size={18} />
             Déconnexion
@@ -252,21 +173,13 @@ export default function Layout({ children }) {
       </aside>
 
       {/* Main content */}
-      <main
-		style={{
-			flex: 1,
-			minWidth: 0,
-			overflow: 'auto',
-			display: 'flex',
-			flexDirection: 'column',
-		}}
-		>
-		<div style={{ flex: 1 }}>
-			{children}
-		</div>
+      <main className="flex-1 min-w-0 overflow-auto flex flex-col">
+        <div className="flex-1">
+          {children}
+        </div>
 
-		<Footer />
-	  </main>
+        <Footer />
+      </main>
     </div>
   );
 }

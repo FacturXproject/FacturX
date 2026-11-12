@@ -24,7 +24,14 @@ export default function ComplianceReport() {
     setError(null);
 
     api.get(`/documents/${documentId}/report`)
-      .then((response) => setReport(response.data || null))
+      .then((response) => {
+        // 204 : le document n'a encore jamais ete valide.
+        if (!response.data) {
+          setError("Aucune validation n'a encore été effectuée pour ce document.");
+          return;
+        }
+        setReport(response.data);
+      })
       .catch((err) => {
         console.error('Report error:', err);
         setError(err.response?.data?.message || "Impossible de charger le rapport de validation.");

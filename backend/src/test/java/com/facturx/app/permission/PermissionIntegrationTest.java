@@ -3,9 +3,11 @@ package com.facturx.app.permission;
 import com.facturx.app.organization.EmailService;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -13,6 +15,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 import com.facturx.app.AbstractIntegrationTest;
+import com.facturx.app.document.Document;
+import com.facturx.app.document.DocumentRepository;
+import com.facturx.app.document.DocumentStatus;
+import com.facturx.app.job.Job;
+import com.facturx.app.job.JobRepository;
+import com.facturx.app.job.JobStatus;
+import com.facturx.app.job.JobType;
 import com.facturx.app.organization.Invitation;
 import com.facturx.app.organization.InvitationRepository;
 import com.facturx.app.organization.InvitationStatus;
@@ -32,10 +41,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 class PermissionIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -55,6 +67,12 @@ class PermissionIntegrationTest extends AbstractIntegrationTest {
 
     @MockitoBean
     private EmailService emailService;
+
+    @Autowired
+    private DocumentRepository documentRepository;
+
+    @Autowired
+    private JobRepository jobRepository;
 
     private static String uniqueEmail(String label) {
         return label + "-" + UUID.randomUUID() + "@x.fr";
@@ -489,6 +507,61 @@ class PermissionIntegrationTest extends AbstractIntegrationTest {
             )
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.error").value("LAST_ADMIN_REQUIRED"));
+    }
+
+    // Admin : tout document. Comptable et client : leurs propres documents, sauf
+    // pendant un traitement. Un document deja passe par la file (jobs) se supprime.
+    @Test
+    void documentDeletionFollowsOwnershipAndStatus() throws Exception {
+        RegisteredUser admin = register("delete-admin");
+        RegisteredUser accountant = register("delete-accountant");
+        RegisteredUser client = register("delete-client");
+        Organization organization = createOrganization(admin);
+        addMember(organization, accountant, Role.ACCOUNTANT);
+        addMember(organization, client, Role.CLIENT);
+
+        // Le comptable supprime son document deja valide, passe par la file d'attente
+        Document validated = upload(accountant, organization);
+        validated.setStatus(DocumentStatus.VALID);
+        documentRepository.save(validated);
+        Job job = new Job();
+        job.setType(JobType.VALIDATION);
+        job.setDocument(validated);
+        job.setStatus(JobStatus.DONE);
+        jobRepository.save(job);
+        deleteDocument(accountant, validated).andExpect(status().isOk());
+        assertThat(documentRepository.findById(validated.getId())).isEmpty();
+
+        // Pas pendant un traitement
+        Document processing = upload(accountant, organization);
+        processing.setStatus(DocumentStatus.PROCESSING);
+        documentRepository.save(processing);
+        deleteDocument(accountant, processing).andExpect(status().isForbidden());
+
+        // Pas le document d'un autre membre
+        Document clientDocument = upload(client, organization);
+        deleteDocument(accountant, clientDocument).andExpect(status().isForbidden());
+
+        // L'admin supprime n'importe quel document
+        deleteDocument(admin, clientDocument).andExpect(status().isOk());
+    }
+
+    private Document upload(RegisteredUser user, Organization organization) throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "facture.pdf", "application/pdf",
+                "%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n".getBytes());
+        MvcResult result = mockMvc.perform(multipart("/api/documents?organizationId=" + organization.getId())
+                        .file(file).with(csrf()).cookie(user.session()))
+                .andExpect(status().isOk())
+                .andReturn();
+        long id = new tools.jackson.databind.ObjectMapper()
+                .readTree(result.getResponse().getContentAsString()).get("id").asLong();
+        return documentRepository.findById(id).orElseThrow();
+    }
+
+    private org.springframework.test.web.servlet.ResultActions deleteDocument(
+            RegisteredUser user, Document document) throws Exception {
+        return mockMvc.perform(delete("/api/documents/" + document.getId())
+                .with(csrf()).cookie(user.session()));
     }
 
     private record RegisteredUser(

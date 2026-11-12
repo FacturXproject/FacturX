@@ -147,66 +147,28 @@ export default function Dashboard({ onFileSelect }) {
   });
 
   return (
-    <div
-      style={{
-        padding: '24px 28px',
-        maxWidth: '900px',
-      }}
-    >
+    <div className="py-6 px-7 max-w-[900px]">
       {/* HEADER */}
-      <div style={{ marginBottom: '24px' }}>
-        <h1
-          style={{
-            margin: 0,
-            fontSize: '20px',
-            fontWeight: 700,
-            color: '#1a1a2e',
-          }}
-        >
+      <div className="mb-6">
+        <h1 className="m-0 text-[20px] font-bold text-[#1a1a2e]">
           Tableau de bord
         </h1>
 
-        <p
-          style={{
-            margin: '4px 0 0',
-            fontSize: '13px',
-            color: '#6b7280',
-          }}
-        >
+        <p className="mt-1 mb-0 text-[13px] text-[#6b7280]">
           Consultez vos documents récents.
         </p>
       </div>
 
       {/* DOCUMENTS */}
-      <div style={{ marginTop: '32px' }}>
-        <h2
-          style={{
-            margin: '0 0 12px',
-            fontSize: '14px',
-            fontWeight: 600,
-            color: '#1a1a2e',
-          }}
-        >
+      <div className="mt-8">
+        <h2 className="mt-0 mb-3 text-[14px] font-semibold text-[#1a1a2e]">
           5 derniers documents
         </h2>
 
-        <div
-          style={{
-            border: '1px solid #e5e7eb',
-            borderRadius: '8px',
-            overflow: 'hidden',
-            background: '#fff',
-          }}
-        >
-          <table
-            style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-              fontSize: '13px',
-            }}
-          >
+        <div className="border border-[#e5e7eb] rounded-lg overflow-hidden bg-white">
+          <table className="w-full border-collapse text-[13px]">
             <thead>
-              <tr style={{ background: '#f9fafb' }}>
+              <tr className="bg-[#f9fafb]">
                 {[
                   'Fichier',
                   'Organisation',
@@ -216,11 +178,7 @@ export default function Dashboard({ onFileSelect }) {
                 ].map((title) => (
                   <th
                     key={title}
-                    style={{
-                      padding: '10px 14px',
-                      textAlign: 'left',
-                      fontWeight: 600,
-                    }}
+                    className="px-[14px] py-[10px] text-left font-semibold"
                   >
                     {title}
                   </th>
@@ -231,64 +189,40 @@ export default function Dashboard({ onFileSelect }) {
             <tbody>
               {loading ? (
                 <tr>
-                  <td
-                    colSpan="5"
-                    style={{
-                      padding: '20px',
-                      textAlign: 'center',
-                      color: '#9ca3af',
-                    }}
-                  >
+                  <td colSpan="5" className="p-5 text-center text-[#9ca3af]">
                     Chargement...
                   </td>
                 </tr>
               ) : documents.length > 0 ? (
                 documents.map((doc) => (
-                  <tr
-                    key={doc.id}
-                    style={{
-                      borderTop: '1px solid #f3f4f6',
-                    }}
-                  >
+                  <tr key={doc.id} className="border-t border-[#f3f4f6]">
                     <td
                       onClick={() => handleDocumentClick(doc)}
-                      style={{
-                        padding: '10px 14px',
-                        cursor: 'pointer',
-                        fontWeight: 500,
-                        color: '#1a2744',
-                      }}
+                      className="px-[14px] py-[10px] cursor-pointer font-medium text-[#1a2744]"
                     >
                       {doc.filename}
                     </td>
 
-                    <td style={{ padding: '10px 14px' }}>
+                    <td className="px-[14px] py-[10px]">
                       {doc.organizationName}
                     </td>
 
-                    <td style={{ padding: '10px 14px' }}>
+                    <td className="px-[14px] py-[10px]">
                       {formatDate(doc.uploadedAt)}
                     </td>
 
-                    <td style={{ padding: '10px 14px' }}>
+                    <td className="px-[14px] py-[10px]">
                       {formatType(doc.type)}
                     </td>
 
-                    <td style={{ padding: '10px 14px' }}>
+                    <td className="px-[14px] py-[10px]">
                       <StatusBadge status={doc.status} />
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td
-                    colSpan="5"
-                    style={{
-                      padding: '20px',
-                      textAlign: 'center',
-                      color: '#9ca3af',
-                    }}
-                  >
+                  <td colSpan="5" className="p-5 text-center text-[#9ca3af]">
                     Aucun document
                   </td>
                 </tr>

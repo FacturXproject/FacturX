@@ -1,11 +1,19 @@
 package com.facturx.app.document;
 
+import com.facturx.app.job.JobRepository;
 import com.facturx.app.organization.Organization;
 import com.facturx.app.organization.OrganizationRepository;
 import com.facturx.app.user.User;
 import com.facturx.app.user.UserRepository;
+import com.facturx.app.websocket.DocumentStatusChangedEvent;
+import com.facturx.app.websocket.DocumentWebSocketHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -19,10 +27,14 @@ import com.facturx.app.permission.PermissionService;
 @Service
 public class DocumentService {
 
+    private static final Logger log = LoggerFactory.getLogger(DocumentService.class);
+
     private final DocumentRepository documentRepository;
     private final UserRepository userRepository;
     private final OrganizationRepository organizationRepository;
     private final PermissionService permissionService;
+    private final DocumentWebSocketHandler webSocketHandler;
+    private final JobRepository jobRepository;
 
     @Value("${app.storage.path:/app/uploads}")
     private String storageBasePath;
@@ -31,12 +43,16 @@ public class DocumentService {
             DocumentRepository documentRepository,
             UserRepository userRepository,
             OrganizationRepository organizationRepository,
-            PermissionService permissionService) {
+            PermissionService permissionService,
+            DocumentWebSocketHandler webSocketHandler,
+            JobRepository jobRepository) {
 
         this.documentRepository = documentRepository;
         this.userRepository = userRepository;
         this.organizationRepository = organizationRepository;
         this.permissionService = permissionService;
+        this.webSocketHandler = webSocketHandler;
+        this.jobRepository = jobRepository;
     }
 
     public Document upload(MultipartFile file, Long organizationId, Long ownerId) {
@@ -73,10 +89,26 @@ public class DocumentService {
             document.setStoragePath(targetPath.toString());
             document.setStatus(DocumentStatus.UPLOADED);
 
-            return documentRepository.save(document);
+            Document saved = documentRepository.save(document);
+            notifyUploaded(saved);
+            return saved;
 
         } catch (IOException e) {
             throw new RuntimeException("Failed to store file", e);
+        }
+    }
+
+    // F15 : les autres membres de l'organisation voient le nouveau document sans recharger.
+    private void notifyUploaded(Document document) {
+        try {
+            webSocketHandler.broadcast(new DocumentStatusChangedEvent(
+                    "document.status.changed",
+                    document.getId(),
+                    document.getOrganization().getId(),
+                    document.getStatus(),
+                    document.getOwner().getId()));
+        } catch (Exception e) {
+            log.warn("WebSocket: failed to notify upload of document {}", document.getId(), e);
         }
     }
 
@@ -146,6 +178,9 @@ public class DocumentService {
         }
     }
 
+    // Admin : tout document. Comptable et client : leurs propres documents, sauf pendant
+    // un traitement (QUEUED / PROCESSING) pour ne pas retirer le fichier a un job en cours.
+    @Transactional
     public void deleteDocument(Long documentId,Long currentUserId)
     {
         Document document = getDocument(documentId);
@@ -158,35 +193,42 @@ public class DocumentService {
             Permission.DELETE_ANY_DOCUMENT
         );
 
-        boolean canDeleteOwnPending = permissionService.hasPermission(
+        boolean canDeleteOwn = permissionService.hasPermission(
             currentUserId,
             organizationId,
-            Permission.DELETE_OWN_PENDING_DOCUMENT
+            Permission.DELETE_OWN_DOCUMENT
         );
 
         boolean isOwner =
             document.getOwner() != null
             && document.getOwner().getId().equals(currentUserId);
 
-        boolean isPending =
-            document.getStatus() == DocumentStatus.UPLOADED;
+        boolean inProgress =
+            document.getStatus() == DocumentStatus.QUEUED
+            || document.getStatus() == DocumentStatus.PROCESSING;
 
         if (!canDeleteAny
-                && !(canDeleteOwnPending && isOwner && isPending)) {
+                && !(canDeleteOwn && isOwner && !inProgress)) {
             throw new com.facturx.app.permission.AccessDeniedException();
         }
 
-        try {
-            Files.deleteIfExists(
-                Paths.get(document.getStoragePath())
-            );
-        } catch (IOException e) {
-            throw new RuntimeException(
-                "Failed to delete stored file",
-                e
-            );
-        }
-
+        // Les jobs referencent le document (cle etrangere) : sans cela la suppression
+        // d'un document deja valide via la file d'attente echouait (500).
+        jobRepository.deleteByDocument_Id(documentId);
         documentRepository.delete(document);
+
+        // Le fichier n'est supprime qu'une fois la suppression en base validee : un echec
+        // en base ne laisse plus un document sans fichier.
+        Path storagePath = Paths.get(document.getStoragePath());
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    Files.deleteIfExists(storagePath);
+                } catch (IOException e) {
+                    log.warn("Failed to delete stored file {}", storagePath, e);
+                }
+            }
+        });
     }
 }

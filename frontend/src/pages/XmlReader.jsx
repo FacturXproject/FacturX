@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FileCode2, Eye, Building2 } from 'lucide-react';
 
 import api from '../services/api';
+import { canDeleteDocument } from '../utils/documentPermissions';
 
 export default function XmlReader() {
 	const navigate = useNavigate();
@@ -14,6 +15,10 @@ export default function XmlReader() {
 	const [loadingOrganizations, setLoadingOrganizations] = useState(true);
 	const [loadingDocuments, setLoadingDocuments] = useState(false);
 	const [error, setError] = useState(null);
+
+	const currentOrganization = organizations.find(
+		(organization) => String(organization.id) === String(selectedOrganizationId)
+	);
 
 	useEffect(() => {
 		async function loadOrganizations() {
@@ -30,11 +35,15 @@ export default function XmlReader() {
 							return {
 								id,
 								name: details.data.name ?? `Organisation #${id}`,
+								role: organization.role,
+								userId: organization.userId,
 							};
 						} catch {
 							return {
 								id,
 								name: `Organisation #${id}`,
+								role: organization.role,
+								userId: organization.userId,
 							};
 						}
 					})
@@ -485,6 +494,11 @@ export default function XmlReader() {
 											Lire la facture
 											</button>
 
+											{canDeleteDocument(
+												document,
+												currentOrganization?.role,
+												currentOrganization?.userId
+											) && (
 											<button
 											onClick={() => handleDeleteDocument(document.id)}
 											style={{
@@ -500,6 +514,7 @@ export default function XmlReader() {
 											>
 											Supprimer
 											</button>
+											)}
 										</div>
 										</td>
 									</tr>

@@ -9,6 +9,7 @@ import {
   Eye,
   ArrowDownUp,
 } from 'lucide-react';
+import { canDeleteDocument } from '../utils/documentPermissions';
 import api from '../services/api';
 import DocumentUploadForm from '../components/DocumentUploadForm';
 import { useDocumentStatusEvent } from '../context/DocumentWebSocketContext';
@@ -1107,12 +1108,7 @@ const totalPages = Math.ceil(documents.length / documentsPerPage);
 
                 <tbody>
                   {visibleDocuments.map((doc) => {
-                    const canDelete =
-                      currentRole === 'ADMIN' ||
-                      (
-                        String(doc.ownerId) === String(currentUserId) &&
-                        doc.status === 'UPLOADED'
-                      );
+                    const canDelete = canDeleteDocument(doc, currentRole, currentUserId);
 
                     return (
                       <tr

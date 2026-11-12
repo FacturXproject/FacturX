@@ -1,0 +1,136 @@
+BUGS FIX #4
+===========
+
+FOR THE TEAM
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+- application.properties has no default DB credentials any more. Docker is not
+  affected (values come from .env). To run the backend without Docker, set
+  DB_USER and DB_PASSWORD yourself.
+- GET /api/documents/{id}/report now returns 204 (was 404) when the document
+  was never validated. The public API (/api/public/v1) still returns 404.
+- Document deletion rule changed: accountants and clients can now delete their
+  own documents in any status, except while they are processed (QUEUED,
+  PROCESSING). Admins still delete any document. Permission renamed
+  DELETE_OWN_PENDING_DOCUMENT -> DELETE_OWN_DOCUMENT.
+- README, Individual Contributions: avalent2, please fill in your "Challenges"
+  line (currently "[Need to fill the answer]").
+
+
+
+
+PROBLEMS FOUND
+
+1. Default credentials in the repository
+   application.properties had ${DB_USER:postgres} and ${DB_PASSWORD:postgres}.
+   The subject requires credentials to be stored only in .env.
+
+2. Red 404 error in the browser console on the document page
+   Opening a document that was never validated called /report, which answered
+   404. It happened after every upload.
+
+3. Tailwind barely used
+   Only 4 pages used Tailwind; Layout (visible on every page) and the Dashboard
+   used inline styles only.
+
+4. README incomplete (sections required by the subject)
+   No communication channel, no data types, no "how" for each module, no
+   versions in Prerequisites, no challenges per member, no project parts in
+   AI usage.
+
+5. New uploads not shown live to other members
+   An upload sent no WebSocket event: other members of the organization saw the
+   new document only after reloading the page. The README did not say clearly
+   that real-time covers documents only.
+
+6. Documents could not be deleted
+   - An accountant (or client) could delete their own document only while it was
+     UPLOADED. "Vérifier" and "Convertir" validate right away, so the uploader
+     could never delete it.
+   - Deleting a document validated through the queue failed with 500 for every
+     role (foreign key from the jobs table).
+   - The file was deleted from disk before the database row: when the database
+     delete failed, the document stayed in the list without its file.
+   - "Lecture XML" showed "Supprimer" on every document, even when the user was
+     not allowed to delete it (click -> 403).
+   - No document described who can delete what.
+
+
+
+
+FIXES
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+1. application.properties: ${DB_USER} and ${DB_PASSWORD} without defaults.
+   README "Local development without Docker" updated.
+
+2. DocumentController: /report returns 204 when there is no validation yet
+   (ValidationReportService.findReportForDocument). The "Rapport" page shows
+   "Aucune validation n'a encore été effectuée pour ce document." instead of an
+   empty page.
+
+3. Layout.jsx and Dashboard.jsx converted to Tailwind classes (no inline style
+   left). Same look: before/after screenshots compared pixel by pixel.
+
+4. README:
+   - Project Management: Slack
+   - Database Schema: key fields and data types (from the real database)
+   - Modules: new "How" column
+   - Prerequisites: Docker / Compose v2, OpenSSL versions
+   - Individual Contributions: challenges (sabenzar, feturbin, yseddiki;
+     avalent2 and iso-brie to fill in)
+   - AI usage: parts of the project (tests for F01, F08, F09, F11, F12, F17;
+     all bug-fix PRs)
+   - 204 responses of /me and /report documented
+
+5. DocumentService.upload sends a "document.status.changed" event with status
+   UPLOADED (same permission filter as the other events). The dashboard and the
+   organization page already reload their list for an unknown document
+   (BUGS_FIX_3), so the new document appears live. Uploads through the public
+   API send the event too.
+   README F15: real-time covers documents only (new uploads and status
+   changes), not organizations, members or invitations.
+
+6. DocumentService.deleteDocument:
+   - new rule: admin deletes any document; accountant and client delete their
+     own documents except while QUEUED or PROCESSING;
+   - the document's jobs are deleted first, in the same transaction;
+   - the file is deleted from disk only after the database commit.
+   Frontend: one shared rule (utils/documentPermissions.js) used by the
+   organization page and "Lecture XML" (button hidden when not allowed).
+   README: "Who can delete a document" table in the API Reference.
+
+
+
+
+
+TESTS
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+New / updated backend tests:
+- DocumentFlowTest.uploadingAValidPdfSucceeds: checks the UPLOADED WebSocket
+  event
+- DocumentValidationFlowTest.reportForADocumentNeverValidatedReturnsNoContent
+  (renamed, 404 -> 204)
+- PermissionIntegrationTest.documentDeletionFollowsOwnershipAndStatus: own
+  validated document with a job deleted; document being processed and another
+  member's document refused (403); admin deletes any
+New frontend test:
+- documentPermissions.test.js: delete rule for each role and status
+
+Results:
+- Backend (mvn test): 219/219 passed (also checked without default DB
+  credentials).
+- Frontend (vitest): 113/113 passed; no lint error in changed files; build OK.
+- Team E2E scripts: F13 34/34, F16 33/33, F17 30/30, F20 43/43.
+- Tailwind: before/after screenshots (dashboard, documents, profile, mobile
+  menu, hover; 1280px and 375px) identical, except 10 anti-aliasing pixels on a
+  rounded corner.
+- Manual checks in the browser:
+  backend starts with credentials from .env only;
+  two users, same organization: an upload appears live for the other user,
+  then its status changes live;
+  all pages walked at 1280px and 375px: no React warning, no 404 on the
+  document page, no horizontal page scroll;
+  deletion, 3 roles: own document deleted from the organization page;
+  accountant deletes a document uploaded through "Vérifier" (was impossible);
+  admin deletes a document validated through the queue (was 500);
+  "Lecture XML": no "Supprimer" on another member's document;
+  no file left on disk without a document, no document left without a file.

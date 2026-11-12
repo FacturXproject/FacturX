@@ -1,6 +1,8 @@
 package com.facturx.app.document;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -10,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.facturx.app.AbstractIntegrationTest;
+import com.facturx.app.websocket.DocumentWebSocketHandler;
 import jakarta.servlet.http.Cookie;
 import java.util.UUID;
 
@@ -19,6 +22,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -34,6 +38,9 @@ class DocumentFlowTest extends AbstractIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @MockitoSpyBean
+    private DocumentWebSocketHandler webSocketHandler;
 
     private static String uniqueEmail(String label) {
         return label + "-" + UUID.randomUUID() + "@x.fr";
@@ -154,7 +161,7 @@ class DocumentFlowTest extends AbstractIntegrationTest {
                 validPdfBytes()
         );
 
-        mockMvc.perform(
+        MvcResult result = mockMvc.perform(
                         multipart(
                                 "/api/documents?organizationId=" + orgId
                         )
@@ -169,7 +176,17 @@ class DocumentFlowTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.status")
                         .value("UPLOADED"))
                 .andExpect(jsonPath("$.organizationId")
-                        .value(orgId));
+                        .value(orgId))
+                .andReturn();
+
+        // F15 : les autres membres sont notifies du nouveau document.
+        long documentId = new ObjectMapper()
+                .readTree(result.getResponse().getContentAsString())
+                .get("id").asLong();
+        verify(webSocketHandler).broadcast(argThat(event ->
+                event.documentId() == documentId
+                        && event.organizationId() == orgId
+                        && event.status() == DocumentStatus.UPLOADED));
     }
 
     @Test
