@@ -436,7 +436,9 @@ API (F17).
   modules should interact so that the project works reliably and stays stable.
 - **avalent2** (PO) — invitations and members, document list and statuses, real-time
   WebSocket, export / import.
-  *Challenges:* [Need to fill the answer]
+  *Challenges:* one challenge was testing real-time document updates across different
+  browser sessions. I had to check that each session received the right updates and
+  that the connection behaved as expected when users logged in or out.
 - **yseddiki** — organizations, document upload, Factur-X generation (with feturbin),
   advanced search.
   *Challenges:* time management. It was hard to fit my share of the work into about
