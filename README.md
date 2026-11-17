@@ -284,8 +284,13 @@ users ──1..n──▶ organization_members ◀──1..n── organizations
   └──1..n──▶ documents ◀───────────1..n────────────┘
                  │
                  ├──1..n──▶ jobs
-                 ├┄┄1..n┄┄▶ validation_runs ──1..n──▶ validation_errors ┄┄rule_code┄┄▶ rule_catalog
-                 ├┄┄1..n┄┄▶ draft_invoices ──1..n──▶ extracted_fields, draft_lines, draft_taxes
+                 ├┄┄1..n┄┄▶ validation_runs ──1..n──▶ validation_errors
+                 │                                    ┊ rule_code
+                 │                                    ▼
+                 │                                    rule_catalog
+                 ├┄┄1..n┄┄▶ draft_invoices ─┬─1..n──▶ extracted_fields
+                 │                          ├─1..n──▶ draft_lines
+                 │                          └─1..n──▶ draft_taxes
                  └┄┄1..n┄┄▶ generated_invoices (source and generated document)
 ```
 
