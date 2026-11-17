@@ -277,26 +277,32 @@ PostgreSQL 17, managed through JPA / Hibernate. HTTP sessions are stored in the
 `spring_session` tables created by Spring Session JDBC.
 
 ```text
-users ─────────────┐
-  │                │
-  │ 1..n           │ 1..n
-  ▼                ▼
-organization_members ◀── n..1 ── organizations ── 1..n ──▶ invitations
-                                     │
-                                     ├── 1..n ──▶ api_keys (owner_id → users)
-                                     │
-                                     └── 1..n ──▶ documents (owner_id → users)
-                                                     │
-                     ┌───────────────┬───────────────┼────────────────────┐
-                     ▼               ▼               ▼                    ▼
-                   jobs        validation_runs   draft_invoices    generated_invoices
-                                     │               │
-                                     ▼               ├──▶ extracted_fields
-                             validation_errors       ├──▶ draft_lines
-                                     │               └──▶ draft_taxes
-                                     ▼
-                              rule_catalog (by rule_code)
+users ──1..n──▶ organization_members ◀──1..n── organizations ──1..n──▶ invitations
+  │                                                │
+  ├──1..n──▶ api_keys ◀────────────1..n────────────┤
+  │                                                │
+  └──1..n──▶ documents ◀───────────1..n────────────┘
+                 │
+                 ├──1..n──▶ jobs
+                 ├┄┄1..n┄┄▶ validation_runs ──1..n──▶ validation_errors
+                 │                                    ┊ rule_code
+                 │                                    ▼
+                 │                                    rule_catalog
+                 ├┄┄1..n┄┄▶ draft_invoices ─┬─1..n──▶ extracted_fields
+                 │                          ├─1..n──▶ draft_lines
+                 │                          └─1..n──▶ draft_taxes
+                 └┄┄1..n┄┄▶ generated_invoices (source and generated document)
 ```
+
+How to read it:
+
+- `A ──1..n──▶ B`: one row of `A` is linked to many rows of `B`; `B` holds the foreign
+  key (for example `documents.organization_id` → `organizations`).
+- `organization_members` is a **join table**: it links users and organizations
+  (many-to-many) and stores the user's role in each organization.
+- `users` → `api_keys` and `users` → `documents` are the owner (`owner_id`).
+- Solid line (`──`): foreign key in the database. Dotted line (`┄┄`): the row stores the
+  id or the code of the other table, without a database constraint.
 
 | Table | Main columns | Purpose |
 |---|---|---|
@@ -436,7 +442,9 @@ API (F17).
   modules should interact so that the project works reliably and stays stable.
 - **avalent2** (PO) — invitations and members, document list and statuses, real-time
   WebSocket, export / import.
-  *Challenges:* [Need to fill the answer]
+  *Challenges:* one challenge was testing real-time document updates across different
+  browser sessions. I had to check that each session received the right updates and
+  that the connection behaved as expected when users logged in or out.
 - **yseddiki** — organizations, document upload, Factur-X generation (with feturbin),
   advanced search.
   *Challenges:* time management. It was hard to fit my share of the work into about
